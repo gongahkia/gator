@@ -9,19 +9,27 @@ struct ExactDecisionButton: View {
     let enabled: Bool
     let action: () -> Void
     var body: some View {
-        NativeDecisionControl(title: title, enabled: enabled, action: action)
-            .focusable(enabled)
-            .disabled(!enabled)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(title)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Space or an explicit press chooses this exact decision. Return never authorizes.")
-            .accessibilityAction { if enabled { action() } }
-            .onKeyPress(.return) { .handled }
-            .onKeyPress(.space, phases: .down) { press in
-                guard enabled, press.modifiers.isEmpty else { return .ignored }
-                action(); return .handled
-            }
+        if enabled {
+            NativeDecisionControl(title: title, enabled: true, action: action)
+                .focusable()
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(title)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Space or an explicit press chooses this exact decision. Return never authorizes.")
+                .accessibilityAction { action() }
+                .onKeyPress(.return) { .handled }
+                .onKeyPress(.space, phases: .down) { press in
+                    guard press.modifiers.isEmpty else { return .ignored }
+                    action(); return .handled
+                }
+        } else {
+            // A standard disabled native control exposes AXEnabled correctly.
+            // A trait-only custom AX proxy can otherwise appear enabled even
+            // when its callback is guarded. There is no decision action here.
+            Button(title, action: {}).disabled(true)
+                .accessibilityLabel(title)
+                .accessibilityHint("Unavailable. Inspect the current owner and exact review before deciding.")
+        }
     }
 }
 

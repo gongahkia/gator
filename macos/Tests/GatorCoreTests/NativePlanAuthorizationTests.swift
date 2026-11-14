@@ -91,7 +91,7 @@ func executableReview(_ summary: JSONValue) -> JSONValue {
     let review = try await inspectFixturePlan(app, fixture)
     let first = Task { await app.authorizePlan(owner: owner, review: review, action: .approve) }
     let duplicate = Task { await app.authorizePlan(owner: owner, review: review, action: .approve) }
-    try await waitUntil { owner.planOperation != nil }
+    try await waitUntil { owner.planOperation?.phase == .acknowledged }
     let id = try #require(owner.planOperation?.id)
     await fixture.patch(["task_plan_result": .object(["request_id": .string(id), "error": .string("original recovery scope changed")])])
     await first.value; await duplicate.value
@@ -180,7 +180,7 @@ func executableReview(_ summary: JSONValue) -> JSONValue {
     await app.newConversation(); let second = app.current
     let reviewB = try await inspectFixturePlan(app, other)
     let attempt = Task { await app.authorizePlan(owner: second, review: reviewB, action: .approve) }
-    try await waitUntil { second.planOperation != nil }
+    try await waitUntil { second.planOperation?.phase == .acknowledged }
     let idB = try #require(second.planOperation?.id)
     await first.patch(["task_plan_result": .object(["request_id": .string(idA)])])
     try await waitUntil { original.planOperation?.resultConfirmed == true }
@@ -230,4 +230,27 @@ func executableReview(_ summary: JSONValue) -> JSONValue {
     #expect(owner.submission?.phase == .accepted)
     #expect(await fixture.sent("task_plan").isEmpty)
     #expect(await app.shutdown(confirmed: true))
+}
+
+@Test func nativePlanReceiptRetentionBoundsCompletedHistoryWithoutDroppingUncertainty() async throws {
+    let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+    let store = NativeDraftStore(directory: root, profile: "bounded-plan-receipts")
+    var archive = NativeArchive(); archive.selectedConversationID = "chat-010"
+    var records: [String: NativePlanOperation] = [:]
+    for index in 0..<140 {
+        let owner = String(format: "chat-%03d", index)
+        let identity = try #require(NativePlanIdentity(conversationID: owner, summary: planSummary()))
+        var record = NativePlanOperation(id: UUID().uuidString, nonce: UUID().uuidString, identity: identity, generation: UUID(), action: .approve)
+        record.phase = index < 3 ? .uncertain : .completed
+        records["conversation:" + owner] = record
+    }
+    archive.planOperationsByContext = records
+    try await store.save(archive)
+    let loaded = try await store.load()
+    #expect(loaded.version == 4); #expect(loaded.planOperationsByContext?.count == 35)
+    for index in 0..<3 {
+        let context = "conversation:" + String(format: "chat-%03d", index)
+        #expect(loaded.planOperationsByContext?[context]?.id == records[context]?.id)
+    }
+    #expect(loaded.planOperationsByContext?["conversation:chat-010"]?.id == records["conversation:chat-010"]?.id)
 }

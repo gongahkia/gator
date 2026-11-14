@@ -89,6 +89,17 @@ actor NativeDraftStore {
         var archive = original
         if archive.planOperationsByContext?.isEmpty == false { archive.version = 4 }
         if archive.drafts.values.contains(where: { $0.correction != nil || $0.planFirst == true }) { archive.version = max(3, archive.version) }
+        if let operations = archive.planOperationsByContext {
+            // Never let terminal UI receipts grow into an unreadable archive.
+            // Unconfirmed authorizations are retained, not evicted for space.
+            let retained = operations.filter { $0.value.blocksAuthorization || [.accepted, .working, .waitingReview].contains($0.value.phase) }
+            guard retained.count <= 128 else { throw BridgeFailure("Too many unconfirmed native plan operations. Inspect their original owners before starting more; saved data was kept.") }
+            let selected = "conversation:" + archive.selectedConversationID
+            let terminal = operations.filter { retained[$0.key] == nil }.sorted {
+                if $0.key == selected { return true }; if $1.key == selected { return false }; return $0.key > $1.key
+            }
+            archive.planOperationsByContext = retained.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - retained.count)).map { ($0.key, $0.value) })) { current, _ in current }
+        }
         let cutoff = Date().addingTimeInterval(-7 * 86400)
         let keep = archive.drafts.filter { $0.value.updated >= cutoff || $0.key == archive.pending?.context || archive.pendingByContext?[$0.key] != nil }
             .sorted { $0.value.updated > $1.value.updated }

@@ -9,7 +9,7 @@ Plan First already existed and remains optional, conversation-specific and captu
 1. **Review:** `task_plan.inspect` supplies the actual owner/task/revision/digest/request ID. Only its matching `task_plan_result.review` populates a native exact read. The native read captures owner generation, focus epoch, complete task summary and projected scope/recovery context.
 2. **Explicit authorization:** Approve & Start sends `action: approve`; Go can immediately dispatch. It is never labeled approval-only. Start Approved Plan sends `action: start` only after a fresh Go read reports `state: queued`, `phase: approved`. Go's validated approved phase represents the retained revision/digest-bound approval; no imaginary approval token/boolean was added.
 3. **Dispatch:** the existing shared coordinator serializes authorization with session transitions/admissions. It checks the selected original owner, no competing controls and the three-working/four-cached limits. Pending native metadata is persisted before a send. State and capacity are checked again after that storage await.
-4. **Execution:** transport acknowledgement only projects acknowledged. Matching result ID projects Go acceptance/rejection; the exact task summary's running/dispatching state projects execution. Completion/failure/stopping comes from that same task, not another run or the presence of plan steps. Plan approval does not approve tool actions; existing exact action tokens remain required.
+4. **Execution:** transport acknowledgement only projects acknowledged. Matching result ID projects Go acceptance/rejection; the exact task summary's running/dispatching state projects execution. Completion/failure/stopping comes from that same task, not another run or the presence of plan steps. Plan approval does not approve tool actions; existing exact action tokens remain required. Plan-preparation admission is labeled separately: Go also uses its running flag during preparation, which must not be mistaken for reviewed execution.
 5. **Recovery:** startup restores state and never sends approve/start. Unconfirmed native IDs survive restart. A replacement owner plus a fresh exact inspection can reconcile retained uncertainty without replay. A queued approved plan needs a new explicit Start. A dispatched/completed/cancelled/unapproved plan cannot use Start.
 
 ```mermaid
@@ -42,7 +42,7 @@ The inspector displays objective, outcome, ordered proposed steps, declared effe
 | `Sources/GatorMac/TaskInspectorView.swift` | Existing contextual inspector embeds the completed review; stale reads stay visibly stale; inspection/revision/back navigation opts into native keyboard focus. |
 | `Sources/GatorMac/ExactDecisionButton.swift` | Shared exact-decision control: named SwiftUI focus/accessibility element over the guarded native button; explicit Space/click/accessibility press; Return/keypad Enter guard; Tab exit and focus scrolling. |
 | `Sources/GatorMac/ConversationView.swift` | Concise original-owner plan operation status and inspectable uncertain request identity; existing conversation surface retained. |
-| `Tests/GatorCoreTests/NativePlanAuthorizationTests.swift` | New: eleven focused protocol/result/ownership/freshness/capacity/persistence/duplicate-input tests. |
+| `Tests/GatorCoreTests/NativePlanAuthorizationTests.swift` | New: thirteen focused protocol/result/ownership/freshness/capacity/persistence/duplicate-input tests. |
 | `Tests/GatorCoreTests/NativePlanIntegrationTests.swift` | New: four real Go/coordinator integration journeys, including independent Go rejection of invalid identities and foreground misuse. |
 | `Tests/GatorCoreTests/Fixtures/plan-provider.mjs` | New: disposable local provider, actual Go plan preparation/revision/routing and file-held execution; no connected services or tool writes. |
 | `Tests/GatorCoreTests/Fixtures/retained-plan/main.go` | New test setup only: calls Go's actual `Store.ApproveTaskPlan` after the owner exits, retaining approval without dispatch. It does not hand-edit authorization JSON or change application Go behavior. |
@@ -89,14 +89,14 @@ GATOR_TEST_BINARY=/tmp/gator-native-runtime bun test --preload ./scripts/preload
 | Full requested Go package tests | PASS: `cmd/gator` 157.251 s; `internal/workapp` 42.243 s. |
 | Host/session/draft/upload/policy tests | PASS: 63, zero failed/skipped. |
 | Swift build | PASS: Swift 6.1.2 / macOS 15.5 SDK, minimum macOS 15.0. |
-| Full Swift suite | PASS: 65 tests, 13.893 s; all 50 earlier tests retained, eleven new authorization tests and four new real Go tests. |
+| Full Swift suite | PASS: 67 tests, 15.240 s; all 50 earlier tests retained, thirteen new authorization tests and four new real Go tests. |
 | Main targeted TUI regressions | PASS: 52 tests / 979 assertions / 9 files, 116.21 s. |
 | Additional TUI exact plan controls and request recovery | PASS: 7 tests / 71 assertions / 2 files, 18.60 s. Includes actual Go approve/start and stale-review rejection. |
 | Development package | PASS: native executable and real Go runtime bundled; `Info.plist` lint passed. |
 
 Logs: `/tmp/gator-native-t04-{go,host,build,tests,package,tui,tui-plan}.log`. No live model endpoint, real account or email action was used. Full repository suites beyond those listed were not run. Packaging refuses existing destinations; rebuild to a fresh path rather than overwrite a running app or a preserved earlier tranche.
 
-One early uncertainty unit fixture used an 80 ms timeout for both read and control. Under concurrent tests that expired the read before its controlled result. The fixture now establishes the read with a normal bound and then disconnects after acknowledgement to exercise actual uncertain admission. The separate timeout/late-result case still exercises timeout without replay. No production deadline was relaxed and no test was skipped.
+One early uncertainty unit fixture used an 80 ms timeout for both read and control. Under concurrent tests that expired the read before its controlled result. The fixture now establishes the read with a normal bound and then disconnects after acknowledgement to exercise actual uncertain admission. The separate timeout/late-result case still exercises timeout without replay. Response fixtures also wait for an actual frame acknowledgement before injecting a matching result, rather than treating creation of a local pending record as a sent frame. No production deadline was relaxed and no test was skipped.
 
 ## Real Go integration evidence
 
@@ -106,6 +106,44 @@ One early uncertainty unit fixture used an 80 ms timeout for both read and contr
 - `realGoRejectsWrongPlanIdentitiesAndUnapprovedStartIndependentlyOfNativeGuards`: test-only typed transport access to the same managed Go process deliberately bypasses native presentation guards. Go rejects wrong conversation/task/revision/digest, Start on an unapproved plan and approval without foreground ownership. Fresh correct approval through the coordinator then executes once.
 
 Each fixture uses isolated configuration/state/native drafts, a whitelisted environment and a local controlled provider. There are no external credentials, connected accounts, emails or destructive tools. Setup uses Go's actual stores/contracts; production code never executes the setup helper.
+
+## Actual launched native journeys
+
+All final journeys used `/tmp/Gator-Native-Tranche04-Ready.app` and its bundled Go executable with disposable state/configuration and local controlled providers. The native drivers used macOS Accessibility and targeted keyboard events; these are real AppKit/SwiftUI interactions, not mock Swift state. No human VoiceOver speech test is implied.
+
+Machine-local sources and reproducible commands are retained on this Mac:
+
+```sh
+swiftc /tmp/gator-native-t04-ax.swift -o /tmp/gator-native-t04-ax
+python3 /tmp/gator-native-tranche04-journeys.py new
+python3 /tmp/gator-native-tranche04-journeys.py revised
+python3 /tmp/gator-native-tranche04-journeys.py restored
+python3 /tmp/gator-native-t04-action-regression.py action
+```
+
+Run from the repository root; the retained-approval helper above and Accessibility/event-posting permission are prerequisites. The last regression driver reuses the existing `/tmp/gator-native-ax` helper for its keyboard/AX operations. These temporary drivers are verification artifacts, not application dependencies. Persistent Go/coordinator reproduction is in the Swift integration tests.
+
+| Journey | Final result and evidence root |
+| --- | --- |
+| A — new reviewed plan | PASS, exit 0: `/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-native-tranche04-ui-xvru8ijw` |
+| B — revised plan | PASS, exit 0: `/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-native-tranche04-ui-d0fl1izl` |
+| C — restored approval | PASS, exit 0: `/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-native-tranche04-ui-9zuu6l1d` |
+| D — automated native accessibility/keyboard | PASS for the enumerated controls below in A/B/C; physical human acceptance remains partial. |
+| Earlier action-correction/native-button regression | PASS, exit 0: `/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-native-tranche03-ui-dw32ke5y` |
+
+Each root retains `journey.json`, controlled provider traces, native draft/operation records and images. Logs: `/tmp/gator-native-t04-native-{new,revised,restored,action-regression}.log`.
+
+**A:** native Plan First preparation produced the real proposal. Full inspection exposed objective/steps/effects/budget. Tab reached the named Approve & Start control; Shift-Tab returned to Back to Conversation. Return while actually keyboard-focused produced zero execution. Compact/full presentations shared the same owner/read. Explicit native activation produced a matching result and actual running request, with exactly one provider execution. An ordinary conversation in another owner responded while that work remained running. Quit warned about the background owner; Keep Gator Open preserved it. Dismissing both normal and menu-bar panel windows left both original Go PIDs alive and the original request journal running. Completion while dismissed did not change selection. Returning retained the result and both conversation-specific drafts. Final Quit reaped all owners.
+
+**B:** the original exact read could request a correction but did not authorize it. Go retained a changed revision/digest (revision 1 to 3) on the same task. The old visible control was actually AX-disabled. Fresh inspection enabled approval of the replacement; execution count was exactly one. Completion and the unrelated draft remained available.
+
+**C:** the native app exited before fixture setup called Go's actual Store approval API. Reopening the same conversation showed an approved queued plan with zero execution and no automatic start. Fresh inspection offered only Start Approved Plan. Keyboard-focused Return did not start it; explicit Space did. The retained approval executed exactly once, then completion and guarded subprocess cleanup were observed.
+
+**D:** actual Enter/Shift-Enter, Tab/Shift-Tab, named control focus, Return safety, explicit Space, Command-I, Command-L/Escape, draft restoration, stale disabled state and native review scrolling were exercised. Current Full Keyboard Access was false throughout: the repair is app-local, not a global preference change. A successful direct AX set-focused response was not treated as keyboard-focus evidence; the driver uses actual Tab and checks the focused element's name.
+
+The additional action regression exercised the shared button after its accessibility changes: actual Tab reached Approve Exact Action, Return did not approve; Go-managed correction retained its child owner; replacement required a new exact token; actual keyboard Space declined it with zero fake sends. Original work/drafts survived, background completion was retained and both Go owners were reaped.
+
+The fully rendered revised-plan and restored-approval screenshots were visually inspected, including readable budgets and distinct authorization explanations. One new-plan capture after presentation switching was partial and is excluded from visual acceptance evidence; its full content, focus and controls were verified through the actual native AX tree and Go journal. Manual visual inspection across presentation switches remains an operator check. Compilation and partial captures are not offered as visual proof.
 
 ## Requested scenario ledger
 
@@ -123,7 +161,7 @@ Each fixture uses isolated configuration/state/native drafts, a whitelisted envi
 
 Read-only preference inspection reported Reduce Motion **false**, Increase Contrast **false**, Full Keyboard Access **false**, preferred body font **13 pt**. VoiceOver was not running. No system setting or input source was changed.
 
-The focused native pass found and repaired an actual Tab trap in the AppKit decision control and a missing accessible name on its SwiftUI keyboard focus target. Review controls opt into app-local keyboard focus, Tab exits the native control, the semantic focus element has the decision's name/action, and intentional focus scrolls the native button into view. Return stays non-authorizing in both keyboard and native button handling. No global keyboard preference was altered.
+The focused native pass found and repaired an actual Tab trap in the AppKit decision control and a missing accessible name on its SwiftUI keyboard focus target. Final native testing also caught a custom disabled accessibility proxy which still reported enabled, despite the native authority guard rejecting its action. Disabled decisions now use a standard disabled native Button with no decision callback, exposing the actual unavailable state. Review controls opt into app-local keyboard focus, Tab exits the native control, the semantic focus element has the decision's name/action, and intentional focus scrolls the native button into view. Return stays non-authorizing in both keyboard and native button handling. No global keyboard preference was altered.
 
 | Evidence category | Scope |
 | --- | --- |
@@ -155,14 +193,26 @@ Full scoped review of native plan review/authorization and shared exact-decision
 
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
-| HIGH | `Sources/GatorMac/ExactDecisionButton.swift` | Native button could trap Tab; SwiftUI focus target could be unnamed. | Named app-local focus target, explicit Tab exit, guarded Return and Space. | Keyboard and assistive-control access must remain usable without accidental authorization. |
+| HIGH | `Sources/GatorMac/ExactDecisionButton.swift` | Native button could trap Tab; SwiftUI focus target could be unnamed; a disabled custom proxy could report enabled. | Named app-local focus target, explicit Tab exit, guarded Return/Space and a standard unavailable control with correct AX state. | Keyboard and assistive-control access must remain usable without accidental authorization. |
 | HIGH | `Sources/GatorMac/PlanReviewContent.swift` | Material budget/access context was inside a technical disclosure and there were no native authorization controls. | Material context expanded before exact approve/start; distinct lifecycle labels. | Authorization requires readable scope and consequences. |
 
 Considered but rejected: switching to a custom panel was unnecessary for these control/focus fixes; changing global keyboard/accessibility preferences was prohibited and app-local focus suffices; using a generic default Return button would weaken exact authorization safety.
 
+## Acceptance matrix and remaining boundaries
+
+| Status | Scope |
+| --- | --- |
+| PASS | Complete native plan preparation → exact read → approve/dispatch/execute; revision with fresh review; explicit retained-approved Start; owner/revision/digest binding; no duplicate execution; acknowledgement/result separation; independent conversation; retained completion; native draft isolation; bounds and guarded shutdown; listed unit/real-Go/native/host/TUI checks. |
+| PARTIAL | Accessibility and two-surface visual acceptance: selected native AX/keyboard/scroll checks and rendered captures passed; human speech/IME/preference checks and an exhaustive visual pass remain outstanding. |
+| FAIL | No known failing product check remains in the final executed suites/journeys. The native Tab/name/disabled-state defects and deterministic fixture corrections are recorded above. |
+| NOT TESTED | Physical VoiceOver speech/VO navigation, physical IME, larger-text/contrast/Reduce Motion setting variants, exhaustive every-control traversal, live account/provider verification and broad long-history/performance benchmarks. |
+| DEFERRED | Manual plan editing, broad queue management, native attachments, Following, voice, provider installation/login, general file editing/export and distribution signing/notarization. |
+
+Some implementation files were incorporated by external repository commits during the session. The inventory records the entire tranche, rather than only its final uncommitted diff; this agent created no commits.
+
 ## Persistence, safety limits and launch
 
-Native archive version 4 retains pending plan operation identity in the **existing native draft store**. Versions 1–3 remain readable; older app bundles reject version 4 rather than discard pending authorizations. Compare older builds with isolated profiles. Terminal drafts and Go schemas are untouched. Forced parallel native application instances do not synchronize draft writes; normal single-instance launch remains the supported use of a profile.
+Native archive version 4 retains pending plan operation identity in the **existing native draft store**. Completed receipt caches are bounded, while unconfirmed identities are never evicted to make room; Go history is unaffected. Versions 1–3 remain readable; older app bundles reject version 4 rather than discard pending authorizations. Compare older builds with isolated profiles. Terminal drafts and Go schemas are untouched. Forced parallel native application instances do not synchronize draft writes; normal single-instance launch remains the supported use of a profile.
 
 An unconfirmed operation conservatively retains its owner/capacity. There is no Retry Approve/Start button. Reconnect or guarded restart and fresh exact inspection reconcile canonical state; no action is re-sent. If the original task has already dispatched, it is inspected rather than restarted. Go errors about scope, permission, budget or leases are not bypassed by making another task.
 
