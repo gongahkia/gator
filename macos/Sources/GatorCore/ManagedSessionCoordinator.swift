@@ -125,8 +125,14 @@ public final class ManagedSessionCoordinator {
     private func focus(_ owner: GatorApplicationState, _ foreground: Bool) async throws {
         try await owner.host(.focus(foreground), timeout: operationTimeout) { $0.value["foreground"].bool == foreground && $0.value["session_request"] == .null }
     }
+    public func retainedOwnerExplanation(_ owner: GatorApplicationState) -> String? {
+        if let key = key(for: owner), uncertain.contains(key) { return "This original owner retains an unconfirmed host bootstrap or task control. Its slot is kept because timeout does not prove non-execution. Open its chat to inspect; no control will be retried automatically." }
+        if owner.receiptOperation?.unresolved == true { return "An unconfirmed read-only receipt check is retained with this owner. Its result has not been established; no check or external send will be replayed." }
+        if owner.recovery?.unresolved == true { return "Unresolved retained work or action evidence keeps this cached owner available for inspection. It will not be evicted to make room for another chat." }
+        return nil
+    }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
-        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true else { return false }
+        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recovery?.unresolved != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
     }
@@ -254,6 +260,14 @@ public final class ManagedSessionCoordinator {
             // Capacity and transitions are serialized through the operation-specific
             // result or truthful uncertainty, never through nonce acknowledgement.
             await owner.awaitPlanAuthorizationResult()
+        }.value
+    }
+    public func checkReceipt(owner: GatorApplicationState, receipt: NativeRecoveryReceipt, generation: UUID, action: NativeReceiptAction) async {
+        let previous = owner.receiptOperation?.id
+        await enqueue { [self] in
+            guard owner === current, owners[receipt.identity?.conversationID ?? ""] === owner, !switching, !stopping, owner.receiptOperation?.id == previous else { throw BridgeFailure("The selected owner or pending check changed. Inspect its retained receipt again.") }
+            if let reason = owner.receiptUnavailable(receipt, generation: generation) { throw BridgeFailure(reason) }
+            await owner.checkReceipt(receipt, generation: generation, action: action)
         }.value
     }
     public func respondToApproval(owner: GatorApplicationState, review: ApprovalReview, approved: Bool) async {

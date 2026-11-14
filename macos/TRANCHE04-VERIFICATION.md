@@ -53,10 +53,10 @@ The inspector displays objective, outcome, ordered proposed steps, declared effe
 All production frames retain the existing version 1 NDJSON protocol over the original owner's stdin/stdout:
 
 ```json
-{"version":1,"type":"task_plan","nonce":"<native nonce>","task_plan":{"conversation_id":"<Go owner>","task_id":"<Go task>","revision":1,"digest":"<Go digest>","action":"inspect | approve | start","request_id":"<native operation ID>"}}
+{"version":1,"type":"task_plan","nonce":"<native nonce>","task_plan":{"conversation_id":"<Go owner>","task_id":"<Go task>","revision":1,"digest":"<Go digest>","action":"approve","request_id":"<native operation ID>"}}
 ```
 
-`action_applied` matches only the transport nonce. `state.task_plan_result.request_id` identifies the actual plan result; `error` is surfaced literally. `state.task_plans` supplies the exact task's state/phase/work ID. `state.foreground`, existing host focus confirmations and generation/focus epoch guard original ownership. Existing managed dialogue continues to handle ordinary conversation and `revise_plan`; Swift does not classify text or manufacture correction controls.
+Use `inspect` for a read and `start` for an already-approved undispatched plan; the other identity fields have the same shape. `action_applied` matches only the transport nonce. `state.task_plan_result.request_id` identifies the actual plan result; `error` is surfaced literally. `state.task_plans` supplies the exact task's state/phase/work ID. `state.foreground`, existing host focus confirmations and generation/focus epoch guard original ownership. Existing managed dialogue continues to handle ordinary conversation and `revise_plan`; Swift does not classify text or manufacture correction controls.
 
 Go still independently enforces identity, current plan, phase, scope, execution leases, request journal, permission/effect and remaining-budget restrictions. Neither native controls nor the fixture adds authorization to Go.
 
@@ -220,6 +220,6 @@ An unconfirmed operation conservatively retains its owner/capacity. There is no 
 open /tmp/Gator-Native-Tranche04-Ready.app --args --open-window
 ```
 
-Omit `--args --open-window` for menu-bar-first launch. The bundle contains `Contents/MacOS/GatorMac` and `Contents/Resources/gator-runtime`. Tranche 01, 02 and 03 app bundles are preserved. Command-I opens task inspection, Inspect Current Plan loads the exact read, Command-L/Escape returns to the composer. Approve & Start may execute immediately; Start Approved Plan uses retained approval. Both require explicit Space/click/assistive press, and both remain Go-owned.
+Quit an older running Gator build before launching this bundle; do not force concurrent instances on the same profile. Omit `--args --open-window` for menu-bar-first launch. The bundle contains `Contents/MacOS/GatorMac` and `Contents/Resources/gator-runtime`. Tranche 01, 02 and 03 app bundles are preserved. Command-I opens task inspection, Inspect Current Plan loads the exact read, Command-L/Escape returns to the composer. Approve & Start may execute immediately; Start Approved Plan uses retained approval. Both require explicit Space/click/assistive press, and both remain Go-owned.
 
 Recommended Tranche 05: bounded native recovery inspection for interrupted work and uncertain effects, using existing Go receipts and recovery contracts, plus the remaining human accessibility acceptance. No Tranche 05 implementation is included.

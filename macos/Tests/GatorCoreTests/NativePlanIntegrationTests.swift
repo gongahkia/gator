@@ -7,7 +7,7 @@ import Testing
     let provider: Process
     let configuration: BridgeLaunchConfiguration
     var app: ManagedSessionCoordinator
-    init() async throws {
+    init(factory: (@Sendable () -> any BridgeTransport)? = nil) async throws {
         root = try temporaryDirectory(); provider = Process(); let pipe = Pipe()
         provider.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         provider.arguments = ["node", try #require(Bundle.module.url(forResource: "plan-provider", withExtension: "mjs", subdirectory: "Fixtures")).path]
@@ -25,7 +25,9 @@ import Testing
         try JSONEncoder().encode(settings).write(to: config.appendingPathComponent("config.json"))
         try Data().write(to: root.appendingPathComponent("hold-execution"))
         configuration = BridgeLaunchConfiguration(runtime: URL(fileURLWithPath: ProcessInfo.processInfo.environment["GATOR_TEST_BINARY"] ?? "/tmp/gator-native-runtime"), workspace: workspace, environment: ["PATH": path, "HOME": root.path, "GATOR_CONFIG_DIR": root.appendingPathComponent("config").path, "GATOR_STATE_DIR": root.appendingPathComponent("state").path, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"])
-        app = ManagedSessionCoordinator(configuration: configuration, nativeDraftDirectory: root.appendingPathComponent("native"), profile: "plan")
+        if let factory {
+            app = ManagedSessionCoordinator(configuration: configuration, store: NativeDraftStore(directory: root.appendingPathComponent("native"), profile: "plan"), factory: factory)
+        } else { app = ManagedSessionCoordinator(configuration: configuration, nativeDraftDirectory: root.appendingPathComponent("native"), profile: "plan") }
         await app.start(); try await managedEventually("plan fixture connected") { app.current.isConnected }
     }
     func send(_ text: String) async throws {

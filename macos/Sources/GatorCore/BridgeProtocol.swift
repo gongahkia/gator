@@ -169,6 +169,7 @@ struct BridgeFramer {
 enum BridgeCommand: Sendable {
     case host(HostCommand)
     case submission(id: String, context: String, text: String, planFirst: Bool = false)
+    case receipt(NativeReceiptIdentity, action: NativeReceiptAction, request: String)
     case inspectPlan(NativePlanIdentity, request: String)
     case authorizePlan(NativePlanIdentity, action: NativePlanAction, request: String)
     case workMode(NativeWorkMode)
@@ -189,6 +190,9 @@ enum BridgeCommand: Sendable {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 128 * 1024 else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
             v["type"] = .string("upload_submit")
             v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array([]), "plan_first": .bool(planFirst)])
+        case let .receipt(identity, action, request):
+            var fields = identity.fields; fields["action"] = .string(action.rawValue); fields["request_id"] = .string(request)
+            v["type"] = .string("receipt"); v["receipt"] = .object(fields)
         case let .inspectPlan(identity, request):
             v["type"] = .string("task_plan")
             v["task_plan"] = .object(["action": .string("inspect"), "conversation_id": .string(identity.conversationID), "task_id": .string(identity.taskID), "revision": .number(Decimal(identity.revision)), "digest": .string(identity.digest), "request_id": .string(request)])

@@ -40,6 +40,8 @@ struct TaskInspectorView: View {
                                 ForEach(Array(task.publicActivity.enumerated()), id: \.offset) { _, entry in Text(verbatim: entry) }
                             }.textSelection(.enabled)
                         }
+                        if let retention = sessions.retainedOwnerExplanation(owner) { Text(verbatim: retention).font(.caption).textSelection(.enabled) }
+                        RecoveryInspectorContent(owner: owner, generation: inspection.generation)
                         let capability = snapshot.value["dialogue_task"]
                         if capability["can_guide"].bool || capability["can_stop"].bool || capability["can_correct_action"].bool || capability["can_revise_plan"].bool {
                             DisclosureGroup("Controls currently reported by Gator") {

@@ -220,6 +220,10 @@ struct ConversationView: View {
             if !sessions.issue.isEmpty { Text(verbatim: sessions.issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
             if !application.issue.isEmpty { Text(verbatim: application.issue).font(.caption).foregroundStyle(.orange).textSelection(.enabled).lineLimit(3) }
             if !application.persistenceIssue.isEmpty { Text(verbatim: application.persistenceIssue).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            if sessions.inspection == nil, application.review == nil, application.recovery?.relevant == true || application.receiptOperation?.unresolved == true {
+                Button("Inspect Recovery Evidence") { sessions.inspectTask(application.conversationID) }.help("Inspect retained evidence · ⌘I")
+                    .accessibilityLabel("Inspect recovery evidence for the selected conversation")
+            }
             if application.connectionStatus == .disconnected { Button("Reconnect and Inspect") { Task { await sessions.reconnect() } } }
             if application.snapshot?.running == true && application.review == nil {
                 Text(application.snapshot?.value["dialogue_active"].bool == true ? "Work continues independently. You can keep talking here; Gator decides how to route your message." : "Preparing conversation during work… Your draft is kept.").font(.caption).foregroundStyle(.secondary)

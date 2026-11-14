@@ -26,6 +26,8 @@ public final class GatorApplicationState {
     public private(set) var focusRequest = UUID()
     public private(set) var planReviews: [String: NativePlanReview] = [:]
     public private(set) var planOperation: NativePlanOperation?
+    public private(set) var receiptOperation: NativeReceiptOperation?
+    @ObservationIgnored private var receiptDeadline: Task<Void, Never>?
     private var planReviewEpoch = UUID()
     @ObservationIgnored private var planControlDeadline: Task<Void, Never>?
     @ObservationIgnored private var retiredApprovalTokens: Set<String> = []
@@ -115,7 +117,9 @@ public final class GatorApplicationState {
            snapshot?.value["task_plans"].array.contains(where: { pending.identity.matches($0) && $0["state"].string == "queued" && $0["phase"].string == "approved" }) == true { return false }
         return pending.reservesCapacity
     }
+    public var recovery: NativeRecoveryProjection? { snapshot.map(NativeRecoveryProjection.init) }
     public var quitGuard: String? {
+        if receiptOperation?.unresolved == true { return "A read-only receipt check is unconfirmed. Its identity is retained; no check or external action will replay on restart." }
         if planOperation?.blocksAuthorization == true { return "A plan authorization outcome is unconfirmed. Its identity is retained and is never replayed. Quitting stops this owner." }
         if archive.pending != nil { return "A submission has an unconfirmed outcome. Its identity and draft will be kept; it will not be resent on restart." }
         if snapshot?.hasApproval == true { return "An exact action is waiting for review. Quitting cancels this Go owner; the approval will not be replayed." }
@@ -132,6 +136,7 @@ public final class GatorApplicationState {
                 let requested = "conversation:" + configuration.conversationID
                 archive.pending = archive.pendingByContext?[requested] ?? (archive.pending?.context == requested ? archive.pending : nil)
             }
+            receiptOperation = archive.receiptOperationsByContext?["conversation:" + configuration.conversationID]
             submission = archive.pending
             planOperation = archive.planOperationsByContext?["conversation:" + configuration.conversationID]
             restoringContext = configuration.conversationID.isEmpty ? "" : "conversation:" + configuration.conversationID
@@ -255,6 +260,7 @@ public final class GatorApplicationState {
                 } else { issue = "The plan changed while loading. Inspect its current revision again." }
                 planReadRequest = nil; operation = ""; deadlineTask?.cancel()
             }
+            receiveReceiptResult(next)
             receivePlanOperation(next)
             if !next.running { stopping = false }
             if approvalSending && (previous?.value["pending_approval"] != next.value["pending_approval"]) { approvalSending = false; operation = ""; deadlineTask?.cancel(); review = nil }
@@ -262,12 +268,14 @@ public final class GatorApplicationState {
             // State ticks can be frequent: persistence is required only for durable client changes.
             if archive.selectedConversationID != previous?.conversationID || (submissionNonce == nil && previous?.value["upload_result"] != next.value["upload_result"]) { persist() }
         case .acknowledged(let nonce):
+            if var pending = receiptOperation, pending.nonce == nonce, pending.phase == "submitted" { pending.phase = "acknowledged"; setReceiptOperation(pending) }
             if var pending = planOperation, pending.nonce == nonce, pending.phase == .submitted { pending.phase = .acknowledged; setPlanOperation(pending) }
             if nonce == submissionNonce, var pending = archive.pending, pending.phase == .submitted {
                 pending.phase = .acknowledged; archive.pending = pending; submission = pending; persist()
             }
         case .disconnected(let reason):
             connectionStatus = .disconnected; issue = reason
+            markReceiptUncertain()
             markUncertain(); markPlanUncertain("Original Go owner disconnected."); operation = ""; setting = nil; planReadRequest = nil; approvalSending = false; stopping = false
             deadlineTask?.cancel(); startupDeadline?.cancel(); planControlDeadline?.cancel()
         case .updateReady: break
@@ -431,6 +439,7 @@ public final class GatorApplicationState {
     }
     public func shutdown(confirmed: Bool = false) async -> Bool {
         guard confirmed || quitGuard == nil else { return false }
+        markReceiptUncertain()
         markUncertain(); markPlanUncertain("Application shutdown requested."); guard await flushDrafts() else { return false }
         connectionStatus = .stopping
         deadlineTask?.cancel(); startupDeadline?.cancel(); planControlDeadline?.cancel()
@@ -556,6 +565,50 @@ public final class GatorApplicationState {
     }
     func awaitPlanAuthorizationResult() async {
         while planOperation?.phase.awaitingResult == true && isConnected { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    public func receiptUnavailable(_ candidate: NativeRecoveryReceipt, generation expected: UUID) -> String? {
+        guard isConnected, generation == expected, candidate.identity?.conversationID == conversationID else { return "Open the original connected owner and inspect its current evidence." }
+        guard let current = recovery?.receipts.first(where: { $0.id == candidate.id }), current == candidate, current.identity != nil else { return "Exact retained bundle identity is missing or changed. A journal receipt alone cannot authorize a check." }
+        if receiptOperation?.unresolved == true { return "A prior check is unconfirmed. Its request identity is retained; no automatic retry. Reconnect and inspect retained evidence." }
+        guard operation.isEmpty, snapshot?.value["receipt_busy"].bool != true else { return "Wait for the current owner operation." }
+        if !persistenceIssue.isEmpty { return "Native storage needs attention. No check was submitted." }
+        return nil
+    }
+    func checkReceipt(_ candidate: NativeRecoveryReceipt, generation expected: UUID, action: NativeReceiptAction) async {
+        guard receiptUnavailable(candidate, generation: expected) == nil, let identity = candidate.identity, let owner = transport else { return }
+        var pending = NativeReceiptOperation(id: UUID().uuidString, nonce: UUID().uuidString, identity: identity, generation: generation, action: action)
+        setReceiptOperation(pending); operation = "Awaiting read-only receipt check…"
+        guard await flushDrafts() else { pending.phase = "uncertain"; setReceiptOperation(pending); operation = ""; return }
+        guard generation == expected, isConnected, recovery?.receipts.contains(candidate) == true else {
+            pending.phase = "failed"; pending.result = .object(["error": .string("Owner or evidence changed before send. No check submitted.")]); setReceiptOperation(pending); operation = ""; return
+        }
+        receiptDeadline?.cancel()
+        receiptDeadline = Task { [weak self, responseTimeout] in
+            try? await Task.sleep(for: responseTimeout)
+            guard !Task.isCancelled, let self, self.receiptOperation?.id == pending.id, self.receiptOperation?.unresolved == true else { return }
+            self.markReceiptUncertain(); self.operation = ""
+        }
+        do { try await owner.send(.receipt(identity, action: action, request: pending.id), nonce: pending.nonce) }
+        catch { if generation == expected, receiptOperation?.id == pending.id, receiptOperation?.unresolved == true { markReceiptUncertain(); operation = "" } }
+    }
+    private func setReceiptOperation(_ value: NativeReceiptOperation) {
+        receiptOperation = value
+        if archive.receiptOperationsByContext == nil { archive.receiptOperationsByContext = [:] }
+        archive.receiptOperationsByContext?["conversation:" + value.identity.conversationID] = value
+        persist()
+    }
+    private func markReceiptUncertain() {
+        guard var value = receiptOperation, value.unresolved else { return }
+        value.phase = "uncertain"; setReceiptOperation(value); receiptDeadline?.cancel()
+    }
+    private func receiveReceiptResult(_ next: BridgeSnapshot) {
+        guard var pending = receiptOperation, pending.unresolved, pending.generation == generation, pending.identity.conversationID == next.conversationID else { return }
+        let result = next.value["receipt_result"]
+        guard result["request_id"].string == pending.id else { return }
+        pending.result = result
+        pending.phase = result["error"].string.isEmpty && ["not_checked", "found", "ambiguous", "unconfirmed"].contains(result["check"]["status"].string) ? "confirmed" : "failed"
+        setReceiptOperation(pending); receiptDeadline?.cancel(); operation = ""
     }
 
     // Host-only operations retain this owner's generation through every await.

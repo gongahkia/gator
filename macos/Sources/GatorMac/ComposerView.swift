@@ -42,6 +42,12 @@ struct ComposerView: View {
                 .accessibilityLabel("Send message")
             }
         }
+        .task {
+            // A newly inserted composer must request focus after SwiftUI restores
+            // its focus hierarchy. Snapshot updates do not restart this task.
+            await Task.yield()
+            application.requestComposerFocus()
+        }
         .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.primary.opacity(0.10), lineWidth: 0.5))

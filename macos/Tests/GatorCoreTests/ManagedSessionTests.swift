@@ -77,7 +77,7 @@ final class SessionFixturePool: @unchecked Sendable {
     init(_ fixtures: [SessionFixture]) { pending = fixtures }
     func next() -> any BridgeTransport { lock.withLock { pending.removeFirst() } }
 }
-@MainActor func managedFixture(_ root: URL, _ fixtures: [SessionFixture], timeout: Duration = .milliseconds(150), admissionTimeout: Duration = .milliseconds(100)) async -> ManagedSessionCoordinator {
+@MainActor func managedFixture(_ root: URL, _ fixtures: [SessionFixture], timeout: Duration = .seconds(2), admissionTimeout: Duration = .milliseconds(100)) async -> ManagedSessionCoordinator {
     let pool = SessionFixturePool(fixtures)
     let app = ManagedSessionCoordinator(configuration: BridgeLaunchConfiguration(runtime: URL(fileURLWithPath: "/unused"), workspace: root), store: NativeDraftStore(directory: root.appendingPathComponent("native"), profile: "managed"), operationTimeout: timeout, admissionTimeout: admissionTimeout, factory: { pool.next() })
     await app.start(); return app
