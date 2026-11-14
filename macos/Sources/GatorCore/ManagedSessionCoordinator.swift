@@ -55,7 +55,7 @@ public final class ManagedSessionCoordinator {
         return result
     }
     public var ownerCount: Int { records.count }
-    public var workingCount: Int { records.values.filter { $0.connectionStatus != .closed && ($0.snapshot?.running == true || $0.reservesPlanCapacity) }.count }
+    public var workingCount: Int { records.values.filter { $0.connectionStatus != .closed && ($0.snapshot?.running == true || $0.reservesPlanCapacity || $0.reservesRecoveryCapacity) }.count }
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
@@ -132,7 +132,7 @@ public final class ManagedSessionCoordinator {
         return nil
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
-        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recovery?.unresolved != true else { return false }
+        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
     }
@@ -260,6 +260,31 @@ public final class ManagedSessionCoordinator {
             // Capacity and transitions are serialized through the operation-specific
             // result or truthful uncertainty, never through nonce acknowledgement.
             await owner.awaitPlanAuthorizationResult()
+        }.value
+    }
+    public func recoveryUnavailable(owner: GatorApplicationState, recovery: NativeRequestRecovery, action: NativeRecoveryAction) -> String? {
+        guard owner === current, owners[recovery.conversationID] === owner, !switching, !stopping else { return "Open and focus the original owner before reviewing recovery." }
+        if let key = key(for: owner), uncertain.contains(key) { return "This owner has an unconfirmed host control. Inspect its retained state first." }
+        if action != .reviewAccess, workingCount >= 3 { return "Three tasks are working or retain unconfirmed admissions. No work was stopped; wait for capacity." }
+        return owner.recoveryUnavailable(recovery, action: action)
+    }
+    public func reviewRecoveryAccess(owner: GatorApplicationState, recovery: NativeRequestRecovery, proposed: Bool = false) async {
+        let selections = proposed ? owner.recoveryAccess[recovery.id]?.selections : nil
+        await enqueue { [self] in
+            if let reason = recoveryUnavailable(owner: owner, recovery: recovery, action: .reviewAccess) { throw BridgeFailure(reason) }
+            guard !proposed || selections == owner.recoveryAccess[recovery.id]?.selections else { throw BridgeFailure("Account selection changed while waiting. Review the current choices again.") }
+            await owner.reviewRecoveryAccess(recovery, proposed: proposed)
+        }.value
+    }
+    public func prepareRecovery(owner: GatorApplicationState, recovery: NativeRequestRecovery, action: NativeRecoveryAction) async {
+        let previous = owner.recoveryPreparation?.id
+        await enqueue { [self] in
+            guard owner.recoveryPreparation?.id == previous else { throw BridgeFailure("A preparation decision changed while this input waited. Inspect the original task.") }
+            if let reason = recoveryUnavailable(owner: owner, recovery: recovery, action: action) { throw BridgeFailure(reason) }
+            await owner.prepareRecovery(recovery, action: action) { [self] in
+                owner === current && !switching && !stopping && workingCount <= 3 && owners[recovery.conversationID] === owner
+            }
+            await owner.awaitRecoveryAdmission()
         }.value
     }
     public func checkReceipt(owner: GatorApplicationState, receipt: NativeRecoveryReceipt, generation: UUID, action: NativeReceiptAction) async {

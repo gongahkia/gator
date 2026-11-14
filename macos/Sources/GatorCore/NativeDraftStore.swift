@@ -32,6 +32,7 @@ struct NativeArchive: Codable, Sendable {
     // Optional for compatibility with Tranche 01 archives. A single actor merges
     // owner-scoped writes so a late result cannot overwrite another chat's draft.
     var pendingByContext: [String: PendingSubmission]?
+    var recoveryPreparationsByContext: [String: NativeRecoveryPreparation]?
     var receiptOperationsByContext: [String: NativeReceiptOperation]?
     var planOperationsByContext: [String: NativePlanOperation]?
 }
@@ -48,7 +49,7 @@ actor NativeDraftStore {
         let data = try Data(contentsOf: file)
         guard data.count <= 6 * 1024 * 1024 else { throw BridgeFailure("Native drafts are oversized; the saved file was kept unchanged.") }
         var archive = try JSONDecoder().decode(NativeArchive.self, from: data)
-        guard [1, 2, 3, 4, 5].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 && ($0.value.correction?.text.utf8.count ?? 0) <= 120 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
+        guard [1, 2, 3, 4, 5, 6].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 && ($0.value.correction?.text.utf8.count ?? 0) <= 120 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
         if archive.pending != nil { archive.pending?.phase = .uncertain }
         if let pending = archive.pendingByContext {
             guard pending.count <= 128, pending.allSatisfy({ validContext($0.key) && $0.value.context == $0.key && !$0.value.id.isEmpty && $0.value.id.count <= 64 && $0.value.text.utf8.count <= 128 * 1024 }) else { throw BridgeFailure("Invalid native pending submissions; original file kept.") }
@@ -65,6 +66,10 @@ actor NativeDraftStore {
         if let receipts = archive.receiptOperationsByContext {
             guard receipts.count <= 128, receipts.allSatisfy({ validContext($0.key) && $0.key == "conversation:" + $0.value.identity.conversationID && !$0.value.id.isEmpty && $0.value.id.count <= 64 }) else { throw BridgeFailure("Invalid native receipt operation; original evidence kept.") }
             archive.receiptOperationsByContext = receipts.mapValues { original in var value = original; if value.unresolved { value.phase = "uncertain" }; return value }
+        }
+        if let preparations = archive.recoveryPreparationsByContext {
+            guard preparations.count <= 128, preparations.allSatisfy({ validContext($0.key) && $0.key == "conversation:" + $0.value.conversationID && !$0.value.id.isEmpty && $0.value.id.count <= 64 && $0.value.action != .reviewAccess && ($0.value.connections?.count ?? 0) <= 16 }) else { throw BridgeFailure("Invalid retained recovery preparation; original file kept.") }
+            archive.recoveryPreparationsByContext = preparations.mapValues { original in var value = original; if value.blocks { value.phase = "uncertain" }; return value }
         }
         return archive
     }
@@ -84,6 +89,8 @@ actor NativeDraftStore {
         if !merged.planOperationsByContext!.isEmpty { merged.version = max(4, merged.version) }
         if merged.receiptOperationsByContext == nil { merged.receiptOperationsByContext = [:] }
         merged.receiptOperationsByContext?[context] = original.receiptOperationsByContext?[context]
+        if merged.recoveryPreparationsByContext == nil { merged.recoveryPreparationsByContext = [:] }
+        merged.recoveryPreparationsByContext?[context] = original.recoveryPreparationsByContext?[context]
         try save(merged)
     }
     func selectConversation(_ id: String) throws {
@@ -108,11 +115,18 @@ actor NativeDraftStore {
             archive.planOperationsByContext = retained.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - retained.count)).map { ($0.key, $0.value) })) { current, _ in current }
         }
         if let receipts = archive.receiptOperationsByContext, !receipts.isEmpty {
-            archive.version = 5
+            archive.version = max(5, archive.version)
             let unresolved = receipts.filter { $0.value.unresolved }
             guard unresolved.count <= 128 else { throw BridgeFailure("Too many unconfirmed receipt checks; original archive kept.") }
             let terminal = receipts.filter { !($0.value.unresolved) }.sorted { $0.key < $1.key }
             archive.receiptOperationsByContext = unresolved.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - unresolved.count)).map { ($0.key, $0.value) })) { current, _ in current }
+        }
+        if let preparations = archive.recoveryPreparationsByContext, !preparations.isEmpty {
+            archive.version = 6
+            let pending = preparations.filter { $0.value.blocks }
+            guard pending.count <= 128 else { throw BridgeFailure("Too many unconfirmed recovery preparations. Original archive kept.") }
+            let terminal = preparations.filter { !$0.value.blocks }.sorted { $0.key < $1.key }
+            archive.recoveryPreparationsByContext = pending.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - pending.count)).map { ($0.key, $0.value) })) { current, _ in current }
         }
         let cutoff = Date().addingTimeInterval(-7 * 86400)
         let keep = archive.drafts.filter { $0.value.updated >= cutoff || $0.key == archive.pending?.context || archive.pendingByContext?[$0.key] != nil }

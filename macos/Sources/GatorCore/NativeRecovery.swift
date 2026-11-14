@@ -76,7 +76,7 @@ public struct NativeRecoveryProjection: Equatable, Sendable {
         for value in snapshot.value["request_recoveries"].array {
             let r = value["recovery"]
             let fields = NativeRecoveryPresentation.fields(value, keys: ["task_id", "provider", "model", "state", "plan_phase"]) + NativeRecoveryPresentation.fields(r, keys: ["kind", "summary", "repair", "scope_digest", "processing_digest", "needs", "preparation"])
-            add("request", value["task_id"].string, value["text"].string, NativeRecoveryPresentation.status(value["state"].string), "Recovery guidance only. " + (r["retry_safe"].bool ? "Go reports conditional retry eligibility; this is not permission to replay. " : "No safe retry is established. ") + "Repair, retry preparation and discard are unavailable here.", fields)
+            add("request", value["task_id"].string, value["text"].string, NativeRecoveryPresentation.status(value["state"].string), "Recovery guidance only. " + (r["retry_safe"].bool ? "Go reports conditional retry eligibility; this is not permission to replay. " : "No safe retry is established. ") + "Any recovery preparation requires an explicit reviewed request; it does not authorize execution. Account setup and discard are unavailable here.", fields)
         }
         for q in snapshot.value["queue"].array {
             add("queue", q["id"].string, q["text"].string, q["interrupted"].bool ? "Interrupted · not resumed" : "Queued · not executing", "Retained queue identity. Opening these details does not run or resume it.", NativeRecoveryPresentation.fields(q, keys: ["id", "inputs"]))

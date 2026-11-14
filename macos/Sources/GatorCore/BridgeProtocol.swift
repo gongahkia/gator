@@ -169,6 +169,7 @@ struct BridgeFramer {
 enum BridgeCommand: Sendable {
     case host(HostCommand)
     case submission(id: String, context: String, text: String, planFirst: Bool = false)
+    case recovery(fields: [String: JSONValue])
     case receipt(NativeReceiptIdentity, action: NativeReceiptAction, request: String)
     case inspectPlan(NativePlanIdentity, request: String)
     case authorizePlan(NativePlanIdentity, action: NativePlanAction, request: String)
@@ -190,6 +191,8 @@ enum BridgeCommand: Sendable {
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 128 * 1024 else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
             v["type"] = .string("upload_submit")
             v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array([]), "plan_first": .bool(planFirst)])
+        case .recovery(let fields):
+            v["type"] = .string("request_recovery"); v["request_recovery"] = .object(fields)
         case let .receipt(identity, action, request):
             var fields = identity.fields; fields["action"] = .string(action.rawValue); fields["request_id"] = .string(request)
             v["type"] = .string("receipt"); v["receipt"] = .object(fields)

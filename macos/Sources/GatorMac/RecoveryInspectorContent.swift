@@ -7,10 +7,19 @@ struct RecoveryInspectorContent: View {
     let owner: GatorApplicationState
     let generation: UUID
     var body: some View {
-        if let recovery = owner.recovery, recovery.relevant || owner.receiptOperation != nil {
+        if let recovery = owner.recovery, recovery.relevant || owner.receiptOperation != nil || owner.recoveryPreparation != nil {
             VStack(alignment: .leading, spacing: 14) {
                 Label("Recovery and retained evidence", systemImage: "clock.arrow.circlepath").font(.headline).accessibilityAddTraits(.isHeader)
                 Text("Inspection never resumes work, grants access, approves an action or resends anything.").font(.callout)
+                if let preparation = owner.recoveryPreparation {
+                    Label(preparation.status, systemImage: "list.bullet.clipboard").textSelection(.enabled)
+                    Text(verbatim: "Original task: " + preparation.taskID + " · preparation request: " + preparation.id).font(.caption).textSelection(.enabled)
+                    if ["plan_ready", "reconciled"].contains(preparation.phase), let summary = owner.snapshot?.value["task_plans"].array.first(where: { $0["id"].string == preparation.taskID }), let identity = NativePlanIdentity(conversationID: owner.conversationID, summary: summary) {
+                        Button("Inspect Recovery Plan") { Task { await sessions.loadPlan(identity, owner: owner) } }.focusable()
+                            .disabled(owner !== sessions.current || !owner.isConnected || !owner.operation.isEmpty)
+                        Text("The exact plan review and Approve & Start controls are below. Preparation never authorizes execution.").font(.caption)
+                    }
+                }
                 if let pending = owner.receiptOperation, !recovery.receipts.contains(where: { $0.identity == pending.identity }) {
                     Text(verbatim: pending.summary).textSelection(.enabled)
                     DisclosureGroup("Retained check identity · no replay") {
@@ -30,6 +39,9 @@ struct RecoveryInspectorContent: View {
                         DisclosureGroup("Evidence for " + record.status) {
                             ForEach(record.fields) { field in Text(verbatim: field.text).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled) }
                         }.font(.caption)
+                        if let retained = owner.requestRecoveries.first(where: { record.id == "request:" + $0.id }) {
+                            RecoveryPreparationView(owner: owner, recovery: retained)
+                        }
                     }.padding(10).background(.background, in: RoundedRectangle(cornerRadius: 10))
                 }
                 ForEach(recovery.receipts) { receipt in
