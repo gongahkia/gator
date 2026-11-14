@@ -129,7 +129,7 @@ GATOR_TEST_BINARY=/tmp/gator-native-runtime bun test --preload ./scripts/preload
 - Prior-timeout exact-case reproduction: **1 passed**, 23 filtered, 13 assertions, 5.61 s. This is intentionally a targeted reproduction, not claimed as a complete file run.
 - Complete affected file: **24 passed**, zero failed, 437 assertions, 64.02 s. Includes the exact case and all four terminal dimensions.
 - Other targeted nine TUI files: **31 passed**, zero failed, 833 assertions, 99.63 s.
-- Interaction recovery file: result recorded below after completion.
+- Interaction recovery file: **1 passed**, zero failed, 13 assertions, 17.95 s. Together with the complete correction file and nine-file run, 56 distinct TUI tests passed across 11 files; the one-test timeout reproduction is counted separately, not added again.
 
 ### Previous TUI timeout investigation
 
@@ -213,3 +213,18 @@ SHA-256 of final packaged executables:
 - Go: `58bf3597e14b99abe3a6919107ed9d648e81d77f340a2fcc2d82f1019a2b170e`
 
 All acceptance accounts are controlled fixtures. Distribution signing/notarization is outside scope.
+
+## Requested scenario ledger
+
+| Cases | Evidence |
+| --- | --- |
+| 1–5: eligibility, interruption, missing/changed token and supersession | Parameterized native rejection tests, generation/current-record checks, real interruption and original-task completion tests. No controls are derived from an arbitrary interrupted queue row. |
+| 6–14: task-bound access, ordering, configured choices, readiness and stale tokens | Native ordered/duplicate positional selection test, invented-choice rejection, immediate old-copy invalidation, reordered-result rejection, scope invalidation, actual Go access/stale-scope tests and native keyboard/account journey. Host access suites cover denied operations, read-only mode and retained requirements. |
+| 15–25: exact preparation, owner/model/scope guards, matching admission, duplicate input and no pre-approval work | Native pending/captured-review/final-admission tests, actual Go wrong owner/task/token/processing rejection, held-preparer acceptance test, explicit plan approval test and interrupted-no-replay test. |
+| 26–32: revised plan, current tuple, separate authorization and retained evidence | Actual Go and native retry journey through fresh plan inspection and one execution, stale-plan invalidation at preparation, existing restored-approved Start and prior action/plan correction integrations. Host recovery integration independently exercises original retained input/budget/scope accounting. |
+| 33–37: multi-owner, generation, failures, focus and Quit | Native late-result A/B draft isolation, generation/restart retention, three-working limit test, existing managed-session regression cases, launched account/navigation and interrupted-owner journeys. |
+| 38–44: earlier tranches | All 82 prior Swift tests retained in the 96-test sequential run, including real-Go interruption, immutable read-only receipt checks, exact approvals/plans, correction/revision, dialogue, archive and owner lifecycle; listed Go/host/TUI suites. |
+
+Final native retry evidence was rerun after all account-keyboard and captured-review repairs on the delivered bundle. Its `journey.json` reports passed; original task and separate explicit authorization are retained with one successful execution. Actual native account B/C/E and interruption D also report passed. These are controlled-provider/native-app results, not production-account or spoken-accessibility acceptance.
+
+The final process check found no remaining native test application, controlled recovery provider or owned Go bridge process. No publication, deployment, push or commit command was issued. Verification stops at this tranche.
