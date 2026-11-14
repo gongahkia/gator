@@ -170,3 +170,19 @@ func accessReview(_ needs: [JSONValue], picks: [String] = ["alpha", "beta"], rea
     #expect(await fixtures[0].sent("request_recovery").isEmpty)
     #expect(app.workingCount == 3); #expect(await app.shutdown(confirmed: true))
 }
+
+@Test @MainActor func anOldExplicitDecisionCannotAuthorizeANewReadyAccountSelection() async throws {
+    let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+    let fixture = SessionFixture(), app = await managedFixture(root, [fixture], admissionTimeout: .seconds(2)), owner = app.current
+    let recovery = try await patchRecovery(fixture, owner: owner, value: failedRecovery(needs: accessNeeds()))
+    try await readAccess(app, fixture: fixture, recovery: recovery, value: accessReview(accessNeeds()))
+    let original = try #require(owner.recoveryAccess[recovery.id])
+    #expect(owner.proposeRecoveryAccount(recovery, index: 0, account: "beta")); #expect(!owner.isCurrentRecoveryAccess(original))
+    await app.reviewRecoveryAccess(owner: owner, recovery: recovery, proposed: true)
+    let id = try #require(await fixture.sent("request_recovery").last?["request_recovery"]["request_id"].string)
+    await fixture.patch(["request_recovery_result": .object(["request_id": .string(id), "access_review": accessReview(accessNeeds(), picks: ["beta", "beta"])])])
+    try await waitUntil { owner.recoveryAccess[recovery.id]?.ready == true && owner.operation.isEmpty }
+    await app.prepareRecovery(owner: owner, recovery: recovery, action: .prepareAccess, reviewedAccess: original)
+    #expect(await fixture.sent("request_recovery").allSatisfy { $0["request_recovery"]["action"].string == "review_access" })
+    #expect(owner.recoveryPreparation == nil); #expect(await app.shutdown(confirmed: true))
+}

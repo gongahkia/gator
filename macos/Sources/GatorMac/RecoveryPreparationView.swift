@@ -33,7 +33,12 @@ struct RecoveryPreparationView: View {
                                     Text(verbatim: choice["label"].string + " (" + choice["id"].string + ")" + (choice["issue"].string.isEmpty ? "" : " · needs repair"))
                                         .tag(choice["id"].string).disabled(!choice["issue"].string.isEmpty)
                                 }
-                            }.disabled(!owner.operation.isEmpty || !owner.isCurrentRecovery(recovery) || owner !== sessions.current || access.recovery != recovery)
+                            }.focusable()
+                                .onKeyPress(.downArrow) { moveAccount(requirement, selected: selected, index: index, direction: 1); return .handled }
+                                .onKeyPress(.upArrow) { moveAccount(requirement, selected: selected, index: index, direction: -1); return .handled }
+                                .onKeyPress(.return) { .handled }
+                                .help("Use Up or Down to choose a configured account. Wait for Go to review each selection. Return never prepares work.")
+                                .disabled(!owner.isCurrentRecovery(recovery) || owner !== sessions.current || access.recovery != recovery)
                                 .accessibilityLabel("Configured account for requirement \(index + 1): " + requirement["need"]["operation"].string)
                             ForEach(requirement["choices"].array, id: \.self) { choice in
                                 VStack(alignment: .leading, spacing: 3) {
@@ -55,10 +60,21 @@ struct RecoveryPreparationView: View {
             let action: NativeRecoveryAction = recovery.needs.isEmpty ? .prepareRetry : .prepareAccess
             let reason = sessions.recoveryUnavailable(owner: owner, recovery: recovery, action: action)
             ExactDecisionButton(title: action == .prepareAccess ? "Prepare Plan With Reviewed Access" : "Prepare Recovery Plan", enabled: reason == nil) {
-                Task { await sessions.prepareRecovery(owner: owner, recovery: recovery, action: action) }
+                let reviewedAccess = owner.recoveryAccess[recovery.id]
+                Task { await sessions.prepareRecovery(owner: owner, recovery: recovery, action: action, reviewedAccess: reviewedAccess) }
             }
             if let reason { Text(verbatim: reason).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
             Text("For account repair, open /connections in Gator’s terminal app; inspect permissions with /permissions. Provider setup uses /models. Recovery does not run these commands or change those settings.").font(.caption).foregroundStyle(.secondary)
         }.accessibilityIdentifier("gator.recovery.prepare." + recovery.id)
+    }
+    private func moveAccount(_ requirement: JSONValue, selected: String, index: Int, direction: Int) {
+        guard owner.operation.isEmpty else { return }
+        let choices = requirement["choices"].array.filter { $0["issue"].string.isEmpty }
+        guard !choices.isEmpty else { return }
+        let current = choices.firstIndex { $0["id"].string == selected }
+        let next = current.map { min(max($0 + direction, 0), choices.count - 1) } ?? (direction > 0 ? 0 : choices.count - 1)
+        let account = choices[next]["id"].string
+        guard account != selected, owner.proposeRecoveryAccount(recovery, index: index, account: account) else { return }
+        Task { await sessions.reviewRecoveryAccess(owner: owner, recovery: recovery, proposed: true) }
     }
 }

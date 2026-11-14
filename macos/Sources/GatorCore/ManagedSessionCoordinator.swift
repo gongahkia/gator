@@ -276,12 +276,14 @@ public final class ManagedSessionCoordinator {
             await owner.reviewRecoveryAccess(recovery, proposed: proposed)
         }.value
     }
-    public func prepareRecovery(owner: GatorApplicationState, recovery: NativeRequestRecovery, action: NativeRecoveryAction) async {
+    public func prepareRecovery(owner: GatorApplicationState, recovery: NativeRequestRecovery, action: NativeRecoveryAction, reviewedAccess: NativeRecoveryAccess? = nil) async {
+        let capturedAccess = action == .prepareAccess ? reviewedAccess ?? owner.recoveryAccess[recovery.id] : nil
         let previous = owner.recoveryPreparation?.id
         await enqueue { [self] in
             guard owner.recoveryPreparation?.id == previous else { throw BridgeFailure("A preparation decision changed while this input waited. Inspect the original task.") }
             if let reason = recoveryUnavailable(owner: owner, recovery: recovery, action: action) { throw BridgeFailure(reason) }
-            await owner.prepareRecovery(recovery, action: action) { [self] in
+            guard action != .prepareAccess || (capturedAccess != nil && owner.recoveryAccess[recovery.id] == capturedAccess) else { throw BridgeFailure("The reviewed account selection changed after this decision. Inspect the new summary and explicitly prepare again.") }
+            await owner.prepareRecovery(recovery, action: action, reviewedAccess: capturedAccess) { [self] in
                 owner === current && !switching && !stopping && workingCount <= 3 && owners[recovery.conversationID] === owner
             }
             await owner.awaitRecoveryAdmission()

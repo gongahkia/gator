@@ -604,12 +604,12 @@ public final class GatorApplicationState {
         return nil
     }
     public func isCurrentRecoveryAccess(_ access: NativeRecoveryAccess) -> Bool {
-        guard isCurrentRecovery(access.recovery), let snapshot, access.scope == NativePlanPresentation.scope(snapshot), let review = access.review else { return false }
+        guard recoveryAccess[access.recovery.id] == access, isCurrentRecovery(access.recovery), let snapshot, access.scope == NativePlanPresentation.scope(snapshot), let review = access.review else { return false }
         return review["requirements"].array.count == access.selections.count && review["requirements"].array.map { $0["selected"].string } == access.selections
     }
     /// Synchronous invalidation occurs before an async request can be queued.
     public func proposeRecoveryAccount(_ candidate: NativeRequestRecovery, index: Int, account: String) -> Bool {
-        guard isCurrentRecovery(candidate), operation.isEmpty, var access = recoveryAccess[candidate.id], access.recovery == candidate, access.requirements.indices.contains(index), access.selections.indices.contains(index), access.requirements[index]["choices"].array.contains(where: { $0["id"].string == account && $0["issue"].string.isEmpty }) else { return false }
+        guard isCurrentRecovery(candidate), operation.isEmpty, var access = recoveryAccess[candidate.id], access.recovery == candidate, snapshot.map(NativePlanPresentation.scope) == access.scope, access.requirements.indices.contains(index), access.selections.indices.contains(index), access.requirements[index]["choices"].array.contains(where: { $0["id"].string == account && $0["issue"].string.isEmpty }) else { return false }
         access.selections[index] = account; access.review = nil; access.issue = "Selection changed · awaiting a fresh Go access review"
         recoveryAccess[candidate.id] = access; return true
     }
@@ -626,9 +626,10 @@ public final class GatorApplicationState {
         do { try await owner.send(.recovery(fields: fields), nonce: UUID().uuidString) }
         catch { if generation == candidate.generation, accessRequest?.id == request { accessRequest = nil; operation = ""; issue = error.localizedDescription } }
     }
-    func prepareRecovery(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction, finalAdmissionAllowed: @MainActor () -> Bool) async {
+    func prepareRecovery(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction, reviewedAccess: NativeRecoveryAccess? = nil, finalAdmissionAllowed: @MainActor () -> Bool) async {
         guard action != .reviewAccess, recoveryUnavailable(candidate, action: action) == nil, let owner = transport else { return }
-        let access = action == .prepareAccess ? recoveryAccess[candidate.id] : nil
+        let access = action == .prepareAccess ? reviewedAccess : nil
+        guard action != .prepareAccess || (access != nil && access == recoveryAccess[candidate.id]) else { return }
         var pending = NativeRecoveryPreparation(id: UUID().uuidString, nonce: UUID().uuidString, conversationID: conversationID, taskID: candidate.id, token: candidate.token, generation: generation, action: action, connections: access?.selections, accessToken: access?.review?["token"].string, previousRevision: snapshot?.value["task_plans"].array.first(where: { $0["id"].string == candidate.id })?["revision"].int ?? 0)
         setRecoveryPreparation(pending); operation = "Awaiting recovery preparation admission…"; issue = ""
         guard await flushDrafts() else { pending.phase = "not_submitted"; pending.error = "Could not retain the operation identity; no send attempted."; setRecoveryPreparation(pending); operation = ""; return }
