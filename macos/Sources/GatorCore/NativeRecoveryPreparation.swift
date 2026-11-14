@@ -37,6 +37,8 @@ public struct NativeRecoveryPreparation: Codable, Equatable, Sendable {
     public let connections: [String]?
     public let accessToken: String?
     public let previousRevision: Int
+    public var resultConfirmed: Bool?
+    public var accepted: Bool?
     public var phase = "submitted"
     public var error = ""
     public var blocks: Bool { ["submitted", "acknowledged", "accepted", "preparing", "uncertain"].contains(phase) }
@@ -48,7 +50,7 @@ public struct NativeRecoveryPreparation: Codable, Equatable, Sendable {
         case "preparing": return "Model preparing revised plan · no execution authorized"
         case "plan_ready": return "Revised plan ready · inspect its latest revision and approve separately"
         case "reconciled": return "A newer proposal is retained after reconnect. Prior admission remains unconfirmed; no request was replayed. Inspect the current plan."
-        case "uncertain": return "Preparation outcome uncertain · retained request identity; no automatic retry"
+        case "uncertain": return accepted == true ? "Preparation outcome uncertain · Go had admitted preparation; revised plan not confirmed; no automatic retry" : "Preparation outcome uncertain · admission unconfirmed; retained request identity; no automatic retry"
         case "rejected": return "Go rejected preparation: " + error
         case "not_submitted": return "Preparation not submitted: " + error
         default: return "Preparation failed: " + error

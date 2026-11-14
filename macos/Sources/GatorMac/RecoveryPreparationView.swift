@@ -12,7 +12,7 @@ struct RecoveryPreparationView: View {
             Text("Preparing may use the original model and consume usage to propose a revised plan. It does not approve that plan, grant account permissions or repeat external actions.").font(.callout).textSelection(.enabled)
             if !recovery.needs.isEmpty {
                 Button("Review Configured Account Access") {
-                    Task { await sessions.reviewRecoveryAccess(owner: owner, recovery: recovery) }
+                    Task { await sessions.reviewRecoveryAccess(owner: owner, recovery: recovery, proposed: owner.recoveryAccess[recovery.id]?.recovery == recovery) }
                 }.focusable().disabled(sessions.recoveryUnavailable(owner: owner, recovery: recovery, action: .reviewAccess) != nil)
                     .accessibilityLabel("Review configured account access for the original task")
                 if let access = owner.recoveryAccess[recovery.id] {
@@ -58,7 +58,7 @@ struct RecoveryPreparationView: View {
                 Task { await sessions.prepareRecovery(owner: owner, recovery: recovery, action: action) }
             }
             if let reason { Text(verbatim: reason).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-            Text("Account sign-in, credentials and permission changes use Gator’s existing terminal configuration. Recovery does not run terminal commands or change those settings.").font(.caption).foregroundStyle(.secondary)
+            Text("For account repair, open /connections in Gator’s terminal app; inspect permissions with /permissions. Provider setup uses /models. Recovery does not run these commands or change those settings.").font(.caption).foregroundStyle(.secondary)
         }.accessibilityIdentifier("gator.recovery.prepare." + recovery.id)
     }
 }

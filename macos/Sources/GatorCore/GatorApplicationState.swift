@@ -502,6 +502,7 @@ public final class GatorApplicationState {
 
     public func planAuthorizationUnavailable(_ review: NativePlanReview, action: NativePlanAction) -> String? { planAuthorizationIssue(review, action: action) }
     private func planAuthorizationIssue(_ review: NativePlanReview, action: NativePlanAction, permittedPendingID: String? = nil) -> String? {
+        if recoveryPreparation?.blocks == true { return "Recovery preparation is pending or unconfirmed. Inspect its resulting plan before any separate authorization." }
         let ownPrepared = permittedPendingID != nil && planOperation?.id == permittedPendingID && planOperation?.phase == .submitted
         guard managed, isConnected, let snapshot, snapshot.value["foreground"].bool else { return "Open and focus the original connected owner, then inspect again." }
         guard isCurrentPlanReview(review), planReviews[review.identity.taskID] == review else { return "This review changed. Inspect the exact current plan again." }
@@ -584,10 +585,12 @@ public final class GatorApplicationState {
     public func isCurrentRecovery(_ candidate: NativeRequestRecovery) -> Bool {
         isConnected && candidate.valid && candidate.generation == generation && candidate.conversationID == conversationID && requestRecoveries.contains(candidate)
     }
-    public func recoveryUnavailable(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction) -> String? {
+    public func recoveryUnavailable(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction) -> String? { recoveryEligibility(candidate, action: action) }
+    private func recoveryEligibility(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction, pendingID: String? = nil) -> String? {
+        let ownPending = pendingID != nil && recoveryPreparation?.id == pendingID && recoveryPreparation?.phase == "submitted"
         guard isCurrentRecovery(candidate), let snapshot, snapshot.value["foreground"].bool else { return "Open the original connected owner and inspect its current recovery state." }
-        if recoveryPreparation?.blocks == true { return "An earlier preparation is pending or uncertain. Inspect its original task; it cannot be retried automatically." }
-        if !operation.isEmpty || archive.pending != nil || approvalSending || snapshot.busy || snapshot.hasApproval || snapshot.hasExternal || snapshot.value["dialogue_dispatch"] != .null || snapshot.value["session_request"] != .null || snapshot.value["mode"].string != "chat" || snapshot.value["panel"] != .null { return "Return to the idle original owner before reviewing recovery." }
+        if recoveryPreparation?.blocks == true && !ownPending { return "An earlier preparation is pending or uncertain. Inspect its original task; it cannot be retried automatically." }
+        if (!operation.isEmpty && !ownPending) || archive.pending != nil || approvalSending || snapshot.busy || snapshot.hasApproval || snapshot.hasExternal || snapshot.value["dialogue_dispatch"] != .null || snapshot.value["session_request"] != .null || snapshot.value["mode"].string != "chat" || snapshot.value["panel"] != .null { return "Return to the idle original owner before reviewing recovery." }
         if !persistenceIssue.isEmpty { return "Native operation storage needs attention. Nothing will be submitted." }
         if !snapshot.value["requests_issue"].string.isEmpty { return snapshot.value["requests_issue"].string }
         if action == .reviewAccess { return candidate.needs.isEmpty ? "This task has no retained account-access requirement." : nil }
@@ -616,7 +619,7 @@ public final class GatorApplicationState {
         if proposed && selections == nil { return }
         let request = UUID().uuidString, scope = NativePlanPresentation.scope(snapshot)
         if var old = recoveryAccess[candidate.id] { old.review = nil; old.issue = "Reviewing configured account access…"; recoveryAccess[candidate.id] = old }
-        accessRequest = (request, candidate, selections, scope); operation = "Reviewing configured access…"
+        accessRequest = (request, candidate, selections, scope); operation = "Reviewing configured access…"; issue = ""
         startDeadline { [weak self] in self?.accessRequest = nil; self?.operation = ""; self?.issue = "Access review was not confirmed. No recovery plan or account change was requested. Review explicitly again." }
         var fields: [String: JSONValue] = ["conversation_id": .string(candidate.conversationID), "task_id": .string(candidate.id), "token": .string(candidate.token), "action": .string("review_access"), "request_id": .string(request)]
         if let selections { fields["connections"] = .array(selections.map(JSONValue.string)) }
@@ -627,10 +630,10 @@ public final class GatorApplicationState {
         guard action != .reviewAccess, recoveryUnavailable(candidate, action: action) == nil, let owner = transport else { return }
         let access = action == .prepareAccess ? recoveryAccess[candidate.id] : nil
         var pending = NativeRecoveryPreparation(id: UUID().uuidString, nonce: UUID().uuidString, conversationID: conversationID, taskID: candidate.id, token: candidate.token, generation: generation, action: action, connections: access?.selections, accessToken: access?.review?["token"].string, previousRevision: snapshot?.value["task_plans"].array.first(where: { $0["id"].string == candidate.id })?["revision"].int ?? 0)
-        setRecoveryPreparation(pending); operation = "Awaiting recovery preparation admission…"
+        setRecoveryPreparation(pending); operation = "Awaiting recovery preparation admission…"; issue = ""
         guard await flushDrafts() else { pending.phase = "not_submitted"; pending.error = "Could not retain the operation identity; no send attempted."; setRecoveryPreparation(pending); operation = ""; return }
         // Revalidate after persistence, without treating our own new receipt as a conflict.
-        let valid = isCurrentRecovery(candidate) && isConnected && snapshot?.value["foreground"].bool == true && snapshot?.running == false && snapshot?.hasApproval == false && (access == nil || access.map(isCurrentRecoveryAccess) == true)
+        let valid = recoveryEligibility(candidate, action: action, pendingID: pending.id) == nil && (access == nil || access.map(isCurrentRecoveryAccess) == true)
         guard valid && finalAdmissionAllowed() else { pending.phase = "not_submitted"; pending.error = "Owner, recovery, access or capacity changed before send. Inspect again."; setRecoveryPreparation(pending); operation = ""; return }
         // Invalidate all old plan authorization reads before mutation, even while admission is pending.
         planReviews.removeValue(forKey: candidate.id)
@@ -656,7 +659,10 @@ public final class GatorApplicationState {
         let result = next.value["request_recovery_result"]
         if let reading = accessRequest, result["request_id"].string == reading.id {
             let review = result["access_review"], rows = review["requirements"].array
-            if !result["error"].string.isEmpty { issue = result["error"].string }
+            if !result["error"].string.isEmpty {
+                issue = result["error"].string
+                if var access = recoveryAccess[reading.recovery.id] { access.review = nil; access.issue = issue; recoveryAccess[reading.recovery.id] = access }
+            }
             else if isCurrentRecovery(reading.recovery), reading.scope == NativePlanPresentation.scope(next), rows.map({ $0["need"] }) == reading.recovery.needs, rows.count <= 16, review["token"].string.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil, reading.connections == nil || rows.map({ $0["selected"].string }) == reading.connections {
                 recoveryAccess[reading.recovery.id] = NativeRecoveryAccess(recovery: reading.recovery, scope: reading.scope, requirements: rows, selections: rows.map { $0["selected"].string }, review: review)
                 issue = ""
@@ -665,9 +671,9 @@ public final class GatorApplicationState {
         }
         guard var pending = recoveryPreparation else { return }
         let prior = pending
-        if pending.generation == generation, pending.awaitsResult, result["request_id"].string == pending.id {
-            pending.error = result["error"].string
-            if pending.error.isEmpty && result["accepted"].bool { pending.phase = "accepted" }
+        if pending.generation == generation, pending.conversationID == next.conversationID, pending.awaitsResult, result["request_id"].string == pending.id {
+            pending.error = result["error"].string; pending.resultConfirmed = true; pending.accepted = pending.error.isEmpty && result["accepted"].bool
+            if pending.accepted == true { pending.phase = "accepted" }
             else { pending.phase = "rejected"; if pending.error.isEmpty { pending.error = "Go did not confirm preparation admission." } }
             if var access = recoveryAccess[pending.taskID] { access.review = nil; recoveryAccess[pending.taskID] = access }
             recoveryDeadline?.cancel(); operation = ""
