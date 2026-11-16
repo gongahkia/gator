@@ -77,4 +77,46 @@ Skill severity HIGH corresponds to P1, MEDIUM to material P2 and LOW to P3. Unve
 
 ## Remediation / after-state ledger
 
-Presentation implementation, targeted native checks, benchmark deltas and remaining accessibility boundaries will be appended here after the fixes. Before evidence above is preserved. No P0 is known; investigation items are not passed until actual observation supports them. Full acceptance is blocked by any reproducible unresolved P0/P1.
+Before evidence is preserved. The remediation below is implemented; desktop acceptance remains explicitly bounded by the verification report. No P0 authorization/data-loss defect was found. Missing interaction proof is not converted into PASS.
+
+| Finding | Implemented resolution | After evidence / assessment |
+| --- | --- | --- |
+| 01 | Extracted native editor; explicit responder paste, standard Edit commands, plain-text precedence and composition guard | Real hardware-style CG Command-V reached `paste`, staged pixels and required Send. Earlier Unicode-injected event never reached the responder. Headless AppKit event tests also pass. |
+| 02 | Typed file-URL/legacy file-list handling; rejects textual paths/web URLs, captures original import context | Component and actual Go staging tests pass. Native drag source/Finder automation did not establish an actual drop/chip; **NOT TESTED at desktop boundary**. No false success from a source drag operation alone. |
+| 03 | Shared native Markdown block presentation preserves fenced whitespace, headings and lists | `final/full-conversation-light.png`, `final/conversation.ax.txt`; literal commands/reviews bypass the renderer. |
+| 04–06 | Standard full-window toolbar/subtitle; centered welcome; plain assistant prose and expandable result/context sections | Compare before/full-idle and full-conversation with final counterparts. No coding sidebar or dashboard. |
+| 07,10–11 | Bounded actionable notice region, complete expandable errors, grouped native model/session/work-mode menus | Full/compact attachment and plan screenshots; connection label explicitly does not certify provider authentication. |
+| 08–09 | Adaptive accent (tested ≥4.5 contrast), semantic surfaces, count-bounded attachment viewport and balanced native editor | Light final + dark candidate screenshots; full contrast/preference acceptance remains partial. |
+| 12 | Avoid date parsing when no dialogue merge is needed; avoid duplicate message projection | 2,000-message median projection 191.568→2.621 ms in early comparable samples. Loaded repetitions are documented separately. |
+| 13 | Flat task/plan/action sections; explicit approval row, full exact text retained | Real Go plan inspection/Approve & Start observed; plan top/bottom screenshots. Token/revision/digest checks retained. Final GUI action/correction/recovery screenshot coverage incomplete. |
+| 14 | Bundled code-generated ICNS, productivity category, existing macOS15 metadata | Bundle metadata/resources verified. No downloaded art, external dependency or runtime repository path. |
+| 15 | Tab/Shift-Tab key-loop, composition/undo lifetime bound to conversation+generation, bounded text paste and compact Escape | Native AppKit tests and actual Tab-to-Attach observation. Physical IME/VoiceOver remain operator-led. |
+
+### Additional reproduced defect: repeated pasted images (P1)
+
+The running app accepted two separate screenshot pastes, but Go rejected admission: `attachment "Pasted image.png" was supplied more than once`. This is a real native naming defect, not a reason to relax Go validation. `NativeUploadStore` now assigns `Pasted image.png`, `Pasted image 2.png`, etc., checking existing draft names. Opaque IDs and immutable bytes remain distinct. Unit and real Go files-only multi-image delivery tests verify the fix. Duplicate user-selected document names still receive Go's accurate rejection; no original is renamed or overwritten silently.
+
+### Presentation lifetime/performance follow-up (P2)
+
+Process-only fixture appearance was being assigned repeatedly. It is now applied only when the name changes. The observed app sample returned to 0% idle CPU. This does not establish that all prior CPU usage was caused by appearance assignment: host load and AX automation were also substantial.
+
+Native configuration also preserves SwiftUI's own window identifier. Weak references identify compact/full presentations for activation and Escape; they do not own application/session lifetime. Full windows explicitly remain visible on deactivation. Headless AppKit tests cover mapping and scene-identity preservation. This is a precaution against scene restoration interference, not a claim that the earlier synthetic window loss has been conclusively attributed.
+
+### Remaining acceptance limits
+
+- Actual native drag-and-drop into the composer is unverified. No unrestricted path fallback was added.
+- Some AX menu/session interactions timed out or lost their target window. Main-thread sampling included an idle AppKit event loop, so these observations do not prove a product deadlock. Broad desktop/menu restoration acceptance remains **PARTIAL**.
+- Final screenshots do not cover every requested review/recovery/background/streaming/long-history state. Missing evidence is listed in the verification matrix.
+- Physical VoiceOver, physical IME, preference variants, multiple displays and Spaces require operator acceptance.
+- Real provider success is blocked by an invalid existing Gemini key; no credential/default was changed.
+- Safe upload pruning remains deferred; preserving retained inputs takes precedence over cleanup.
+
+**After-state verdict:** materially improved native chat hierarchy, readable output and safer native input, with strong headless functional evidence. This is not unconditional first-party-quality or final migration acceptance while the listed desktop checks remain incomplete.
+
+### Additional ownership/input findings during remediation
+
+Finding 15 also covers native editor lifetime: reusing one NSTextView across conversations can retain marked text and undo state while changing its edit callback. The editor now has a context/generation-bound SwiftUI identity. A headless NSHostingView test starts marked text in A, switches to B, verifies a different native editor, and commits the old editor without changing B. This is composition API testing, not physical IME acceptance.
+
+Fresh native profiles now request Go's existing `GATOR_UI_BOOT_MODE=new` so the initial editable conversation has a Go-created durable ID before typing/imports. Existing archives/drafts/uncertain workspace admissions retain their original restore path. A real Go test verifies initial identity, one owner, no model invocation/task/plan and idempotent second-surface startup. This uses existing protocol; it neither creates hidden work nor replaces the coordinator.
+
+The standalone marked-text/focus component fixture initially had a zero-size button and default released-on-close NSWindow. Corrected fixture geometry, explicit focusability and owned window lifetime preserve the same Tab/Shift-Tab assertions; six component cases then passed. No production timing assertion was relaxed.

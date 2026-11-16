@@ -46,12 +46,15 @@ import Testing
         let id = owner.conversationID; #expect(!id.isEmpty)
         let request = try #require(owner.beginAttachmentImport()); await owner.importImage(try attachmentPNG(), request: request)
         let image = try #require(owner.draftUploads.first)
+        let nextPaste = try #require(owner.beginAttachmentImport()); await owner.importImage(try attachmentPNG(), request: nextPaste)
+        let secondImage = try #require(owner.draftUploads.last)
+        #expect(secondImage.name == "Pasted image 2.png"); #expect(image.id != secondImage.id)
         try await f.send()
         try await managedEventually("files-only pixels delivered") { f.trace().contains { $0["kind"].string == "work" && $0.pretty.contains("data:image/png;base64,") } && owner.snapshot?.running == false }
         #expect(f.trace().contains { $0.pretty.contains("Please take a look at the attached files.") })
         let journal = try Data(contentsOf: f.root.appendingPathComponent("state/gator/conversations/" + id + "/requests.json"))
         let retained = String(decoding: journal, as: UTF8.self)
-        #expect(retained.contains(document.id)); #expect(retained.contains(image.id))
+        #expect(retained.contains(document.id)); #expect(retained.contains(image.id)); #expect(retained.contains(secondImage.id))
         #expect(FileManager.default.fileExists(atPath: f.configuration.nativeUploadDirectory.appendingPathComponent(document.id).path))
         #expect(owner.draftUploads.isEmpty); #expect(owner.draftText.isEmpty)
         await f.close()
@@ -83,4 +86,21 @@ import Testing
         try await managedEventually("main completion retained") { parent.snapshot?.running == false }
         await f.close()
     } catch { print("Attachment dialogue fixture:", f.app.issue, f.app.current.issue, f.trace().map(\.pretty)); await f.close(); throw error }
+}
+@Test @MainActor func realGoFreshNativeOwnerHasDurableIdentityBeforeFirstDraftWithoutStartingWork() async throws {
+    let f = try await NativeAttachmentFixture()
+    do {
+        #expect(await f.app.shutdown())
+        let pool = f.pool
+        f.app = ManagedSessionCoordinator(configuration: f.configuration, store: NativeDraftStore(directory: f.root.appendingPathComponent("fresh-native"), profile: "fresh"), factory: { pool.next() })
+        await f.app.start()
+        let owner = f.app.current
+        #expect(!owner.conversationID.isEmpty); #expect(owner.context == "conversation:" + owner.conversationID)
+        #expect(owner.canEditDraft); #expect(owner.snapshot?.running == false); #expect(owner.snapshot?.value["task_plans"].array.isEmpty == true)
+        #expect(f.trace().isEmpty); #expect(f.app.ownerCount == 1)
+        try await attach(owner, [try uploadFile(f.root)])
+        let files = owner.draftUploads
+        await f.app.start(); #expect(f.app.current === owner); #expect(f.app.ownerCount == 1); #expect(owner.draftUploads == files)
+        await f.close()
+    } catch { await f.close(); throw error }
 }

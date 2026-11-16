@@ -1,0 +1,15 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--1AB21518FC5DEDBE.txt
+[3/5] Emitting module GatorCoreTests
+[4/5] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[4/6] Write Objects.LinkFileList
+[5/6] Linking GatorNativePackageTests
+Build complete! (4.99s)
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+◇ Test realGoReceivesImmutableDocumentAndFilesOnlyImageThroughManagedOwner() started.
+✔ Test realGoReceivesImmutableDocumentAndFilesOnlyImageThroughManagedOwner() passed after 1.984 seconds.
+✔ Test run with 1 test passed after 1.985 seconds.

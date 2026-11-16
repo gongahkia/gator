@@ -165,7 +165,12 @@ public actor NativeUploadStore {
         let normalized = try imageThumbnail(bytes, normalize: true)
         guard normalized.count <= NativeUploadLimits.image, existing.count < NativeUploadLimits.count, NativeUploadLimits.validSelection(existing), existing.reduce(normalized.count, { $0 + $1.size }) <= NativeUploadLimits.total else { throw failure("Pasted image exceeds the 4 MiB image or 16 MiB message limit.") }
         let fd = try openRoot(); defer { close(fd) }
-        let name = "Pasted image.png", (directory, folder, output) = try create(fd, name: name)
+        // Go rejects duplicate input display names even with distinct upload IDs.
+        // Repeated screenshot pastes therefore need distinct staged names too.
+        let names = Set(existing.map(\.name))
+        var name = "Pasted image.png", suffix = 2
+        while names.contains(name) { name = "Pasted image \(suffix).png"; suffix += 1 }
+        let (directory, folder, output) = try create(fd, name: name)
         defer { close(output); close(folder) }
         do {
             try normalized.withUnsafeBytes { bytes in

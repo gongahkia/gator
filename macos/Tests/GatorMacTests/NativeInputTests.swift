@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 @testable import GatorMac
 
@@ -67,4 +68,50 @@ import Testing
 @Test @MainActor func fullWindowUsesStandardApplicationMenusWhileMenuBarOnlyStaysAccessory() {
     #expect(NativeApplicationPresentation.policy(hasFullWindow: true) == .regular)
     #expect(NativeApplicationPresentation.policy(hasFullWindow: false) == .accessory)
+}
+@Test @MainActor func oversizedPlainTextPasteLeavesCurrentNativeDraftIntact() {
+    let view = ComposerTextView(); view.isEditable = true; view.string = "Keep this draft"
+    view.onPasteImage = { false }; view.readPlainText = { String(repeating: "x", count: 128 * 1024 + 1) }
+    var rejected = false; view.onRejectedText = { _ in rejected = true }
+    view.paste(nil)
+    #expect(rejected); #expect(view.string == "Keep this draft")
+}
+
+@Test @MainActor func ownerSwitchReplacesNativeCompositionContextAndKeepsCallbacksWithOriginalOwner() async throws {
+    _ = NSApplication.shared
+    var editsA: [String] = [], editsB: [String] = []
+    func root(_ key: String, _ text: String, _ edit: @escaping (String) -> Void) -> some View {
+        NativeComposer(text: text, editable: true, focusRequest: UUID(), onEdit: edit, onDropFiles: { _ in false }, onDragTarget: { _ in }, onPasteImage: { false }, onSend: {}).id(key).frame(width: 300, height: 80)
+    }
+    let host = NSHostingView(rootView: root("owner-A", "A draft", { editsA.append($0) }))
+    host.frame = NSRect(x: 0, y: 0, width: 300, height: 80)
+    func editor(_ view: NSView) -> ComposerTextView? { if let text = view as? ComposerTextView { return text }; return view.subviews.lazy.compactMap(editor).first }
+    host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(30))
+    let original = try #require(editor(host))
+    original.setMarkedText("にほん", selectedRange: NSRange(location: 3, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+    host.rootView = root("owner-B", "B draft", { editsB.append($0) })
+    host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(30))
+    let replacement = try #require(editor(host))
+    #expect(replacement !== original); #expect(!replacement.hasMarkedText()); #expect(replacement.string == "B draft")
+    original.insertText("日本", replacementRange: NSRange(location: NSNotFound, length: 0))
+    #expect(editsB.isEmpty); #expect(replacement.string == "B draft")
+}
+
+@Test @MainActor func windowPresentationKeepsSwiftUISceneIdentityAndMapsBothSurfaces() {
+    let full = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 480), styleMask: [.titled], backing: .buffered, defer: true)
+    full.isReleasedWhenClosed = false; full.identifier = .init("conversation-scene")
+    NativeApplicationPresentation.register(full, compact: false)
+    #expect(full.identifier?.rawValue == "conversation-scene")
+    #expect(NativeApplicationPresentation.fullWindow === full)
+    #expect(!NativeApplicationPresentation.isCompact(full))
+    var compact: NSWindow? = NSWindow(contentRect: .zero, styleMask: [], backing: .buffered, defer: true)
+    compact?.isReleasedWhenClosed = false
+    NativeApplicationPresentation.register(compact!, compact: true)
+    #expect(NativeApplicationPresentation.isCompact(compact))
+    compact?.close(); compact = nil
+    // AppKit may retain a closed window until its event loop drains; the
+    // presentation registry deliberately does not own that lifetime.
+    #expect(NativeApplicationPresentation.fullWindow === full)
+    #expect(full.identifier?.rawValue == "conversation-scene")
+    full.close()
 }

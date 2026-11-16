@@ -1,0 +1,24 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[2/7] Copying Fixtures
+[3/7] Write swift-version--1AB21518FC5DEDBE.txt
+[5/10] Emitting module GatorMac
+[6/10] Compiling GatorMac NativeWindowConfiguration.swift
+[7/10] Compiling GatorMac NativeComposer.swift
+[8/11] Compiling GatorMac AppDelegate.swift
+[8/13] Write Objects.LinkFileList
+[9/13] Linking GatorMac
+[10/13] Applying GatorMac
+[12/15] Compiling GatorMacTests NativeInputTests.swift
+[13/15] Emitting module GatorMacTests
+[13/15] Write Objects.LinkFileList
+[14/15] Linking GatorNativePackageTests
+Build complete! (55.57s)
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+◇ Test windowPresentationKeepsSwiftUISceneIdentityAndWeakReferences() started.
+✘ Test windowPresentationKeepsSwiftUISceneIdentityAndWeakReferences() recorded an issue at NativeInputTests.swift:112:5: Expectation failed: (NativeApplicationPresentation.compactWindow → <NSWindow: 0x7fd0b7204d90>) == nil
+✘ Test windowPresentationKeepsSwiftUISceneIdentityAndWeakReferences() failed after 0.367 seconds with 1 issue.
+✘ Test run with 1 test failed after 0.370 seconds with 1 issue.

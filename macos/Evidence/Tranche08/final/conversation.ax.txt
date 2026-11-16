@@ -1,0 +1,59 @@
+AXApplication | Gator |  | 
+AXWindow | Gator – Read these controlled attachments and summarize my day. |  | 
+AXGroup |  |  | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Pasted image.png
+AXStaticText |  |  | brief.md
+AXStaticText |  |  | Read these controlled attachments and summarize my day.
+AXStaticText |  |  | Gator
+AXHeading |  | Your day, with room to breathe | 
+AXStaticText |  |  | I found three useful things to keep in view. The draft remains yours to review.
+AXStaticText |  |  | • Finish the project update.
+AXStaticText |  |  | • Leave time for lunch.
+AXStaticText |  |  | • Review the travel details before booking.
+AXHeading |  | A small example | 
+AXGroup |  | swift code | 
+AXStaticText |  |  | swift
+AXScrollArea |  |  | 
+AXStaticText |  |  | let message = "Hello, Gator"
+print(message)
+AXStaticText |  |  | A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+AXLink | https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes |  | 
+AXStaticText |  |  | Nothing has been sent or scheduled. You can ask for a correction or keep talking.
+AXDisclosureTriangle |  | Retained work result | 
+AXDisclosureTriangle |  | Context and sources | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXPopUpButton |  | Select Model | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Inspect Current Task | 
+AXGroup |  |  | 
+AXPopUpButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Read these controlled attachments and summarize my day.
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

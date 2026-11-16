@@ -1,0 +1,16 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--1AB21518FC5DEDBE.txt
+[3/6] Emitting module GatorCoreTests
+[4/6] Compiling GatorCoreTests NativePerformanceTests.swift
+[4/6] Write Objects.LinkFileList
+[5/6] Linking GatorNativePackageTests
+Build complete! (3.33s)
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+◇ Test nativePresentationBenchmark() started.
+GATOR_BENCHMARK {"fixtures":[{"bytes":24084,"decodeMedianMS":1.5690326690673828,"messages":50,"transcriptMedianMS":5.5059194564819336},{"bytes":240934,"decodeMedianMS":13.357043266296387,"messages":500,"transcriptMedianMS":48.399090766906738},{"bytes":964934,"decodeMedianMS":51.544904708862305,"messages":2000,"transcriptMedianMS":191.56801700592041}],"kind":"native-presentation","peakRSSBytes":14860288,"samples":7}
+✔ Test nativePresentationBenchmark() passed after 2.268 seconds.
+✔ Test run with 1 test passed after 2.268 seconds.

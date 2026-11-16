@@ -86,3 +86,14 @@ func nativeUploadLimitsRejectInvalidSelections(_ kind: String) async throws {
     #expect(NativeClipboardPolicy.pasteImage(hasText: true, hasFileURL: false, hasImage: true, explicitlyImage: true))
     #expect(!NativeClipboardPolicy.pasteImage(hasText: false, hasFileURL: true, hasImage: true, explicitlyImage: true))
 }
+
+@Test func repeatedImagePastesHaveDistinctBackendInputNamesAndImmutableIDs() async throws {
+    let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+    let store = NativeUploadStore(root: root.appendingPathComponent("uploads")), png = try attachmentPNG()
+    let first = try await store.importPastedImage(png, existing: [])[0]
+    let second = try await store.importPastedImage(png, existing: [first])[0]
+    let third = try await store.importPastedImage(png, existing: [first, second])[0]
+    #expect([first.name, second.name, third.name] == ["Pasted image.png", "Pasted image 2.png", "Pasted image 3.png"])
+    #expect(Set([first.id, second.id, third.id]).count == 3)
+    try await store.check([first, second, third])
+}

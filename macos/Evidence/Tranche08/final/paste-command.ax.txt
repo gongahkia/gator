@@ -1,0 +1,32 @@
+AXApplication | Gator |  | 
+AXWindow | Gator – New chat |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | What can I help with?
+AXStaticText |  |  | Ask a question, make a plan, or pick up where you left off.
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXPopUpButton |  | Select Model | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Inspect Current Task | 
+AXGroup |  |  | 
+AXPopUpButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | New chat
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

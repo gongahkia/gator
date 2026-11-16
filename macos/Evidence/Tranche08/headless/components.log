@@ -1,0 +1,54 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[4/11] Copying Fixtures
+[5/11] Write swift-version--1AB21518FC5DEDBE.txt
+[7/15] Compiling GatorCore NativeMessageContent.swift
+[8/15] Emitting module GatorCore
+[9/15] Compiling GatorCore BridgeProtocol.swift
+[10/15] Compiling GatorCore GatorApplicationState.swift
+[11/50] Compiling GatorMac NativeMessageBody.swift
+[12/50] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[13/50] Compiling GatorMac PlanReviewContent.swift
+[14/50] Compiling GatorMac RecoveryInspectorContent.swift
+[15/52] Compiling GatorMac ExactDecisionButton.swift
+[16/52] Compiling GatorMac ExactReviewContent.swift
+[17/52] Compiling GatorMac NativeComposer.swift
+[18/52] Compiling GatorMac NativeDropInput.swift
+[19/52] Compiling GatorMac GatorApp.swift
+[20/52] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[21/52] Emitting module GatorMac
+[22/52] Compiling GatorMac AppDelegate.swift
+[23/52] Compiling GatorMac ApprovalReviewView.swift
+[24/52] Compiling GatorMac AttachmentSelectionView.swift
+[25/52] Compiling GatorCoreTests NativeMessageContentTests.swift
+[26/52] Compiling GatorMac ConversationView.swift
+[27/52] Compiling GatorMac RecoveryPreparationView.swift
+[28/52] Compiling GatorMac TaskInspectorView.swift
+[28/52] Write Objects.LinkFileList
+[29/52] Linking GatorMac
+[30/52] Applying GatorMac
+[32/54] Emitting module GatorMacTests
+[33/54] Compiling GatorMacTests NativeInputTests.swift
+[39/54] Compiling GatorCoreTests GoIntegrationTests.swift
+[45/54] Emitting module GatorCoreTests
+[53/56] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[54/56] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[54/56] Write Objects.LinkFileList
+[55/56] Linking GatorNativePackageTests
+Build complete! (33.36s)
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+◇ Test nativeMarkdownPreservesCodeWhitespaceAndSeparatesReadableBlocks() started.
+✔ Test nativeMarkdownPreservesCodeWhitespaceAndSeparatesReadableBlocks() passed after 0.002 seconds.
+◇ Test nativePresentationBenchmark() started.
+GATOR_BENCHMARK {"fixtures":[{"bytes":24084,"decodeMedianMS":1.1779069900512695,"messages":50,"transcriptMedianMS":0.068068504333496094},{"bytes":240934,"decodeMedianMS":12.849092483520508,"messages":500,"transcriptMedianMS":0.60796737670898438},{"bytes":964934,"decodeMedianMS":51.329970359802246,"messages":2000,"transcriptMedianMS":2.6209354400634766}],"kind":"native-presentation","peakRSSBytes":14970880,"samples":7}
+✔ Test nativePresentationBenchmark() passed after 0.523 seconds.
+◇ Test commandVPasteRoutesExactlyOnceAndPlainTextUsesNativeInsertion() started.
+✔ Test commandVPasteRoutesExactlyOnceAndPlainTextUsesNativeInsertion() passed after 0.168 seconds.
+◇ Test markedTextDoesNotBecomeAnAttachmentOrLoseComposition() started.
+✔ Test markedTextDoesNotBecomeAnAttachmentOrLoseComposition() passed after 0.027 seconds.
+◇ Test filePasteboardCarriesOnlyExplicitFileURLsAndRetainsOrdering() started.
+✔ Test filePasteboardCarriesOnlyExplicitFileURLsAndRetainsOrdering() passed after 0.009 seconds.
+✔ Test run with 5 tests passed after 0.732 seconds.

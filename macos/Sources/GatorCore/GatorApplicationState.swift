@@ -147,6 +147,12 @@ public final class GatorApplicationState {
         do {
             archive = try await store.load(); loaded = true
             if configuration.conversationID.isEmpty && configuration.bootMode != "new" { configuration.conversationID = archive.selectedConversationID }
+            // Allocate an idle durable identity before exposing a fresh native
+            // composer. Existing drafts/uncertain workspace admissions keep the
+            // legacy restore path; opening another scene never calls this twice.
+            if managed, configuration.conversationID.isEmpty, configuration.bootMode.isEmpty, archive.drafts.isEmpty, archive.pending == nil, archive.pendingByContext?.isEmpty != false {
+                configuration.bootMode = "new"
+            }
             if managed {
                 let requested = configuration.conversationID.isEmpty ? "workspace:" + configuration.workspace.path : "conversation:" + configuration.conversationID
                 let matching = archive.pendingByContext?.values.filter { !($0.ownerConversationID ?? "").isEmpty && "conversation:" + ($0.ownerConversationID ?? "") == requested } ?? []

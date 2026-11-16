@@ -18,20 +18,33 @@ struct NativeWindowConfiguration: NSViewRepresentable {
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); configure() }
         func configure() {
             guard let window else { return }
-            window.identifier = .init(compact ? "gator.compact" : "gator.main")
+            // SwiftUI owns its scene/window identifier. Keep weak presentation-only
+            // references instead of overwriting the scene's restoration identity.
+            NativeApplicationPresentation.register(window, compact: compact)
+            if !compact { window.hidesOnDeactivate = false }
             DispatchQueue.main.async { NativeApplicationPresentation.update() }
             #if DEBUG
             // Process-scoped fixture appearance only; never writes OS defaults.
-            if let mode = ProcessInfo.processInfo.environment["GATOR_NATIVE_TEST_APPEARANCE"], ["light", "dark"].contains(mode) { window.appearance = NSAppearance(named: mode == "dark" ? .darkAqua : .aqua) }
+            if let mode = ProcessInfo.processInfo.environment["GATOR_NATIVE_TEST_APPEARANCE"], ["light", "dark"].contains(mode) {
+                let name: NSAppearance.Name = mode == "dark" ? .darkAqua : .aqua
+                if window.appearance?.name != name { window.appearance = NSAppearance(named: name) }
+                if NSApp.appearance?.name != name { NSApp.appearance = NSAppearance(named: name) }
+            }
             #endif
         }
     }
 }
 
 @MainActor enum NativeApplicationPresentation {
+    private(set) static weak var fullWindow: NSWindow?
+    private(set) static weak var compactWindow: NSWindow?
+    static func register(_ window: NSWindow, compact: Bool) {
+        if compact { compactWindow = window } else { fullWindow = window }
+    }
+    static func isCompact(_ window: NSWindow?) -> Bool { window != nil && window === compactWindow }
     static func policy(hasFullWindow: Bool) -> NSApplication.ActivationPolicy { hasFullWindow ? .regular : .accessory }
     static func update() {
-        let full = NSApp.windows.contains { $0.identifier?.rawValue == "gator.main" && $0.isVisible }
+        let full = fullWindow?.isVisible == true
         let desired = policy(hasFullWindow: full)
         if NSApp.activationPolicy() != desired { NSApp.setActivationPolicy(desired) }
     }

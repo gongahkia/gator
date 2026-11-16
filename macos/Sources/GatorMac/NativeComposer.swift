@@ -16,6 +16,7 @@ struct NativeComposer: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView(); scroll.drawsBackground = false
+        scroll.setAccessibilityIdentifier("gator.composer.input")
         scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         let view = ComposerTextView(); view.delegate = context.coordinator
         view.isRichText = false; view.allowsUndo = true; view.drawsBackground = false
@@ -27,6 +28,7 @@ struct NativeComposer: NSViewRepresentable {
         view.isVerticallyResizable = true; view.isHorizontallyResizable = false
         view.autoresizingMask = [.width]; view.textContainer?.widthTracksTextView = true
         view.setAccessibilityLabel("Message Gator")
+        view.setAccessibilityIdentifier("gator.composer.text")
         view.setAccessibilityHelp("Return sends. Shift Return inserts a newline. Composing text is not submitted until composition ends.")
         view.registerForDraggedTypes([.fileURL, .init("NSFilenamesPboardType")])
         scroll.documentView = view
@@ -37,6 +39,7 @@ struct NativeComposer: NSViewRepresentable {
         guard let view = scroll.documentView as? ComposerTextView else { return }
         view.onDropFiles = onDropFiles; view.onDragTarget = onDragTarget
         view.onPasteImage = onPasteImage
+        view.onRejectedText = onEdit
         view.isEditable = editable
         if editable { view.requestComposerFocus(focusRequest) }
         if !view.hasMarkedText(), view.string != text {
@@ -86,9 +89,10 @@ final class ComposerTextView: NSTextView {
         return super.performDragOperation(sender)
     }
     var onPasteImage: (() -> Bool)?
+    var onRejectedText: ((String) -> Void)?
     var readPlainText: () -> String? = { NSPasteboard.general.string(forType: .string) }
     override func cancelOperation(_ sender: Any?) {
-        if !hasMarkedText(), window?.identifier?.rawValue == "gator.compact" { window?.close(); return }
+        if !hasMarkedText(), NativeApplicationPresentation.isCompact(window) { window?.close(); return }
         super.cancelOperation(sender)
     }
     private func isPasteShortcut(_ event: NSEvent) -> Bool {
@@ -116,7 +120,12 @@ final class ComposerTextView: NSTextView {
         if onPasteImage?() == true { NativeInputTrace.record("image paste handled"); return }
         // Plain text wins when both text and pixels are present; HTML is never
         // rendered or interpreted, and file URLs never become image imports.
-        if let text = readPlainText() { insertText(text, replacementRange: selectedRange()) }
+        if let text = readPlainText() {
+            if text.utf8.count > 128 * 1024 { onRejectedText?(text); return }
+            let proposed = (string as NSString).replacingCharacters(in: selectedRange(), with: text)
+            if proposed.utf8.count > 128 * 1024 { onRejectedText?(proposed); return }
+            insertText(text, replacementRange: selectedRange())
+        }
     }
     private var requested: UUID?
     private var handled: UUID?

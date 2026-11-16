@@ -1,0 +1,14 @@
+{
+  "os": "macOS 15.7.7",
+  "sdk": "macOS 15.5",
+  "swift": "6.1.2",
+  "cpu": "Intel Core i5-8279U 2.40 GHz",
+  "memoryGiB": 8,
+  "scratch": "/tmp/gator-native-build",
+  "benchmarkSamples": 7,
+  "hostLoadObserved": [
+    45.55,
+    181.93
+  ],
+  "systemPreferencesChanged": false
+}

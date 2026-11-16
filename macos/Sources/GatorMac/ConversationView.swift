@@ -197,7 +197,11 @@ struct ConversationView: View {
                                 if entry["kind"].string == "text" { Text(verbatim: entry["text"].string).textSelection(.enabled) }
                             }
                             DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
-                                Text(verbatim: application.snapshot?.value["activity"].pretty ?? "").font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                                ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in
+                                    Text(verbatim: entry["tool"].string + " · " + entry["state"].string).textSelection(.enabled)
+                                }
+                                Button("Inspect Current Task") { sessions.inspectTask(application.conversationID) }
+                                Text("Public task status and retained evidence are available in the inspector.")
                             }.font(.caption).foregroundStyle(.secondary)
                         }
                     }

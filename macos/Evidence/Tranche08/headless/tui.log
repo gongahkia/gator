@@ -1,0 +1,31 @@
+bun test v1.4.2 (744846f84)
+
+tests/receipts.test.tsx:
+(pass) uncertain send receipt checks are read only, immutable and retained across restart [4918.27ms]
+(pass) a crashed approved dispatch reopens only its owned receipt and never retries the send [2307.78ms]
+(pass) contextual receipts retain original account, permission checks and cancelled-read outcomes at 110×34 [5655.71ms]
+(pass) contextual receipts retain original account, permission checks and cancelled-read outcomes at 80×24 [6136.74ms]
+(pass) contextual receipts retain original account, permission checks and cancelled-read outcomes at 60×20 [5824.32ms]
+(pass) contextual receipts retain original account, permission checks and cancelled-read outcomes at 42×14 [6372.26ms]
+
+tests/draft-synchronization.test.tsx:
+(pass) programmatic drafts wait for native layout and keep the latest text through work snapshots [864.12ms]
+
+tests/conversation-during-work.test.tsx:
+(pass) ordinary messages converse, steer an original task and delegate work without changing focus; results survive restart [18206.47ms]
+(pass) ordinary conversation cancels a preparing plan and a delegated review through their exact native owners [4173.68ms]
+
+tests/attachments.test.tsx:
+(skip) file selection and native image paste preserve drafts, reject limits, and submit immutable files only explicitly
+
+tests/approvals.test.tsx:
+(pass) exact live approval is required before a connected send and stale tokens cannot approve [2270.63ms]
+
+tests/recovery.test.tsx:
+(pass) restart leaves interrupted requests paused and keyboard resume uses the admitted immutable attachment [4564.46ms]
+
+ 11 pass
+ 1 skip
+ 0 fail
+ 313 expect() calls
+Ran 12 tests across 6 files. [63.91s]

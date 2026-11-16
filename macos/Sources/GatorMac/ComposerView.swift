@@ -33,6 +33,9 @@ struct ComposerView: View {
                 }, onDragTarget: { dropTargeted = $0 }, onPasteImage: { NativeAttachmentActions.pasteImage(owner: application, explicitly: false) }) {
                     if sessions.canSubmit { let owner = application; Task { await sessions.submit(from: owner) } }
                 }
+                // A native input context/undo stack must never be reused for a
+                // different conversation or replacement execution owner.
+                .id(application.context + ":" + application.generation.uuidString)
             }
             .frame(height: compact ? 56 : 76)
             HStack {

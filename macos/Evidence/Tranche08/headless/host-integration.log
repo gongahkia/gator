@@ -1,0 +1,33 @@
+bun test v1.4.2 (744846f84)
+
+app-host/tests/preparation-recovery.test.ts:
+(pass) direct removed-source preparation recovers after repair without an invented run [2000.72ms]
+(pass) direct removed-source preparation recovers with replacement without an invented run [3091.51ms]
+(pass) reviewed removed-source preparation recovers after repair without an invented run [1937.41ms]
+(pass) before first proposal removed-source preparation recovers after repair without an invented run [2252.13ms]
+(pass) reviewed removed-source preparation recovers with replacement without an invented run [2921.09ms]
+(pass) before first proposal removed-source preparation recovers with replacement without an invented run [2080.01ms]
+(pass) delegated source removal before_submission preserves original admitted scope and independent parent work [3406.16ms]
+(pass) delegated source removal during_routing preserves original admitted scope and independent parent work [2358.36ms]
+(pass) delegated source removal after_review preserves original admitted scope and independent parent work [3506.48ms]
+
+app-host/tests/task-access.test.ts:
+(pass) direct task retains its original identity through missing setup, account review and fresh execution [3072.14ms]
+(pass) direct task retains its original identity through credentials setup, account review and fresh execution [3649.28ms]
+(pass) direct task retains its original identity through permission setup, account review and fresh execution [2690.66ms]
+(pass) planned task retains its original identity through missing setup, account review and fresh execution [3643.10ms]
+(pass) planned task retains its original identity through credentials setup, account review and fresh execution [3675.81ms]
+(pass) planned task retains its original identity through permission setup, account review and fresh execution [2845.79ms]
+(pass) delegated missing access repair stays in the original child and preserves independent parent work [4516.67ms]
+(pass) delegated permission access repair stays in the original child and preserves independent parent work [4707.49ms]
+
+app-host/tests/access-rereview.test.ts:
+(pass) prepared recovery can review its repaired credential without duplicating work or budget [4305.39ms]
+(pass) prepared recovery can replace its selected account without duplicating work or budget [4067.23ms]
+(pass) failed-proposal recovery can review its repaired credential without duplicating work or budget [4009.66ms]
+(pass) failed-proposal recovery can replace its selected account without duplicating work or budget [3472.22ms]
+
+ 21 pass
+ 0 fail
+ 561 expect() calls
+Ran 21 tests across 3 files. [68.52s]

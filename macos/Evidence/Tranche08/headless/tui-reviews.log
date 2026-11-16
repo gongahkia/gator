@@ -1,0 +1,41 @@
+bun test v1.4.2 (744846f84)
+
+tests/plan-corrections.test.tsx:
+(pass) ordinary correction during initial preparation retires the old proposal and keeps exact review at 110×34 [4481.59ms]
+(pass) ordinary correction during initial preparation retires the old proposal and keeps exact review at 80×24 [3398.72ms]
+(pass) ordinary correction during initial preparation retires the old proposal and keeps exact review at 60×20 [3421.76ms]
+(pass) ordinary correction during initial preparation retires the old proposal and keeps exact review at 42×14 [3491.83ms]
+(pass) initial correction cancel retains original task through restart at 110×34 [2256.64ms]
+(pass) initial correction failure and retry retains original task through restart at 110×34 [2403.09ms]
+(pass) initial correction cancel retains original task through restart at 80×24 [2154.63ms]
+(pass) initial correction failure and retry retains original task through restart at 80×24 [2433.05ms]
+(pass) initial correction cancel retains original task through restart at 60×20 [2118.37ms]
+(pass) initial correction failure and retry retains original task through restart at 60×20 [2286.46ms]
+(pass) initial correction cancel retains original task through restart at 42×14 [2115.81ms]
+(pass) initial correction failure and retry retains original task through restart at 42×14 [2302.30ms]
+(pass) crashed initial correction stays interrupted until explicit retry at 110×34 [2513.74ms]
+(pass) crashed initial correction stays interrupted until explicit retry at 80×24 [2322.91ms]
+(pass) crashed initial correction stays interrupted until explicit retry at 60×20 [2392.54ms]
+(pass) crashed initial correction stays interrupted until explicit retry at 42×14 [2425.61ms]
+(pass) an empty plan-first draft survives restart and keyboard submission still prepares review [1531.50ms]
+(pass) ordinary corrections revise the same plan while conversation continues, then require a fresh keyboard review [3670.05ms]
+(pass) failed plan corrections retain the previous draft and retry only after another explicit message [2246.21ms]
+(pass) conversational cancellation stops an in-flight plan correction without reviving its proposal [1659.16ms]
+(pass) a delegated preparing plan correction returns its real result to the requesting chat without disturbing other work [3573.94ms]
+(pass) a delegated review plan correction returns its real result to the requesting chat without disturbing other work [3599.01ms]
+(pass) a second ordinary correction replaces an active revision in the same real Go owner [2043.56ms]
+(pass) typed input removal retains originals and executes only the freshly reviewed selection [2618.73ms]
+
+tests/request-recovery-controls.test.tsx:
+(pass) native keyboard recovery inspects failure and prepares original task for review at 110×34 [2697.86ms]
+(pass) native keyboard recovery inspects failure and prepares original task for review at 80×24 [2646.47ms]
+(pass) native keyboard recovery inspects failure and prepares original task for review at 60×20 [2647.66ms]
+(pass) native keyboard recovery inspects failure and prepares original task for review at 42×14 [2535.45ms]
+
+tests/approval-review.test.tsx:
+(pass) approval reviews show exact content, scroll at all sizes and refuse changed or missing previews [708.38ms]
+
+ 29 pass
+ 0 fail
+ 502 expect() calls
+Ran 29 tests across 3 files. [78.04s]
