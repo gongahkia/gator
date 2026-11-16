@@ -5,6 +5,10 @@ public struct BridgeLaunchConfiguration: Sendable {
     public var workspace: URL
     public var environment: [String: String]
     public var conversationID: String
+    var nativeUploadDirectory: URL {
+        let state = environment["GATOR_STATE_DIR"] ?? environment["XDG_STATE_HOME"] ?? ((environment["HOME"] ?? NSHomeDirectory()) + "/.local/state")
+        return URL(fileURLWithPath: state, relativeTo: workspace).standardizedFileURL.appendingPathComponent("gator/native-uploads", isDirectory: true)
+    }
     var managed = false
     var bootMode = ""
     var startSource = ""
@@ -63,6 +67,7 @@ actor GoBridgeConnection: BridgeTransport {
             environment["GATOR_UI_VIEW_ORIGIN"] = configuration.viewOrigin
         }
         environment["GATOR_UI_BACKEND"] = "1"
+        environment["GATOR_DESKTOP_UPLOAD_DIR"] = configuration.nativeUploadDirectory.path
         p.environment = environment; p.standardInput = stdin; p.standardOutput = stdout; p.standardError = stderr
         process = p; input = stdin.fileHandleForWriting
         do { try p.run() }

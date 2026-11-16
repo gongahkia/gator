@@ -25,7 +25,7 @@ struct TaskInspectorView: View {
                         if !task.summary.isEmpty { Text("Public retained summary · open the conversation for full output").font(.caption).foregroundStyle(.secondary); Text(verbatim: task.summary).textSelection(.enabled) }
                         if !task.issue.isEmpty { Label("Task needs attention", systemImage: "exclamationmark.triangle"); Text(verbatim: task.issue).textSelection(.enabled) }
                         if owner !== sessions.current {
-                            Text("Work stays in its original Go owner while you inspect it.").font(.caption).foregroundStyle(.secondary)
+                            Text("Work continues in its original conversation while you inspect it.").font(.caption).foregroundStyle(.secondary)
                             Button("Open Owning Chat") { Task { await sessions.openConversation(task.ownerID) } }.disabled(sessions.switching)
                         }
                         DisclosureGroup("Task identity and ownership") {
@@ -75,13 +75,13 @@ struct TaskInspectorView: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
             }.frame(maxHeight: .infinity)
-        }.padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        }.padding(14).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
             .accessibilityIdentifier("gator.task.inspector." + inspection.ownerID)
     }
     @ViewBuilder private func plan(_ summary: JSONValue, identity: NativePlanIdentity, owner: GatorApplicationState) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Task plan", systemImage: "list.number").font(.headline)
-            Text(verbatim: summary["task"].string).textSelection(.enabled)
+            if owner.planReviews[identity.taskID] == nil { Text(verbatim: summary["task"].string).textSelection(.enabled) }
             Text("Phase: " + summary["phase"].string + " · revision " + String(identity.revision)).font(.caption)
             if !summary["issue"].string.isEmpty { Text(verbatim: summary["issue"].string).textSelection(.enabled) }
             if let review = owner.planReviews[identity.taskID] {
@@ -102,6 +102,6 @@ struct TaskInspectorView: View {
                     .disabled(!sessions.isInspectionCurrent || !owner.isConnected || !owner.operation.isEmpty)
             } else { Text("Open the owning chat to load its complete revision-bound review.").font(.caption) }
             Text(NativePlanPresentation.phaseLabel(summary)).font(.caption).foregroundStyle(.secondary)
-        }.padding(12).background(.background, in: RoundedRectangle(cornerRadius: 10))
+        }.padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
     }
 }

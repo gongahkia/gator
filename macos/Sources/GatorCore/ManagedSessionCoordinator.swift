@@ -25,6 +25,7 @@ public final class ManagedSessionCoordinator {
     private var attention: [String: NativeChatActivity] = [:]
     private var uncertain: Set<UUID> = []
     @ObservationIgnored private let configuration: BridgeLaunchConfiguration
+    @ObservationIgnored private let uploads: NativeUploadStore
     @ObservationIgnored private let store: NativeDraftStore
     @ObservationIgnored private let factory: @Sendable () -> any BridgeTransport
     @ObservationIgnored private let operationTimeout: Duration
@@ -42,8 +43,9 @@ public final class ManagedSessionCoordinator {
     }
     init(configuration: BridgeLaunchConfiguration, store: NativeDraftStore, operationTimeout: Duration = .seconds(5), admissionTimeout: Duration = .seconds(20), factory: @escaping @Sendable () -> any BridgeTransport) {
         var config = configuration; config.managed = true
+        let uploads = NativeUploadStore(root: config.nativeUploadDirectory); self.uploads = uploads
         self.configuration = config; self.store = store; self.factory = factory; self.operationTimeout = operationTimeout; self.admissionTimeout = admissionTimeout
-        let owner = GatorApplicationState(configuration: config, store: store, responseTimeout: admissionTimeout, factory: factory)
+        let owner = GatorApplicationState(configuration: config, store: store, responseTimeout: admissionTimeout, uploads: uploads, factory: factory)
         current = owner
         let key = UUID(); records[key] = owner; order = [key]; expected[key] = config.conversationID
         observe(owner)
@@ -110,9 +112,12 @@ public final class ManagedSessionCoordinator {
         guard !started else { return }; started = true
         await enqueue { [self] in
             await current.start(); try await current.awaitReady()
-            try validateIdentity(current)
+            // Go assigns the first durable conversation on admission. An idle
+            // workspace draft is valid; never invent a conversation identity.
+            if !current.conversationID.isEmpty { try validateIdentity(current) }
+            else if !configuration.conversationID.isEmpty || current.context.isEmpty { throw BridgeFailure("Go did not confirm the original conversation or workspace.") }
             try await focus(current, true)
-            try await store.selectConversation(current.conversationID)
+            if !current.conversationID.isEmpty { try await store.selectConversation(current.conversationID) }
             scheduleHostProjection()
         }.value
     }
@@ -132,7 +137,7 @@ public final class ManagedSessionCoordinator {
         return nil
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
-        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
+        guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, owner.attachmentImport == nil, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
     }
@@ -148,7 +153,7 @@ public final class ManagedSessionCoordinator {
         }
         guard !stopping else { throw BridgeFailure("Gator is closing.") }
         var config = configuration; config.conversationID = id; config.bootMode = new ? "new" : ""; config.startSource = source
-        let owner = GatorApplicationState(configuration: config, store: store, responseTimeout: admissionTimeout, factory: factory), key = UUID()
+        let owner = GatorApplicationState(configuration: config, store: store, responseTimeout: admissionTimeout, uploads: uploads, factory: factory), key = UUID()
         records[key] = owner; order.append(key); expected[key] = id; observe(owner)
         await owner.start()
         do { try await owner.awaitReady(); try validateIdentity(owner) }
@@ -390,6 +395,11 @@ public final class ManagedSessionCoordinator {
 
     private func changed(_ owner: GatorApplicationState, before: BridgeSnapshot?) {
         guard let key = key(for: owner), !stopping else { return }
+        if before?.conversationID != owner.conversationID, validConversationID(owner.conversationID), expected[key, default: ""].isEmpty {
+            expected[key] = owner.conversationID
+            let id = owner.conversationID
+            enqueue { [self] in if owner === current, owner.conversationID == id { try await store.selectConversation(id) } }
+        }
         if before?.running == true, owner.snapshot?.running == false, owner !== current {
             let state = owner.snapshot?.messages.last(where: { $0.value["activity"] != .null })?.value["activity"]["state"].string ?? ""
             let status = state == "failed" ? "Needs attention" : state == "stopped" ? "Stopped" : state == "completed" ? "Completed" : "Work ended · inspect"

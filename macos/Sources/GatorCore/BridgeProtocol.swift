@@ -68,11 +68,18 @@ public struct BridgeSnapshot: Sendable, Equatable {
     /// Read-only dialogue history joins Work history without changing Go's raw
     /// message indexes (which exact approvals use).
     public var transcript: [BridgeMessage] {
+        let baseMessages = messages
+        guard !value["dialogue"].array.isEmpty else { return baseMessages }
         let turns = value["dialogue"].array.sorted { $0["sequence"].int < $1["sequence"].int }
         var remaining = ArraySlice(turns), result: [BridgeMessage] = []
+        // Go retains UTC and local-offset timestamps. Lexical comparison would
+        // move new dialogue above older work in non-UTC time zones.
+        let fractional = ISO8601DateFormatter(), seconds = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        func time(_ value: JSONValue) -> Date? { fractional.date(from: value.string) ?? seconds.date(from: value.string) }
         func appendTurn(_ turn: JSONValue) {
             let prefix = "\(context):dialogue:\(turn["id"].string)"
-            result.append(BridgeMessage(id: prefix + ":user", value: .object(["role": .string("You"), "text": turn["text"]])))
+            result.append(BridgeMessage(id: prefix + ":user", value: .object(["role": .string("You"), "text": turn["text"], "input_ids": turn["input_ids"]])))
             let response = turn["response"].string
             if !response.isEmpty { result.append(BridgeMessage(id: prefix + ":response", value: .object(["role": .string("Gator"), "text": .string(response)]))) }
             let peer = value["dialogue_peers"].array.first { $0["conversation_id"] == turn["task_chat"] && !turn["task_chat"].string.isEmpty }
@@ -84,9 +91,10 @@ public struct BridgeSnapshot: Sendable, Equatable {
                 result.append(BridgeMessage(id: prefix + ":details", value: .object(["role": .string("Gator"), "result": .object(["kind": .string("notice"), "title": .string("Retained conversation context"), "summary": .string(summary), "preview": turn])])))
             }
         }
-        for message in messages {
-            let at = max(message.value["created_at"].string, message.value["activity"]["finished_at"].string, message.value["activity"]["started_at"].string)
-            while let turn = remaining.first, turn["created_at"].string <= at { appendTurn(turn); remaining.removeFirst() }
+        for message in baseMessages {
+            guard !remaining.isEmpty else { result.append(message); continue }
+            let at = [message.value["created_at"], message.value["activity"]["finished_at"], message.value["activity"]["started_at"]].compactMap(time).max()
+            while let turn = remaining.first, let created = time(turn["created_at"]), let at, created <= at { appendTurn(turn); remaining.removeFirst() }
             result.append(message)
         }
         for turn in remaining { appendTurn(turn) }
@@ -168,7 +176,7 @@ struct BridgeFramer {
 /// Host-only finite commands. Native views never receive this type or a raw send method.
 enum BridgeCommand: Sendable {
     case host(HostCommand)
-    case submission(id: String, context: String, text: String, planFirst: Bool = false)
+    case submission(id: String, context: String, text: String, planFirst: Bool = false, files: [String] = [], reply: String? = nil)
     case recovery(fields: [String: JSONValue])
     case receipt(NativeReceiptIdentity, action: NativeReceiptAction, request: String)
     case inspectPlan(NativePlanIdentity, request: String)
@@ -187,10 +195,11 @@ enum BridgeCommand: Sendable {
         switch self {
         case .host(let command):
             for (key, value) in command.fields { v[key] = value }
-        case let .submission(id, context, text, planFirst):
-            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 128 * 1024 else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
+        case let .submission(id, context, text, planFirst, files, reply):
+            guard (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty), text.utf8.count <= 128 * 1024, files.count <= NativeUploadLimits.count, Set(files).count == files.count, files.allSatisfy(NativeUploadLimits.validID) else { throw BridgeFailure("Messages must contain text and fit within 128 KiB.") }
             v["type"] = .string("upload_submit")
-            v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array([]), "plan_first": .bool(planFirst)])
+            v["upload"] = .object(["request_id": .string(id), "context": .string(context), "text": .string(text), "files": .array(files.map(JSONValue.string)), "plan_first": .bool(planFirst)])
+            if let reply { guard reply.range(of: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$", options: .regularExpression) != nil else { throw BridgeFailure("Invalid reply context.") }; if case .object(var upload) = v["upload"] { upload["reply_to_update_id"] = .string(reply); v["upload"] = .object(upload) } }
         case .recovery(let fields):
             v["type"] = .string("request_recovery"); v["request_recovery"] = .object(fields)
         case let .receipt(identity, action, request):

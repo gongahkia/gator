@@ -24,8 +24,19 @@ struct GatorApp: App {
                 .task { delegate.application = application; await application.start() }
         }
         .defaultSize(width: 820, height: 740)
+        .windowToolbarStyle(.unified)
         .defaultLaunchBehavior(ProcessInfo.processInfo.arguments.contains("--open-window") ? .presented : .suppressed)
         .commands {
+            CommandGroup(replacing: .pasteboard) {
+                Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
+                Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
+                Button("Paste") {
+                    NativeInputTrace.record("paste menu invoked textResponder=\(NSApp.keyWindow?.firstResponder is NSTextView)")
+                    let delivered = NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil)
+                    NativeInputTrace.record("paste menu delivered=\(delivered)")
+                }.keyboardShortcut("v")
+                Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
+            }
             CommandMenu("Conversation") {
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
                 Button("Inspect Current Task") { application.inspectTask(application.current.conversationID) }.keyboardShortcut("i")

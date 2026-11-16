@@ -1,0 +1,14 @@
+{
+  "configuredProvider": "gemini",
+  "configuredModel": "gemini-3.5-flash",
+  "maxModelRequests": 1,
+  "maxSteps": 1,
+  "maxTokens": 1024,
+  "mode": "inspect",
+  "externalActions": "forbid",
+  "exitCode": 1,
+  "structuredOutput": false,
+  "blocker": "missing credentials",
+  "elapsedSeconds": 0.125,
+  "isolatedState": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/gator-t08-real-smoke-2ryta72g/state"
+}

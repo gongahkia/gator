@@ -1,0 +1,60 @@
+AXApplication | Gator |  | 
+AXWindow | Gator |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | New chat
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXHeading |  | Task details | 
+AXButton |  | Back to Conversation | 
+AXScrollArea |  |  | 
+AXStaticText |  |  | New chat
+AXStaticText |  |  | Task status: Proposed plan · not evidence of completion
+AXDisclosureTriangle |  | Task identity and ownership | 
+AXStaticText |  |  | Task plan
+AXStaticText |  |  | Prepare a reviewed itinerary
+AXStaticText |  |  | Phase: review · revision 1
+AXStaticText |  |  | Proposed plan · new review required before execution
+AXStaticText |  |  | Task objective: Prepare a reviewed itinerary
+AXStaticText |  |  | Proposed outcome: A concise, reviewed itinerary
+AXHeading |  | Ordered proposed steps | 
+AXStaticText |  |  | Proposed step 1: Read the retained trip notes
+AXStaticText |  |  | Proposed step 2: Compare times and prepare a draft itinerary
+AXStaticText |  |  | Proposed step 3: Present the result without making any bookings
+AXStaticText |  |  | These are proposed instructions. Completion is reported by the task's retained result, not checked off from this list.
+AXStaticText |  |  | Declared effects: read
+draft
+AXStaticText |  |  | Selected connections and sources: None retained in this plan
+AXStaticText |  |  | Sources used by this proposal: None declared
+AXStaticText |  |  | Retained inputs: No retained files or source inputs
+AXHeading |  | Execution budget | 
+AXStaticText |  |  | Work steps: 24 · code steps: 16
+AXStaticText |  |  | Current task state and plan phase: queued · review
+AXStaticText |  |  | Exact revision: 1
+AXStaticText |  |  | Approve & Start authorizes this exact revision and may start execution immediately. Tool actions still require their own exact review where Go requires it.
+AXButton |  | Approve & Start | 
+AXStaticText |  |  | Explicit Space or click authorizes · Return never authorizes
+AXDisclosureTriangle |  | Exact review identity and data | 
+AXButton |  | Request Plan Revision | 
+AXButton |  | Inspect Current Plan | 
+AXStaticText |  |  | Proposed plan · not executed
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXStaticText |  |  | Plan preparation request: accepted
+AXStaticText |  |  | Inspect the proposed plan before any execution. Inspect its latest full review to authorize execution. Manual plan editing remains available in the terminal app.
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

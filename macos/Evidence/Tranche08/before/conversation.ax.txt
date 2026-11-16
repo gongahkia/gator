@@ -1,0 +1,114 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show me a readable native conversation
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXButton |  | Open full Gator window | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Show me a readable native conversation
+AXStaticText |  |  | Gator
+AXStaticText |  |  | # Your day, with room to breathe
+
+I found three useful things to keep in view. The draft remains yours to review.
+
+- Finish the project update.
+- Leave time for lunch.
+- Review the travel details before booking.
+
+## A small example
+
+swift let message = "Hello, Gator" print(message) 
+
+A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+
+Nothing has been sent or scheduled. You can ask for a correction or keep talking.
+AXLink | https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes |  | 
+AXStaticText |  |  | Gator
+AXDisclosureTriangle |  | Retained work result | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Context and sources
+AXStaticText |  |  | Inspect supplied saved context, source references, and usage.
+AXDisclosureTriangle |  | Exact details | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXStaticText |  |  | Request: completed
+AXButton |  | Inspect recovery evidence for the selected conversation | 
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXWindow | Gator |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show me a readable native conversation
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Show me a readable native conversation
+AXStaticText |  |  | Gator
+AXStaticText |  |  | # Your day, with room to breathe
+
+I found three useful things to keep in view. The draft remains yours to review.
+
+- Finish the project update.
+- Leave time for lunch.
+- Review the travel details before booking.
+
+## A small example
+
+swift let message = "Hello, Gator" print(message) 
+
+A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+
+Nothing has been sent or scheduled. You can ask for a correction or keep talking.
+AXLink | https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes |  | 
+AXStaticText |  |  | Gator
+AXDisclosureTriangle |  | Retained work result | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Context and sources
+AXStaticText |  |  | Inspect supplied saved context, source references, and usage.
+AXDisclosureTriangle |  | Exact details | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXStaticText |  |  | Request: completed
+AXButton |  | Inspect recovery evidence for the selected conversation | 
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

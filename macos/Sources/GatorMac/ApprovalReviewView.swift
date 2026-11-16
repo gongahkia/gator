@@ -34,8 +34,8 @@ struct ApprovalReviewView: View {
                     .disabled(!current || application.approvalSending || sessions.switching)
                     .help("Open an editable correction draft. Nothing is approved or sent.")
             }
+            Text("Space or click chooses · Return never approves").font(.caption).foregroundStyle(.secondary)
             HStack {
-                Text("Space or click chooses · Return never approves").font(.caption2).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 ExactDecisionButton(title: "Decline", enabled: current && !application.approvalSending && !sessions.switching) {
                     let owner = application; Task { await sessions.respondToApproval(owner: owner, review: review, approved: false) }
@@ -44,7 +44,7 @@ struct ApprovalReviewView: View {
                     let owner = application; Task { await sessions.respondToApproval(owner: owner, review: review, approved: true) }
                 }.fixedSize()
             }
-        }.padding(14).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }.padding(14).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
             .accessibilityIdentifier("gator.exact.review." + review.conversationID)
             .background(NativeAccessibilityStatus(status: application.approvalSending ? "Exact decision submitted; outcome pending" : current ? "Exact action review. No action has been approved." : "Review changed; decisions unavailable").frame(width: 0, height: 0))
     }

@@ -8,6 +8,7 @@ let package = Package(
     targets: [
         .target(name: "GatorCore"),
         .executableTarget(name: "GatorMac", dependencies: ["GatorCore"]),
+        .testTarget(name: "GatorMacTests", dependencies: ["GatorMac", "GatorCore"]),
         .testTarget(name: "GatorCoreTests", dependencies: ["GatorCore"], resources: [.copy("Fixtures")])
     ]
 )

@@ -12,6 +12,8 @@ struct NativeDraft: Codable, Sendable, Equatable {
     var updated = Date()
     var correction: NativeCorrectionDraft?
     var planFirst: Bool?
+    var uploads: [NativeUpload]?
+    var replyToUpdateID: String?
 }
 
 public struct PendingSubmission: Codable, Sendable, Equatable {
@@ -21,6 +23,10 @@ public struct PendingSubmission: Codable, Sendable, Equatable {
     var draftRevision: UUID
     public var phase: SubmissionPhase
     public var planFirst: Bool?
+    public var uploads: [NativeUpload]?
+    public var replyToUpdateID: String?
+    public var ownerGeneration: UUID?
+    public var ownerConversationID: String?
     var correctionTarget: NativeCorrectionTarget?
 }
 
@@ -49,7 +55,8 @@ actor NativeDraftStore {
         let data = try Data(contentsOf: file)
         guard data.count <= 6 * 1024 * 1024 else { throw BridgeFailure("Native drafts are oversized; the saved file was kept unchanged.") }
         var archive = try JSONDecoder().decode(NativeArchive.self, from: data)
-        guard [1, 2, 3, 4, 5, 6].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 && ($0.value.correction?.text.utf8.count ?? 0) <= 120 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
+        guard [1, 2, 3, 4, 5, 6, 7].contains(archive.version), archive.drafts.count <= 128, archive.drafts.allSatisfy({ validContext($0.key) && $0.value.text.utf8.count <= 128 * 1024 && ($0.value.correction?.text.utf8.count ?? 0) <= 120 * 1024 }), archive.pending.map({ validContext($0.context) && !$0.id.isEmpty && $0.id.count <= 64 && $0.text.utf8.count <= 128 * 1024 }) ?? true else { throw BridgeFailure("Native drafts could not be read safely; the saved file was kept unchanged.") }
+        guard archive.drafts.values.allSatisfy({ NativeUploadLimits.validSelection($0.uploads ?? []) && validReply($0.replyToUpdateID) }), archive.pending.map({ NativeUploadLimits.validSelection($0.uploads ?? []) && validReply($0.replyToUpdateID) }) ?? true, archive.pendingByContext?.values.allSatisfy({ NativeUploadLimits.validSelection($0.uploads ?? []) && validReply($0.replyToUpdateID) }) ?? true else { throw BridgeFailure("Saved attachment drafts are invalid. The original archive was kept.") }
         if archive.pending != nil { archive.pending?.phase = .uncertain }
         if let pending = archive.pendingByContext {
             guard pending.count <= 128, pending.allSatisfy({ validContext($0.key) && $0.value.context == $0.key && !$0.value.id.isEmpty && $0.value.id.count <= 64 && $0.value.text.utf8.count <= 128 * 1024 }) else { throw BridgeFailure("Invalid native pending submissions; original file kept.") }
@@ -82,7 +89,7 @@ actor NativeDraftStore {
         if let legacy = merged.pending { merged.pendingByContext = (merged.pendingByContext ?? [:]).merging([legacy.context: legacy]) { current, _ in current }; merged.pending = nil }
         if let draft = original.drafts[context] { merged.drafts[context] = draft }
         if merged.pendingByContext == nil { merged.pendingByContext = [:] }
-        merged.pendingByContext?[context] = original.pending
+        merged.pendingByContext?[context] = original.pending?.context == context ? original.pending : nil
         if merged.drafts.values.contains(where: { $0.correction != nil || $0.planFirst == true }) || merged.pendingByContext?.values.contains(where: { $0.planFirst == true }) == true { merged.version = max(3, merged.version) }
         if merged.planOperationsByContext == nil { merged.planOperationsByContext = [:] }
         merged.planOperationsByContext?[context] = original.planOperationsByContext?[context]
@@ -96,6 +103,7 @@ actor NativeDraftStore {
     func selectConversation(_ id: String) throws {
         var merged = try load(); merged.selectedConversationID = id; try save(merged)
     }
+    private func validReply(_ id: String?) -> Bool { id == nil || id!.range(of: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$", options: .regularExpression) != nil }
     private func validContext(_ context: String) -> Bool {
         (context.hasPrefix("conversation:") || context.hasPrefix("workspace:")) && context.utf8.count <= 8192
     }
@@ -122,16 +130,18 @@ actor NativeDraftStore {
             archive.receiptOperationsByContext = unresolved.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - unresolved.count)).map { ($0.key, $0.value) })) { current, _ in current }
         }
         if let preparations = archive.recoveryPreparationsByContext, !preparations.isEmpty {
-            archive.version = 6
+            archive.version = max(6, archive.version)
             let pending = preparations.filter { $0.value.blocks }
             guard pending.count <= 128 else { throw BridgeFailure("Too many unconfirmed recovery preparations. Original archive kept.") }
             let terminal = preparations.filter { !$0.value.blocks }.sorted { $0.key < $1.key }
             archive.recoveryPreparationsByContext = pending.merging(Dictionary(uniqueKeysWithValues: terminal.prefix(min(32, 128 - pending.count)).map { ($0.key, $0.value) })) { current, _ in current }
         }
+        if archive.drafts.values.contains(where: { !($0.uploads ?? []).isEmpty || $0.replyToUpdateID != nil }) || !(archive.pending?.uploads ?? []).isEmpty || archive.pendingByContext?.values.contains(where: { !($0.uploads ?? []).isEmpty || $0.replyToUpdateID != nil || $0.ownerConversationID != nil }) == true { archive.version = 7 }
         let cutoff = Date().addingTimeInterval(-7 * 86400)
-        let keep = archive.drafts.filter { $0.value.updated >= cutoff || $0.key == archive.pending?.context || archive.pendingByContext?[$0.key] != nil }
-            .sorted { $0.value.updated > $1.value.updated }
-        archive.drafts = Dictionary(uniqueKeysWithValues: keep.prefix(32).map { ($0.key, $0.value) })
+        let pinned = archive.drafts.filter { !($0.value.uploads ?? []).isEmpty || $0.key == archive.pending?.context || archive.pendingByContext?[$0.key] != nil }
+        guard pinned.count <= 128 else { throw BridgeFailure("Too many retained attachment drafts. Original archive kept.") }
+        let recent = archive.drafts.filter { pinned[$0.key] == nil && $0.value.updated >= cutoff }.sorted { $0.value.updated > $1.value.updated }
+        archive.drafts = pinned.merging(Dictionary(uniqueKeysWithValues: recent.prefix(min(32, 128 - pinned.count)).map { ($0.key, $0.value) })) { current, _ in current }
         if let pending = archive.pending, let draft = original.drafts[pending.context] { archive.drafts[pending.context] = draft }
         for context in archive.pendingByContext?.keys ?? Dictionary<String, PendingSubmission>().keys {
             if let draft = original.drafts[context] { archive.drafts[context] = draft }

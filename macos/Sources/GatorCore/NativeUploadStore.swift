@@ -13,7 +13,7 @@ public struct NativeUpload: Codable, Equatable, Hashable, Sendable, Identifiable
     public var typeLabel: String { (name as NSString).pathExtension.uppercased() }
     public var valid: Bool {
         let parts = id.split(separator: "/", omittingEmptySubsequences: false)
-        return parts.count == 2 && parts[0].range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil && String(parts[1]) == name && NativeUploadLimits.validName(name) && size > 0 && size <= NativeUploadLimits.limit(name) && sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+        return parts.count == 2 && String(parts[0]).range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil && String(parts[1]) == name && NativeUploadLimits.validName(name) && size > 0 && size <= NativeUploadLimits.limit(name) && sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
     }
 }
 public enum NativeUploadLimits {
@@ -21,6 +21,10 @@ public enum NativeUploadLimits {
     public static let extensions = "png jpg jpeg webp pdf docx odt xlsx pptx txt md markdown rst csv tsv json jsonl yaml yml toml xml html htm log ini cfg conf js jsx ts tsx py go rs java c h cpp hpp css scss sh bash zsh sql rb swift kt vue svelte tex r".split(separator: " ").map(String.init)
     public static let images: Set<String> = ["png", "jpg", "jpeg", "webp"]
     public static let hint = "12 files · documents 8 MiB · images 4 MiB · 16 MiB total"
+    public static func validID(_ id: String) -> Bool {
+        let parts = id.split(separator: "/", omittingEmptySubsequences: false)
+        return parts.count == 2 && String(parts[0]).range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil && validName(String(parts[1]))
+    }
     public static func limit(_ name: String) -> Int { images.contains((name as NSString).pathExtension.lowercased()) ? image : document }
     public static func validName(_ name: String) -> Bool {
         !name.isEmpty && name.utf16.count <= 200 && name != "." && name != ".." && !name.unicodeScalars.contains { $0.value < 32 || $0.value == 127 || $0 == "/" || $0 == "\\" } && extensions.contains((name as NSString).pathExtension.lowercased())
@@ -60,7 +64,7 @@ public actor NativeUploadStore {
         let directory = try randomID()
         guard mkdirat(rootFD, directory, 0o700) == 0 else { throw failure("Could not reserve a unique attachment identity.") }
         let folder = openat(rootFD, directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-        guard folder >= 0 else { throw failure("Could not open private attachment storage.") }
+        guard folder >= 0 else { _ = unlinkat(rootFD, directory, AT_REMOVEDIR); throw failure("Could not open private attachment storage.") }
         let file = openat(folder, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard file >= 0 else { close(folder); _ = unlinkat(rootFD, directory, AT_REMOVEDIR); throw failure("Could not create a private attachment copy.") }
         return (directory, folder, file)

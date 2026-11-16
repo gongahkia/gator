@@ -1,0 +1,52 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | What can I help with?
+AXStaticText |  |  | Ask a question, work through an idea, or get something done.
+AXStaticText |  |  | Gator
+AXStaticText |  |  | New chat
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXButton |  | Open full Gator window | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton |  | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXWindow | Gator |  | 
+AXGroup |  |  | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | What can I help with?
+AXStaticText |  |  | Ask a question, work through an idea, or get something done.
+AXStaticText |  |  | Gator
+AXStaticText |  |  | New chat
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXPopUpButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

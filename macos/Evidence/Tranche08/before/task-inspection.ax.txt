@@ -1,0 +1,104 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show me a readable native conversation
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXButton |  | Open full Gator window | 
+AXHeading |  | Task details | 
+AXButton |  | Back to Conversation | 
+AXScrollArea |  |  | 
+AXStaticText |  |  | Show me a readable native conversation
+AXStaticText |  |  | Task status: Completed
+AXStaticText |  |  | Public retained summary · open the conversation for full output
+AXStaticText |  |  | # Your day, with room to breathe
+
+I found three useful things to keep in view. The draft remains yours to review.
+
+- Finish the project update.
+- Leave time for lunch.
+- Review the travel details before booking.
+
+## A small example
+
+```swift
+let message = "Hello, Gator"
+print(message)
+```
+
+A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+
+**Nothing has been sent or scheduled.** You can ask for a correction or keep talking.
+AXDisclosureTriangle |  | Task identity and ownership | 
+AXHeading |  | Recovery and retained evidence | 
+AXStaticText |  |  | Inspection never resumes work, grants access, approves an action or resends anything.
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Completed · retained evidence
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Completed · retained evidence | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXStaticText |  |  | Request: completed
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXWindow | Gator |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show me a readable native conversation
+AXButton |  | Inspect Current Task | 
+AXPopUpButton | More |  | 
+AXHeading |  | Task details | 
+AXButton |  | Back to Conversation | 
+AXScrollArea |  |  | 
+AXStaticText |  |  | Show me a readable native conversation
+AXStaticText |  |  | Task status: Completed
+AXStaticText |  |  | Public retained summary · open the conversation for full output
+AXStaticText |  |  | # Your day, with room to breathe
+
+I found three useful things to keep in view. The draft remains yours to review.
+
+- Finish the project update.
+- Leave time for lunch.
+- Review the travel details before booking.
+
+## A small example
+
+```swift
+let message = "Hello, Gator"
+print(message)
+```
+
+A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+
+**Nothing has been sent or scheduled.** You can ask for a correction or keep talking.
+AXDisclosureTriangle |  | Task identity and ownership | 
+AXHeading |  | Recovery and retained evidence | 
+AXStaticText |  |  | Inspection never resumes work, grants access, approves an action or resends anything.
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Completed · retained evidence
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Completed · retained evidence | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Engine connected
+AXStaticText |  |  | fixture / fixture
+AXStaticText |  |  | Request: completed
+AXDisclosureTriangle |  | Model processing · configuration, not a connectivity test | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

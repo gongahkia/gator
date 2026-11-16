@@ -6,8 +6,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var application: ManagedSessionCoordinator?
     private var terminating = false
     private var mayTerminate = false
+    private var presentationObservers: [NSObjectProtocol] = []
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.willCloseNotification] {
+            presentationObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                Task { @MainActor in
+                    await Task.yield()
+                    NativeApplicationPresentation.update()
+                }
+            })
+        }
+        NativeApplicationPresentation.update()
+    }
+    func applicationWillTerminate(_ notification: Notification) {
+        for observer in presentationObservers { NotificationCenter.default.removeObserver(observer) }
+        presentationObservers.removeAll()
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
