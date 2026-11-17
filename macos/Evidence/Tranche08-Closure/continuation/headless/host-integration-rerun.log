@@ -1,0 +1,17 @@
+bun test v1.4.2 (744846f84)
+
+app-host/tests/preparation-recovery.test.ts:
+(pass) direct removed-source preparation recovers after repair without an invented run [420.17ms]
+(pass) direct removed-source preparation recovers with replacement without an invented run [450.10ms]
+(pass) reviewed removed-source preparation recovers after repair without an invented run [382.40ms]
+(pass) before first proposal removed-source preparation recovers after repair without an invented run [346.81ms]
+(pass) reviewed removed-source preparation recovers with replacement without an invented run [430.75ms]
+(pass) before first proposal removed-source preparation recovers with replacement without an invented run [437.76ms]
+(pass) delegated source removal before_submission preserves original admitted scope and independent parent work [513.57ms]
+(pass) delegated source removal during_routing preserves original admitted scope and independent parent work [464.14ms]
+(pass) delegated source removal after_review preserves original admitted scope and independent parent work [506.58ms]
+
+ 9 pass
+ 0 fail
+ 208 expect() calls
+Ran 9 tests across 1 file. [3.98s]

@@ -1,0 +1,11 @@
+{
+  "originalReportPrefixesPreserved": {
+    "macos/TRANCHE08-UIUX-AUDIT.md": true,
+    "macos/TRANCHE08-VERIFICATION.md": true
+  },
+  "missingReportLinks": [],
+  "repoEnvSecretValuesFoundInNewEvidence": [],
+  "repoEnvSecretValuesFoundInBundle": [],
+  "finalStreamingNativeProcessStillAlive": false,
+  "headUnchanged": true
+}

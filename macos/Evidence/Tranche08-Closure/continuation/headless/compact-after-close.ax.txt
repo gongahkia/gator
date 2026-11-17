@@ -1,0 +1,3 @@
+AXApplication | Gator |  | 
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

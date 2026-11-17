@@ -1,0 +1,24 @@
+✔ plan-first intent survives an empty draft restart and follows retention controls (8.0485ms)
+✔ old drafts remain readable and malformed review intent never silently becomes direct work (1.159709ms)
+✔ update reply drafts retain their referent independently of text across restart (1.350042ms)
+✔ pending draft failures remain visible to update and shutdown preparation (0.883041ms)
+✔ drafts survive restart, stay scoped, and save serially with private permissions (4.144416ms)
+✔ expired drafts are removed and disabling clears retained text (2.760833ms)
+✔ draft requests reject arbitrary fields, large text, and malformed stores recover explicitly (1.033958ms)
+✔ selected files become private independent copies and attachment-only drafts survive restart (6.046333ms)
+✔ imports reject unsupported, oversized and excessive inputs without leaving partial selections (12.27125ms)
+✔ upload submission carries bounded opaque identities and a conversation binding (0.765458ms)
+✔ cleanup keeps files belonging to admitted messages and defers unreadable journals (4.051333ms)
+✔ dialogue-only and completed turns retain captured inputs across pruning without a Work journal (3.326208ms)
+✔ invalid or linked dialogue storage defers cleanup instead of losing uncertain inputs (3.52125ms)
+✔ larger document intake and all attachment guards share the Go runtime limits (13.271167ms)
+✔ pending input scope history protects withdrawn originals during cleanup (1.519833ms)
+✔ failed tasks awaiting explicit setup repair retain original attachments until discarded (1.913042ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 103.475458

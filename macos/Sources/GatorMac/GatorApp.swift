@@ -14,7 +14,9 @@ struct GatorApp: App {
                 .environment(application)
                 .frame(width: 440, height: 620)
                 .task { delegate.application = application; await application.start() }
-        } label: { Label("Gator", systemImage: "text.bubble").accessibilityLabel("Gator") }
+        } label: {
+            Image(nsImage: GatorBrand.menuBarIcon).accessibilityLabel("Gator")
+        }
         .menuBarExtraStyle(.window)
 
         Window("Gator", id: "conversation") {
@@ -67,4 +69,17 @@ enum NativeEnvironment {
         let profile = URL(fileURLWithPath: state, relativeTo: workspace).standardizedFileURL.path
         return ManagedSessionCoordinator(configuration: BridgeLaunchConfiguration(runtime: runtime, workspace: workspace, environment: env), nativeDraftDirectory: data.appendingPathComponent("native/drafts", isDirectory: true), profile: profile)
     }
+}
+
+@MainActor
+private enum GatorBrand {
+    static let menuBarIcon: NSImage = {
+        let image = Bundle.main.url(forResource: "GatorMenuBar", withExtension: "png")
+            .flatMap(NSImage.init(contentsOf:))
+            ?? NSImage(systemSymbolName: "lizard", accessibilityDescription: "Gator")!
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = true
+        image.accessibilityDescription = "Gator"
+        return image
+    }()
 }

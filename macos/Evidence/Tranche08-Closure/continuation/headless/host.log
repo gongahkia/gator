@@ -1,0 +1,71 @@
+TAP version 13
+# Subtest: plan-first intent survives an empty draft restart and follows retention controls
+ok 1 - plan-first intent survives an empty draft restart and follows retention controls
+  ---
+  duration_ms: 47.215
+  ...
+# Subtest: old drafts remain readable and malformed review intent never silently becomes direct work
+ok 2 - old drafts remain readable and malformed review intent never silently becomes direct work
+  ---
+  duration_ms: 2.611541
+  ...
+# Subtest: update reply drafts retain their referent independently of text across restart
+ok 3 - update reply drafts retain their referent independently of text across restart
+  ---
+  duration_ms: 2.576416
+  ...
+# Subtest: pending draft failures remain visible to update and shutdown preparation
+ok 4 - pending draft failures remain visible to update and shutdown preparation
+  ---
+  duration_ms: 2.495958
+  ...
+# Subtest: drafts survive restart, stay scoped, and save serially with private permissions
+ok 5 - drafts survive restart, stay scoped, and save serially with private permissions
+  ---
+  duration_ms: 9.50975
+  ...
+# Subtest: expired drafts are removed and disabling clears retained text
+ok 6 - expired drafts are removed and disabling clears retained text
+  ---
+  duration_ms: 7.315875
+  ...
+# Subtest: draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+ok 7 - draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+  ---
+  duration_ms: 1.140041
+  ...
+# node:internal/modules/esm/resolve:873
+#   throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+#         ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'fflate' imported from /Users/gongahkia/Desktop/coding/projects/gator/app-host/src/office.mjs
+#     at packageResolve (node:internal/modules/esm/resolve:873:9)
+#     at moduleResolve (node:internal/modules/esm/resolve:946:18)
+#     at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+#     at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:640:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:264:38)
+#     at ModuleJob._link (node:internal/modules/esm/module_job:168:49) {
+#   code: 'ERR_MODULE_NOT_FOUND'
+# }
+# Node.js v20.19.5
+# Subtest: /Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/uploads.test.mjs
+not ok 2 - /Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/uploads.test.mjs
+  ---
+  duration_ms: 45.497709
+  location: '/Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/uploads.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 118.087958

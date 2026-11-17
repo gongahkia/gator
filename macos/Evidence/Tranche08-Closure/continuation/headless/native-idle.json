@@ -1,0 +1,13 @@
+{
+  "nativePID": 26551,
+  "goChildren": [
+    "26602",
+    "27663"
+  ],
+  "samplesPID_RSSKiB_CPUPercent_Elapsed": [
+    "26551 138080  12.8 02:47\n26602  39088   0.0 02:46\n27663  41984   3.4 01:01",
+    "26551 138080   0.3 02:48\n26602  39088   0.0 02:47\n27663  41984   0.0 01:02",
+    "26551 138080   0.0 02:49\n26602  39088   0.0 02:48\n27663  41984   0.0 01:03"
+  ],
+  "method": "3 ps CPU/RSS snapshots 1 second apart after fixture response; macOS ps documents %cpu as a decaying average over up to one minute, not instantaneous CPU. First sample still includes recent interaction."
+}

@@ -1,0 +1,118 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show a short controlled conversation
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXMenuButton | More | More | 
+AXButton |  | Open full Gator window | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Show a short controlled conversation
+AXStaticText |  |  | Gator
+AXHeading |  | Your day, with room to breathe | 
+AXStaticText |  |  | I found three useful things to keep in view. The draft remains yours to review.
+AXStaticText |  |  | • Finish the project update.
+AXStaticText |  |  | • Leave time for lunch.
+AXStaticText |  |  | • Review the travel details before booking.
+AXHeading |  | A small example | 
+AXGroup |  | swift code | 
+AXStaticText |  |  | swift
+AXScrollArea |  |  | 
+AXStaticText |  |  | let message = "Hello, Gator"
+print(message)
+AXStaticText |  |  | A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+AXLink | https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes |  | 
+AXStaticText |  |  | Nothing has been sent or scheduled. You can ask for a correction or keep talking.
+AXDisclosureTriangle |  | Retained work result | 
+AXDisclosureTriangle |  | Context and sources | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Hold native work
+AXBusyIndicator |  |  | 
+AXStaticText |  |  | Working toward your requested outcome
+AXDisclosureTriangle |  | Work activity | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXStaticText |  |  | Request: running
+AXStaticText |  |  | Work continues independently. You can keep talking here; Gator decides how to route your message.
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧↩ newline
+AXButton |  | Send message | 
+AXWindow | Gator – Show a short controlled conversation |  | 
+AXGroup |  |  | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Show a short controlled conversation
+AXStaticText |  |  | Gator
+AXHeading |  | Your day, with room to breathe | 
+AXStaticText |  |  | I found three useful things to keep in view. The draft remains yours to review.
+AXStaticText |  |  | • Finish the project update.
+AXStaticText |  |  | • Leave time for lunch.
+AXStaticText |  |  | • Review the travel details before booking.
+AXHeading |  | A small example | 
+AXGroup |  | swift code | 
+AXStaticText |  |  | swift
+AXScrollArea |  |  | 
+AXStaticText |  |  | let message = "Hello, Gator"
+print(message)
+AXStaticText |  |  | A longer reference: https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes
+AXLink | https://example.invalid/planning/your-personal-assistant/retained-evidence-and-reviewed-changes |  | 
+AXStaticText |  |  | Nothing has been sent or scheduled. You can ask for a correction or keep talking.
+AXDisclosureTriangle |  | Retained work result | 
+AXDisclosureTriangle |  | Context and sources | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Hold native work
+AXBusyIndicator |  |  | 
+AXStaticText |  |  | Working toward your requested outcome
+AXDisclosureTriangle |  | Work activity | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXStaticText |  |  | Request: running
+AXStaticText |  |  | Work continues independently. You can keep talking here; Gator decides how to route your message.
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXGroup |  |  | 
+AXMenuButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Show a short controlled conversation
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

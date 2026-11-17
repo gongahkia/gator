@@ -12,6 +12,7 @@ mkdir -p "$native_stage/Gator.app/Contents/MacOS" "$native_stage/Gator.app/Conte
 cp "$native_bin/GatorMac" "$native_stage/Gator.app/Contents/MacOS/GatorMac"
 cp "$native_root/Resources/Info.plist" "$native_stage/Gator.app/Contents/Info.plist"
 swift "$native_root/scripts/make-app-icon.swift" "$native_stage/AppIcon.iconset"
+cp "$native_stage/GatorHead.png" "$native_stage/GatorMenuBar.png" "$native_stage/Gator.app/Contents/Resources/"
 /usr/bin/iconutil -c icns "$native_stage/AppIcon.iconset" -o "$native_stage/Gator.app/Contents/Resources/AppIcon.icns"
 (cd "$repo_root" && go build -trimpath -o "$native_stage/Gator.app/Contents/Resources/gator-runtime" ./cmd/gator)
 chmod 755 "$native_stage/Gator.app/Contents/MacOS/GatorMac" "$native_stage/Gator.app/Contents/Resources/gator-runtime"

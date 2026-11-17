@@ -1,0 +1,133 @@
+bun test v1.4.2 (744846f84)
+
+app-host/tests/preparation-recovery.test.ts:
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) direct removed-source preparation recovers after repair without an invented run [8.92ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) direct removed-source preparation recovers with replacement without an invented run [1.96ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) reviewed removed-source preparation recovers after repair without an invented run [1.38ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) before first proposal removed-source preparation recovers after repair without an invented run [1.38ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) reviewed removed-source preparation recovers with replacement without an invented run [1.34ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) before first proposal removed-source preparation recovers with replacement without an invented run [1.27ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) delegated source removal before_submission preserves original admitted scope and independent parent work [2.16ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) delegated source removal during_routing preserves original admitted scope and independent parent work [1.11ms]
+119 |   }
+120 | 
+121 |   #waitForState(accepted, send, timeout) {
+122 |     return new Promise((resolve, reject) => {
+123 |       if (this.closed) { reject(new Error(this.failure || "Gator is disconnected.")); return; }
+124 |       const finish = error => { clearTimeout(timer); this.off("state", changed); this.off("closed", closed); error ? reject(new Error(error)) : resolve(); };
+                                                                                                                                      ^
+error: ENOENT: no such file or directory, posix_spawn '/Users/gongahkia/Desktop/coding/projects/gator/ui/runtime/gator-runtime'
+      at finish (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:124:129)
+      at emit (node:events:121:23)
+      at <anonymous> (/Users/gongahkia/Desktop/coding/projects/gator/app-host/src/backend.mjs:28:12)
+      at emit (node:events:100:22)
+      at <anonymous> (node:child_process:764:44)
+(fail) delegated source removal after_review preserves original admitted scope and independent parent work [1.13ms]
+
+ 0 pass
+ 9 fail
+Ran 9 tests across 1 file. [54.00ms]

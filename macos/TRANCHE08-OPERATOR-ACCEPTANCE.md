@@ -1,5 +1,7 @@
 # Tranche 08 — operator acceptance
 
+Acceptance candidate: `/tmp/Gator-Native-Tranche08-Acceptance.app` (arm64 build on macOS26.5.2). Automated checks and current screenshot evidence are in `TRANCHE08-ACCEPTANCE-CLOSURE.md`. None of the physical rows below has been signed off by an operator.
+
 Record device/OS, app path, date and operator: ____________________
 Use a disposable profile with the closure loopback fixtures, or harmless local data. Never approve a real external send for this checklist. Do not enter keys into screenshots. Automated AX labels/marked-text API tests are supporting evidence, not spoken VoiceOver or physical IME acceptance.
 
@@ -21,3 +23,5 @@ The operator chooses and restores any system accessibility settings or input sou
 Failures: record the exact steps, screenshot where safe, app version and whether a real external effect could have occurred. A failed authority/accidental-send check is a release blocker. Do not work around it with broad permissions.
 
 Overall operator verdict: ____________________  Remaining checks: ____________________
+
+Additional platform coverage: move the open compact/full views between Spaces and displays while a harmless task runs; dismiss/reopen and verify the selected owner, draft and keyboard focus. Expected: work continues and focus follows intentional navigation. PASS / FAIL / NOT TESTED: __________

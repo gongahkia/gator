@@ -1,0 +1,9 @@
+{
+  "providerPID": 21245,
+  "seedConversation": "work-20261117T005357-eee6da777df4a2c9",
+  "launchDispatchMS": 69.9278329993831,
+  "finalPID": 26551,
+  "firstAccessibleWindowMS": 1230.5941249942407,
+  "timeToConnectedMS": 1230.5967499996768,
+  "method": "one process-cold LaunchServices launch with existing controlled profile; monotonic polling includes AX query overhead; filesystem caches not flushed"
+}

@@ -1,0 +1,51 @@
+Another instance of SwiftPM (PID: 20307) is already running using '/tmp/gator-native-build', waiting until that process has finished execution...[0/1] Planning build
+Building for debugging...
+[0/7] /tmp/gator-native-build/arm64-apple-macosx/debug/GatorNativePackageTests.derived/runner.swift
+[0/7] Write sources
+[4/10] Copying Fixtures
+[5/10] Write swift-version--58304C5D6DBC2206.txt
+[7/31] Emitting module GatorCoreTests
+[8/33] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[9/33] Compiling GatorCoreTests NativeMessageContentTests.swift
+[10/33] Compiling GatorCoreTests NativePerformanceTests.swift
+[11/33] Emitting module GatorMacTests
+[12/33] Compiling GatorMacTests NativeInputTests.swift
+[13/33] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[14/33] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[15/33] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[16/33] Compiling GatorCoreTests resource_bundle_accessor.swift
+[17/33] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[18/33] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[19/33] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[20/33] Compiling GatorCoreTests ApplicationStateTests.swift
+[21/33] Compiling GatorCoreTests BridgeProtocolTests.swift
+[22/33] Compiling GatorCoreTests GoIntegrationTests.swift
+[23/33] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[24/33] Compiling GatorCoreTests ManagedSessionTests.swift
+[25/33] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[26/33] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[27/33] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[28/33] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[29/33] Compiling GatorCoreTests NativeRecoveryTests.swift
+[30/33] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[31/33] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[32/35] Emitting module GatorNativePackageTests
+[33/35] Compiling GatorNativePackageTests runner.swift
+[33/35] Write Objects.LinkFileList
+[34/35] Linking GatorNativePackageTests
+Build complete! (14.12s)
+Test Suite 'Selected tests' started at 2026-11-17 08:53:36.085.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-17 08:53:36.088.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-17 08:53:36.088.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-17 08:53:36.088.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test duplicateDocumentBasenamesPreserveDistinctBytesAndFailGoAdmissionWithoutExecution() started.
+✔ Test duplicateDocumentBasenamesPreserveDistinctBytesAndFailGoAdmissionWithoutExecution() passed after 1.197 seconds.
+◇ Test nativeStreamingSnapshotHandlingBenchmark() started.
+GATOR_STREAM_BENCHMARK samples=5 snapshots=30 retainedMessages=500 wireBytes=2176935 medianBatchMS=202.6829719543457 medianPerSnapshotMS=6.7560990651448565
+✔ Test nativeStreamingSnapshotHandlingBenchmark() passed after 1.059 seconds.
+✔ Test run with 2 tests in 0 suites passed after 2.257 seconds.

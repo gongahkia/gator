@@ -1,0 +1,13 @@
+{
+  "filesSHA256": {
+    "Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "Contents/MacOS/GatorMac": "61bdfc5d3f3198e2cee9ec2b762869c481c676dcaeede5347b6b1fc922e89fc2",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/gator-runtime": "40b788eeb831711a278e09e80365346830d1d305a86f852fda64e4460740d1fa",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
+  },
+  "nativeMatchesBuild": true,
+  "originalBaselineBundleExists": false,
+  "originalBaselineBundleTouched": false
+}

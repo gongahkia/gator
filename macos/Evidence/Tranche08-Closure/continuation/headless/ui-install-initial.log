@@ -1,0 +1,9 @@
+bun install v1.3.11 (af24e281)
+2 |   "lockfileVersion": 2,
+                         ^
+error: Unknown lockfile version
+    at bun.lock:2:22
+UnknownLockfileVersion: failed to parse lockfile: 'bun.lock'
+
+warn: Ignoring lockfile
+error: lockfile had changes, but lockfile is frozen

@@ -1,0 +1,16 @@
+bun test v1.4.2 (744846f84)
+
+tests/draft-synchronization.test.tsx:
+(pass) programmatic drafts wait for native layout and keep the latest text through work snapshots [325.45ms]
+
+tests/attachments.test.tsx:
+(skip) file selection and native image paste preserve drafts, reject limits, and submit immutable files only explicitly
+
+tests/approval-review.test.tsx:
+(pass) approval reviews show exact content, scroll at all sizes and refuse changed or missing previews [662.88ms]
+
+ 2 pass
+ 1 skip
+ 0 fail
+ 45 expect() calls
+Ran 3 tests across 3 files. [2.74s]

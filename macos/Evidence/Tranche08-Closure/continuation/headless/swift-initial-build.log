@@ -1,0 +1,42 @@
+Building for debugging...
+[0/7] Write sources
+[2/7] Write GatorMac-entitlement.plist
+[3/7] Write swift-version--58304C5D6DBC2206.txt
+[5/20] Compiling GatorCore GoBridgeConnection.swift
+[6/20] Compiling GatorCore ManagedSessionCoordinator.swift
+[7/20] Compiling GatorCore NativeTaskReview.swift
+[8/20] Compiling GatorCore NativeRecoveryPreparation.swift
+[9/20] Compiling GatorCore NativePlanExecution.swift
+[10/20] Compiling GatorCore NativeRecovery.swift
+[11/21] Compiling GatorCore NativeUploadStore.swift
+[12/21] Compiling GatorCore NativeDraftStore.swift
+[13/21] Compiling GatorCore NativeMessageContent.swift
+[14/21] Compiling GatorCore ManagedSessionProtocol.swift
+[15/21] Compiling GatorCore NativeDraftAttachments.swift
+[16/21] Emitting module GatorCore
+[17/21] Compiling GatorCore BridgeProtocol.swift
+[18/21] Compiling GatorCore GatorApplicationState.swift
+[19/39] Compiling GatorMac ExactReviewContent.swift
+[20/39] Compiling GatorMac GatorApp.swift
+[21/39] Compiling GatorMac NativeAccessibilityStatus.swift
+[22/39] Compiling GatorMac PlanReviewContent.swift
+[23/39] Compiling GatorMac RecoveryInspectorContent.swift
+[24/39] Compiling GatorMac NativeAttachmentActions.swift
+[25/39] Compiling GatorMac NativeComposer.swift
+[26/41] Compiling GatorMac RecoveryPreparationView.swift
+[27/41] Compiling GatorMac TaskInspectorView.swift
+[28/41] Compiling GatorMac NativeMessageBody.swift
+[29/41] Compiling GatorMac NativeWindowConfiguration.swift
+[30/41] Emitting module GatorMac
+[31/41] Compiling GatorMac NativeDropInput.swift
+[32/41] Compiling GatorMac NativeErrorDisclosure.swift
+[33/41] Compiling GatorMac AppDelegate.swift
+[34/41] Compiling GatorMac ApprovalReviewView.swift
+[35/41] Compiling GatorMac AttachmentSelectionView.swift
+[36/41] Compiling GatorMac ComposerView.swift
+[37/41] Compiling GatorMac ConversationView.swift
+[38/41] Compiling GatorMac ExactDecisionButton.swift
+[38/41] Write Objects.LinkFileList
+[39/41] Linking GatorMac
+[40/41] Applying GatorMac
+Build complete! (18.70s)

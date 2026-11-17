@@ -1,0 +1,17 @@
+package main
+import("bytes";"context";"encoding/json";"fmt";"io";"net/http";"os";"time";"github.com/gongahkia/gator/internal/agent";"github.com/gongahkia/gator/internal/model/openai")
+type bounded struct{requests int;status int;usage any}
+func(b *bounded) RoundTrip(r *http.Request)(*http.Response,error){
+ b.requests++;if b.requests>1{return nil,fmt.Errorf("one-request budget exhausted")};if r.URL.String()!="https://api.openai.com/v1/responses"{return nil,fmt.Errorf("unexpected endpoint")}
+ var body map[string]any;if err:=json.NewDecoder(r.Body).Decode(&body);err!=nil{return nil,err};r.Body.Close();body["max_output_tokens"]=512;p,_:=json.Marshal(body);r.Body=io.NopCloser(bytes.NewReader(p));r.ContentLength=int64(len(p));r.GetBody=nil
+ response,err:=http.DefaultTransport.RoundTrip(r);if err!=nil{return nil,err};b.status=response.StatusCode
+ p,err=io.ReadAll(io.LimitReader(response.Body,2*1024*1024));response.Body.Close();if err!=nil{return nil,err};response.Body=io.NopCloser(bytes.NewReader(p));var result map[string]any;if json.Unmarshal(p,&result)==nil{b.usage=result["usage"]};return response,nil
+}
+func main(){
+ b:=&bounded{};ctx,cancel:=context.WithTimeout(context.Background(),45*time.Second);defer cancel()
+ adapter:=openai.Responses{APIKey:os.Getenv("OPENAI_API_KEY"),Model:os.Getenv("OPENAI_MODEL"),Client:&http.Client{Transport:b,Timeout:45*time.Second,CheckRedirect:func(*http.Request,[]*http.Request)error{return http.ErrUseLastResponse}}}
+ start:=time.Now();turn,err:=adapter.Complete(ctx,agent.TurnRequest{System:"This is a low-cost read-only Gator integration smoke test. Answer in at most eight words. Do not use tools.",Messages:[]agent.Message{{Role:agent.RoleUser,Content:"Reply with: Gator model integration received this message."}}})
+ r:=map[string]any{"provider":"openai","model":os.Getenv("OPENAI_MODEL"),"endpoint":"https://api.openai.com/v1/responses","httpStatus":b.status,"requests":b.requests,"maxOutputTokens":512,"elapsedMS":float64(time.Since(start).Microseconds())/1000,"toolCalls":len(turn.ToolCalls),"usage":b.usage,"responseText":turn.Text,"passed":err==nil&&turn.Text!=""&&len(turn.ToolCalls)==0,"adapter":"existing internal/model/openai.Responses.Complete; ephemeral outbound transport cap only","persistentConfigurationChanged":false}
+ if err!=nil{r["errorClass"]="provider request rejected or unavailable; no retry"}
+ _=json.NewEncoder(os.Stdout).Encode(r)
+}
