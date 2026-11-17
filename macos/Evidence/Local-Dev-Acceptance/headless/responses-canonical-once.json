@@ -1,0 +1,48 @@
+{
+  "authentication": "Bearer",
+  "configurationChanged": false,
+  "contentType": "text/plain",
+  "elapsedMS": 940,
+  "endpoint": "https://api.openai.com/v1/responses",
+  "explicitHeaderNames": [
+    "Authorization",
+    "Content-Type"
+  ],
+  "fallback": false,
+  "inputShape": "string",
+  "maxOutputTokens": 32,
+  "model": "gpt-5.6-terra",
+  "provider": "openai",
+  "redactedError": {
+    "message": "Attempted to access resource from outside project geography US"
+  },
+  "requestCount": 1,
+  "requestID": "req_d68e7ca477c043d6879fd9df22a4f358",
+  "requestKeys": [
+    "input",
+    "max_output_tokens",
+    "model",
+    "store"
+  ],
+  "responseHeaderNames": [
+    "Access-Control-Expose-Headers",
+    "Alt-Svc",
+    "Cf-Cache-Status",
+    "Cf-Ray",
+    "Content-Length",
+    "Content-Type",
+    "Date",
+    "Server",
+    "Set-Cookie",
+    "Strict-Transport-Security",
+    "X-Content-Type-Options",
+    "X-Error-Json",
+    "X-Openai-Authorization-Error",
+    "X-Openai-Internal-Caller",
+    "X-Request-Id"
+  ],
+  "retry": false,
+  "status": 401,
+  "store": false,
+  "dotenvUnchanged": true
+}

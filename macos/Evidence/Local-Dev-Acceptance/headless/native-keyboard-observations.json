@@ -1,0 +1,19 @@
+{
+  "firstAXFocusSetter": {
+    "target": "Approve Exact Action",
+    "returned": 0,
+    "actualFocus": "Inspect Current Task",
+    "acceptedAsProof": false
+  },
+  "acceptedNativeTraversal": [
+    "Tab \u2192 More",
+    "Tab \u2192 Decline",
+    "Tab \u2192 Approve Exact Action",
+    "Return \u2192 Approve Exact Action remains focused; no approval frame",
+    "Shift-Tab \u2192 Decline",
+    "Space \u2192 one exact decline frame"
+  ],
+  "restoredComposer": "Keep my foreground draft during exact review navigation",
+  "physicalVoiceOver": "NOT TESTED",
+  "physicalIME": "NOT TESTED"
+}

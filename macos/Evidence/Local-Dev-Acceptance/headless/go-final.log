@@ -1,0 +1,15 @@
+ok  	github.com/gongahkia/gator/internal/model	0.481s
+ok  	github.com/gongahkia/gator/internal/model/anthropic	0.959s
+ok  	github.com/gongahkia/gator/internal/model/chatcompletions	1.099s
+ok  	github.com/gongahkia/gator/internal/model/gemini	1.739s
+ok  	github.com/gongahkia/gator/internal/model/openai	1.281s
+ok  	github.com/gongahkia/gator/internal/model/providerhttp	1.900s
+ok  	github.com/gongahkia/gator/internal/model/radius	2.337s
+ok  	github.com/gongahkia/gator/internal/agent	2.754s
+ok  	github.com/gongahkia/gator/internal/telemetry	3.177s
+ok  	github.com/gongahkia/gator/internal/workrun	29.323s
+ok  	github.com/gongahkia/gator/internal/cliagent	14.579s
+ok  	github.com/gongahkia/gator/internal/sandbox	11.074s
+ok  	github.com/gongahkia/gator/cmd/gator	43.108s
+ok  	github.com/gongahkia/gator/internal/workapp	13.795s
+ok  	github.com/gongahkia/gator/internal/attachment	4.365s

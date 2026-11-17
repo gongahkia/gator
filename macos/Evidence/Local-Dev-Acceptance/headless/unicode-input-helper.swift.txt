@@ -1,0 +1,21 @@
+import AppKit
+import ApplicationServices
+let a = CommandLine.arguments
+if a[1] == "move" {
+    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: CGPoint(x: Double(a[2])!, y: Double(a[3])!), mouseButton: .left)?.post(tap: .cghidEventTap)
+} else if a[1] == "type" {
+    let chars = Array(a[2].utf16)
+    for offset in stride(from: 0, to: chars.count, by: 16) {
+        let part = Array(chars[offset..<min(offset+16, chars.count)])
+        for down in [true,false] {
+            let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down)
+            event?.flags = []
+            event?.keyboardSetUnicodeString(stringLength: part.count, unicodeString: part)
+            event?.post(tap: .cghidEventTap)
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.015))
+    }
+} else if a[1] == "front" {
+    print(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown")
+}
+RunLoop.current.run(until: Date().addingTimeInterval(0.25))

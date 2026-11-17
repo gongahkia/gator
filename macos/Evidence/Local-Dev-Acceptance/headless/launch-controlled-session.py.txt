@@ -1,0 +1,12 @@
+import os,pathlib,tempfile,subprocess,json
+root=pathlib.Path(tempfile.mkdtemp(prefix='gator-dev-native-'));(root/'workspace').mkdir();(root/'config/gator').mkdir(parents=True)
+provider=subprocess.Popen(['node','macos/Tests/GatorCoreTests/Fixtures/dev-acceptance-provider.mjs'],env={'PATH':os.environ['PATH'],'GATOR_FIXTURE_CONTROL':str(root)},stdout=subprocess.PIPE,stderr=open(root/'provider.log','w'),text=True)
+port=json.loads(provider.stdout.readline())['port']
+(root/'config/gator/config.json').write_text(json.dumps({'version':4,'defaults':{'provider':'fixture','model':'fixture'},'custom_providers':[{'id':'fixture','base_url':f'http://127.0.0.1:{port}/chat','models':['fixture'],'default_model':'fixture'}]}))
+app='/tmp/Gator-Native-Tranche08-Enhanced-Final.app'
+env={'PATH':os.environ['PATH'],'GATOR_CONFIG_DIR':str(root/'config'),'GATOR_STATE_DIR':str(root/'state'),'GATOR_NATIVE_USER_DATA':str(root/'native'),'GATOR_NATIVE_WORKSPACE':str(root/'workspace'),'GATOR_NATIVE_RUNTIME':str(pathlib.Path('macos/Tests/GatorCoreTests/Fixtures/dev-acceptance-runtime.py').resolve()),'GATOR_FIXTURE_CONTROL':str(root),'GATOR_FIXTURE_GO_RUNTIME':app+'/Contents/Resources/gator-runtime','GATOR_NATIVE_TEST_APPEARANCE':'dark','GIT_CONFIG_NOSYSTEM':'1','GIT_CONFIG_GLOBAL':'/dev/null'}
+cmd=['open','-n',app]
+for k,v in env.items():cmd+=['--env',k+'='+v]
+cmd+=['--args','--open-window'];subprocess.run(cmd,check=True)
+metadata={'root':str(root),'providerPID':provider.pid,'port':port,'application':app}
+pathlib.Path('/tmp/gator-dev-native-session.json').write_text(json.dumps(metadata,indent=2));print(json.dumps(metadata),flush=True);provider.wait()

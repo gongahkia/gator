@@ -1,0 +1,95 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Hold unrelated work
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXMenuButton | More | More | 
+AXButton |  | Open full Gator window | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Hold unrelated work
+AXStaticText |  |  | You
+AXStaticText |  |  | Begin inert pending approval
+AXStaticText |  |  | Gator
+AXStaticText |  |  | I've started that as independent work. You can keep talking here.
+AXStaticText |  |  | Gator
+AXStaticText |  |  | The inert review outcome is retained. No external action was executed.
+AXDisclosureTriangle |  | Retained conversation context | 
+AXButton |  | Open Original Task | 
+AXBusyIndicator |  |  | 
+AXStaticText |  |  | Working toward your requested outcome
+AXDisclosureTriangle |  | Work activity | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXStaticText |  |  | Work continues independently. You can keep talking here; Gator decides how to route your message.
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | Keep my foreground draft during exact review navigation
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧↩ newline
+AXButton |  | Send message | 
+AXWindow |  | Gator quick access | 
+AXGroup |  |  | 
+AXButton |  | Gator, 1 task working | 
+AXWindow | Gator – Hold unrelated work |  | 
+AXGroup |  |  | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Hold unrelated work
+AXStaticText |  |  | You
+AXStaticText |  |  | Begin inert pending approval
+AXStaticText |  |  | Gator
+AXStaticText |  |  | I've started that as independent work. You can keep talking here.
+AXStaticText |  |  | Gator
+AXStaticText |  |  | The inert review outcome is retained. No external action was executed.
+AXDisclosureTriangle |  | Retained conversation context | 
+AXButton |  | Open Original Task | 
+AXBusyIndicator |  |  | 
+AXStaticText |  |  | Working toward your requested outcome
+AXDisclosureTriangle |  | Work activity | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXStaticText |  |  | Work continues independently. You can keep talking here; Gator decides how to route your message.
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | Keep my foreground draft during exact review navigation
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXGroup |  |  | 
+AXMenuButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Hold unrelated work
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator, 1 task working |  | 

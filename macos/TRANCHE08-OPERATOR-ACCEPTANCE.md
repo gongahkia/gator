@@ -38,3 +38,20 @@ Use `/tmp/Gator-Native-Tranche08-Enhanced-Final.app` on a Mac that reports a cam
 | With a controlled pending action, choose its owning chat in the glance | Original owner and current exact review open; no approval or external effect occurs. | ___ |
 | Repeat with VoiceOver, Full Keyboard Access, Increase Contrast and Reduce Motion | Labels remain understandable, controls reachable, contrast readable and motion suppressed when requested. | ___ |
 | Move to a flat external display / rearrange displays | No invented notch on a flat display; the real notched screen's panel remains correctly placed. | ___ |
+
+## Final local-development operator sign-off — 2026-11-17
+
+Current candidate: `/tmp/Gator-Native-Tranche08-Enhanced-Final.app`. Automated pending-approval/notch/keyboard evidence is now PASS; these **human** rows remain NOT TESTED. Device/OS: ______ Date/operator: ______. Use a disposable profile and the inert local fixture; decline every proposal. The operator chooses and restores OS settings/input sources. Do not use simulated events or AX labels as spoken VoiceOver/physical IME sign-off.
+
+| Check | Operator steps and expected result | PASS / FAIL / NOT TESTED; notes |
+| --- | --- | --- |
+| VoiceOver conversation | Navigate headings, messages and composer in compact/full views. Roles/order are understandable; streaming does not repeatedly narrate the whole transcript. | NOT TESTED — ______ |
+| Approval review and decline | Begin the inert pending approval; read owner, destination/scope and full content. Return does not decide. Intentionally decline with VoiceOver/Space; no external action occurs. | NOT TESTED — ______ |
+| Notch open/dismiss | Open from hover and ⌘⇧G. Status/rows are announced; hover leaves the other app's focus intact; Escape restores the original draft/focus. | NOT TESTED — ______ |
+| Physical IME | Compose marked text and press Return to commit; repeat after compact/full changes. Composition commits without Send; Shift-Return inserts a newline. | NOT TESTED — ______ |
+| Tab/Shift-Tab | Traverse composer, attachments, notch, task navigation and both decisions. Focus is visible, every critical control reachable, no trap. Repeat under the operator's Full Keyboard Access preference. | NOT TESTED — ______ |
+| Reduce Motion | Enable it yourself and open/close notch, switch chats and inspect work. Expansion/opacity motion is suppressed; text/symbol status remains understandable. | NOT TESTED — ______ |
+| Increase Contrast | Enable it yourself in light/dark views. Critical text, disabled controls, boundaries and focus remain perceivable without relying only on color. | NOT TESTED — ______ |
+| Larger text/wrapping | Choose a supported larger-text/display preference; resize full view. Long exact content wraps/scrolls; owner, consequences and decision controls remain reachable. | NOT TESTED — ______ |
+
+Overall physical accessibility verdict: ______. Outstanding rows: ______. Keep the earlier attachment-removal/recovery and Spaces/display rows for broader platform coverage.

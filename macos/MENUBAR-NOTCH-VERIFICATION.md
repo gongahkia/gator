@@ -68,3 +68,11 @@ The existing [Tranche08 screenshot index](Evidence/Tranche08-Closure/continuatio
 Native code does not change the transcript projection optimization. No new rendering/energy benchmark was conducted for this panel; the previous bounded performance measurements remain historical. Sustained energy profiling and physical accessibility acceptance remain outstanding.
 
 Additional final checks: custom/keyless/managed-local rejection through metering and existing private CLI trace persistence both PASS (`gator-enhanced-custom-trace-check.log`). A credential-free probe of the actual bundled Go executable and controlled fixture cleanup are recorded in `bundled-runtime-probe.json` and `fixture-summary.json`.
+
+## Final local-development follow-up — pending approval PASS
+
+The earlier NOT TESTED row for exact approval routing through the notch is now superseded by [TRANCHE08-LOCAL-DEV-ACCEPTANCE.md](TRANCHE08-LOCAL-DEV-ACCEPTANCE.md). The actual unchanged enhanced-final bundle reached Go-owned exact approval through an advertised inert `web_access` request. Closing presentations left the same owner/interaction/token/review and unrelated running work intact; the notch displayed Needs review, selected the original owner and opened exact review. Compact→full retained identity. Verified keyboard focus on Approve followed by Return sent no decision; explicit Space on Decline sent one original-token decline. The foreground draft was restored and no external action occurred.
+
+Current screenshots are `Evidence/Local-Dev-Acceptance/notch-pending-approval.png`, `compact-exact-review.png` and `full-exact-review-window.png`. Exact hashes/frames and accepted keyboard observations are under that directory's `headless/`. The screenshot of the full review precedes Tab traversal and is not a claim about its focused control. An AX setter's false-positive focus result was excluded; actual Tab focus was checked before Return.
+
+New headless inert-owner regression PASS; complete suite133 PASS /48.335s. No application/UI fix or new bundle was needed. Ordinary targeted interaction evidence now passes this pending-approval scope; physical VoiceOver/IME and preference variants remain operator NOT TESTED.

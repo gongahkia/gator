@@ -1,0 +1,41 @@
+AXApplication | Gator |  | 
+AXWindow |  |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Begin inert pending approval
+AXButton |  | Inspect Current Task | 
+AXButton |  | Return to Requesting Chat | 
+AXButton |  | Stop | 
+AXMenuButton |  | More | 
+AXButton |  | Open full Gator window | 
+AXDisclosureTriangle |  | Work continues in another chat | 
+AXHeading |  | Review this exact action | 
+AXStaticText |  |  | Owner: Begin inert pending approval
+AXScrollArea |  |  | 
+AXHeading |  | Review web research access | 
+AXStaticText |  |  | Inert exact-review fixture. Decline this request. No fetch, search, send or external account operation is implemented by this fixture.
+AXStaticText |  |  | Web scope: https://acceptance.example.invalid
+AXStaticText |  |  | Search service: unavailable: no search provider configured
+AXStaticText |  |  | Shared limits: 8 search requests within 32 total web requests
+AXStaticText |  |  | This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes.
+AXDisclosureTriangle |  | Complete exact review data | 
+AXStaticText |  |  | Approving permits exactly this proposed operation. Only Gator's retained outcome can confirm execution or delivery.
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  | Back to Conversation | 
+AXButton |  | Request Correction | 
+AXStaticText |  |  | Space or click chooses · Return never approves
+AXButton |  | Decline | 
+AXButton |  | Approve Exact Action | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXWindow |  | Gator quick access | 
+AXGroup |  |  | 
+AXButton |  | Gator, 1 chat to inspect | 
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator, A chat needs inspection |  | 

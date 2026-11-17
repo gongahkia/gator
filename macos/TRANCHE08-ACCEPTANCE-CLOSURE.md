@@ -173,3 +173,17 @@ Final checks: Go build PASS; all15 relevant Go packages PASS; Swift build PASS; 
 | Signed/notarized distribution | DEFERRED | No signing/notarization claim. |
 
 Separate final verdicts: **functional migration complete within its established scope; native presentation improved with bounded observed interaction evidence; accessibility acceptance still partial; real-provider evidence now positive for the working Chat route and its two tested CLIs but incomplete across routes/providers; local development bundle ready; distribution deferred.** No Tranche09, automatic provider fallback, new runtime coordinator, README change or agent-created commit.
+
+## Final LOCAL-DEVELOPMENT acceptance — 2026-11-17
+
+The focused follow-up is complete; [TRANCHE08-LOCAL-DEV-ACCEPTANCE.md](TRANCHE08-LOCAL-DEV-ACCEPTANCE.md) is the current local-development decision. Original evidence and earlier conditional judgments above remain historical.
+
+**Pending-approval navigation is now PASS.** The actual existing enhanced-final bundle, an inert loopback advertised-tool fixture and actual bundled Go runtime established pending approval on a child owner while unrelated parent work ran. Dismissal, notch attention/owner navigation, compact review and full expansion preserved the same interaction/token/review hashes. Actual Tab focus on Approve → Return sent no decision; Shift-Tab → Space on Decline sent exactly one original-owner decline. The parent draft remained, unrelated work continued until explicitly released, and no external effect occurred. The previously unverified notch approval gap is closed.
+
+**Responses401 is now diagnosed as the provider's current project-geography rejection:** “Attempted to access resource from outside project geography US.” One permitted minimal canonical request obtained this detail, with32 output tokens maximum and no retry/fallback. This does not establish a missing Responses API or invalid key. Credentials, `.env`, defaults and the working explicit Chat path are unchanged; provider/project administration is required to resolve that route's geography authorization. No app workaround was added.
+
+Final relevant checks: required Go build PASS;15 Go packages PASS; Swift build PASS; **133 Swift tests PASS /48.335s**, including a new real-Go inert approval/navigation regression. Host16 PASS; recovery9 PASS /208 assertions; TUI2 PASS /45 assertions with1 existing platform skip. No headless failure occurred; an unreliable AX focus setter was excluded and replaced by verified native Tab traversal. See `Evidence/Local-Dev-Acceptance/` for commands, assertions, images, request comparison and the single redacted live result.
+
+No production Swift/Go change was needed, so `/tmp/Gator-Native-Tranche08-Enhanced-Final.app` is retained; all six bundle hashes match the earlier candidate and its native binary matches the fresh build. A duplicate development bundle was unnecessary. Changes are test fixtures/helper/regression and acceptance documentation only.
+
+Practical local-development acceptance **can close for the verified native workflow and working explicit Chat route**. Physical VoiceOver/IME/accessibility preference variants remain human NOT TESTED; the concise operator table is updated. Responses geography remains a provider blocker. No reproduced P0/P1; the existing safe duplicate-document-basename P2 limitation remains documented. No Tranche09, distribution work, README change, commit or backend-goal resumption.

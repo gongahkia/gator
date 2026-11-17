@@ -1,0 +1,34 @@
+{
+  "application": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app",
+  "unchangedFromPreviousCandidate": true,
+  "nativeMatchesCurrentBuild": true,
+  "fileSHA256": {
+    "Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "Contents/MacOS/GatorMac": "feefc29f67c0d0fd73d771225f6050c489de7ccf345798626ddcc7f26b3e5b7a",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/gator-runtime": "0ec32bf877b1cad3393bd51d9ebc3e1897e7efd01acbf50cc84e858edd253904",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
+  },
+  "credentialScanPassed": true,
+  "metadata": {
+    "CFBundleExecutable": "GatorMac",
+    "CFBundleIdentifier": "dev.gator.native",
+    "CFBundleName": "Gator",
+    "CFBundleDisplayName": "Gator",
+    "CFBundleIconFile": "AppIcon",
+    "CFBundlePackageType": "APPL",
+    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleVersion": "1",
+    "LSApplicationCategoryType": "public.app-category.productivity",
+    "LSMinimumSystemVersion": "15.0",
+    "LSUIElement": true,
+    "NSHighResolutionCapable": true,
+    "NSPrincipalClass": "NSApplication"
+  },
+  "fileInspection": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app/Contents/MacOS/GatorMac:          Mach-O 64-bit executable arm64\n/tmp/Gator-Native-Tranche08-Enhanced-Final.app/Contents/Resources/gator-runtime: Mach-O 64-bit executable arm64\n",
+  "goMetadata": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app/Contents/Resources/gator-runtime: go1.27.3\n\tpath\tgithub.com/gongahkia/gator/cmd/gator\n\tmod\tgithub.com/gongahkia/gator\tv0.0.0-20261117020730-a69a6a824e51+dirty\t\n\tdep\tgithub.com/Detective-XH/gopdf\tv0.8.7\th1:ISH9pBjXlgeo2Jlmai1eW4eTNsAUwvhpOcricQVvgYg=\n\tdep\tgithub.com/atotto/clipboard\tv0.1.4\th1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=\n\tdep\tgithub.com/aymanbagabas/go-osc52/v2\tv2.0.1\th1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=\n\tdep\tgithub.com/charmbracelet/bubbles\tv1.0.0\th1:12J8/ak/uCZEMQ6KU7pcfwceyjLlWsDLAxB5fXonfvc=\n\tdep\tgithub.com/charmbracelet/bubbletea\tv1.3.10\th1:otUDHWMMzQSB0Pkc87rm691KZ3SWa4KUlvF9nRvCICw=\n\tdep\tgithub.com/charmbracelet/colorprofile\tv0.4.1\th1:a1lO03qTrSIRaK8c3JRxJDZOvhvIeSco3ej+ngLk1kk=\n\tdep\tgithub.com/charmbracelet/lipgloss\tv1.1.0\th1:vYXsiLHVkK7fp74RkV7b2kq9+zDLoEU4MZoFqR/noCY=\n\tdep\tgithub.com/charmbracelet/x/ansi\tv0.11.6\th1:GhV21SiDz/45W9AnV2R61xZMRri5NlLnl6CVF7ihZW8=\n\tdep\tgithub.com/charmbracelet/x/cellbuf\tv0.0.15\th1:ur3pZy0o6z/R7EylET877CBxaiE1Sp1GMxoFPAIztPI=\n\tdep\tgithub.com/charmbracelet/x/term\tv0.2.2\th1:xVRT/S2ZcKdhhOuSP4t5cLi5o+JxklsoEObBSgfgZRk=\n\tdep\tgithub.com/clipperhouse/displaywidth\tv0.9.0\th1:Qb4KOhYwRiN3viMv1v/3cTBlz3AcAZX3+y9OLhMtAtA=\n\tdep\tgithub.com/clipperhouse/stringish\tv0.1.1\th1:+NSqMOr3GR6k1FdRhhnXrLfztGzuG+VuFDfatpWHKCs=\n\tdep\tgithub.com/clipperhouse/uax29/v2\tv2.5.0\th1:x7T0T4eTHDONxFJsL94uKNKPHrclyFI0lm7+w94cO8U=\n\tdep\tgithub.com/creack/pty\tv1.1.24\th1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=\n\tdep\tgithub.com/dustin/go-humanize\tv1.0.1\th1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=\n\tdep\tgithub.com/google/uuid\tv1.6.0\th1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=\n\tdep\tgithub.com/lucasb-eyer/go-colorful\tv1.3.0\th1:2/yBRLdWBZKrf7gB40FoiKfAWYQ0lqNcbuQwVHXptag=\n\tdep\tgithub.com/mattn/go-isatty\tv0.0.24\th1:tGZZoVgT/KiqK1c8ocVLeDS8BSWMRd47J3Lbz7vsReI=\n\tdep\tgithub.com/mattn/go-runewidth\tv0.0.19\th1:v++JhqYnZuu5jSKrk9RbgF5v4CGUjqRfBm05byFGLdw=\n\tdep\tgithub.com/muesli/ansi\tv0.0.0-20230316100256-276c6243b2f6\th1:ZK8zHtRHOkbHy6Mmr5D264iyp3TiX5OmNcI5cIARiQI=\n\tdep\tgithub.com/muesli/cancelreader\tv0.2.2\th1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=\n\tdep\tgithub.com/muesli/termenv\tv0.16.0\th1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc=\n\tdep\tgithub.com/ncruces/go-strftime\tv1.0.0\th1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=\n\tdep\tgithub.com/phpdave11/gofpdi\tv1.0.14-0.20211212211723-1f10f9844311\th1:zyWXQ6vu27ETMpYsEMAsisQ+GqJ4e1TPvSNfdOPF0no=\n\tdep\tgithub.com/pkg/errors\tv0.8.1\th1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=\n\tdep\tgithub.com/remyoudompheng/bigfft\tv0.0.0-20230129092748-24d4a6f8daec\th1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=\n\tdep\tgithub.com/richardlehane/mscfb\tv1.0.7\th1:oeoiM0WE79vHwE8RpIYYvIAc8ajTH2mb6UZm55/+EB0=\n\tdep\tgithub.com/richardlehane/msoleps\tv1.0.6\th1:9BvkpjvD+iUBalUY4esMwv6uBkfOip/Lzvd93jvR9gg=\n\tdep\tgithub.com/rivo/uniseg\tv0.4.7\th1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=\n\tdep\tgithub.com/robfig/cron/v3\tv3.0.1\th1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=\n\tdep\tgithub.com/signintech/gopdf\tv0.38.0\th1:s4apRVQX8SG+1qRfAFpWhs5fS2PFwwPU+fS0SnGRwgA=\n\tdep\tgithub.com/tiendc/go-deepcopy\tv1.7.2\th1:Ut2yYR7W9tWjTQitganoIue4UGxZwCcJy3orjrrIj44=\n\tdep\tgithub.com/xo/terminfo\tv0.0.0-20220910002029-abceb7e1c41e\th1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=\n\tdep\tgithub.com/xuri/efp\tv0.0.1\th1:fws5Rv3myXyYni8uwj2qKjVaRP30PdjeYe2Y6FDsCL8=\n\tdep\tgithub.com/xuri/excelize/v2\tv2.11.0\th1:HxaEFl6sRN2+8J5a8HaKq+0M4FsjBGMnWWtjOCPSG88=\n\tdep\tgithub.com/xuri/nfp\tv0.0.2-0.20250530014748-2ddeb826f9a9\th1:+C0TIdyyYmzadGaL/HBLbf3WdLgC29pgyhTjAT/0nuE=\n\tdep\tgolang.org/x/crypto\tv0.55.0\th1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=\n\tdep\tgolang.org/x/image\tv0.45.0\th1:FMb1nTbH5H9vF55SriQHgFw5GnNL9Jg6L25BwXKzhB0=\n\tdep\tgolang.org/x/net\tv0.58.0\th1:ynWG7rqYi4ccpTEuPZ2QGWHktVEM9DMCj9yzDE0Q7To=\n\tdep\tgolang.org/x/sys\tv0.47.0\th1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=\n\tdep\tgolang.org/x/text\tv0.41.0\th1:vz/seA0lnX87Othu2f/0L24RcgrXD9/YFTSuGjj3rH8=\n\tdep\tmodernc.org/libc\tv1.75.6\th1:yKk8qo+Di4gkmvRboK8ocCqH22FiUCR6jRy2OwtCRus=\n\tdep\tmodernc.org/mathutil\tv1.7.1\th1:GCZVGXdaN8gTqB1Mf/usp1Y/hSqgI2vAGGP4jZMCxOU=\n\tdep\tmodernc.org/memory\tv1.12.1\th1:nFMiWrpStgZczNl6XI9GnIk/rWhYIyHGUaR04pGbp9g=\n\tdep\tmodernc.org/sqlite\tv1.58.0\th1:38u40/bwkfM7f0Myhosl+SEMltSDxnGdQf8o6Kjmys0=\n\tbuild\t-buildmode=exe\n\tbuild\t-compiler=gc\n\tbuild\t-trimpath=true\n\tbuild\tDefaultGODEBUG=cryptocustomrand=1,httpservecontentmaxranges=1,tlssecpmlkem=0,tracebacklabels=0,urlstrictcolons=0,x509sslcertoverrideplatform=0\n\tbuild\tCGO_ENABLED=1\n\tbuild\tGOARCH=arm64\n\tbuild\tGOOS=darwin\n\tbuild\tGOARM64=v8.0\n\tbuild\tvcs=git\n\tbuild\tvcs.revision=a69a6a824e5195b5bbff2c5247e290d152aa72e9\n\tbuild\tvcs.time=2026-11-17T02:07:30Z\n\tbuild\tvcs.modified=true\n",
+  "head": "87339a6112d8c68f9d0a7b64e982b0d7dad6d424",
+  "applicationChanges": false,
+  "signingOrDistributionWork": false
+}

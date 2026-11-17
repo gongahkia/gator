@@ -1,0 +1,3 @@
+ok  	github.com/gongahkia/gator/internal/model/openai	0.453s
+ok  	github.com/gongahkia/gator/internal/model/chatcompletions	1.609s
+ok  	github.com/gongahkia/gator/internal/model/providerhttp	0.855s

@@ -1,0 +1,15 @@
+import json,pathlib,hashlib,sys,subprocess
+m=json.load(open('/tmp/gator-dev-native-session.json'));root=pathlib.Path(m['root']);out=pathlib.Path('macos/Evidence/Local-Dev-Acceptance/headless/native-checkpoints.jsonl')
+rows=[]
+for p in sorted(root.glob('latest-*.json')):
+ s=json.loads(p.read_text());a=s.get('pending_approval') or {};review={}
+ if a.get('message_index',-1)>=0:review=s['messages'][a['message_index']].get('result',{})
+ rows.append({'observer':p.stem,'owner':s.get('conversation_id'),'foreground':s.get('foreground'),'running':s.get('running'),'interaction':a.get('id'),'tokenSHA256':hashlib.sha256(a['token'].encode()).hexdigest() if a.get('token') else None,'reviewSHA256':hashlib.sha256(json.dumps(review,sort_keys=True).encode()).hexdigest() if review else None})
+commands=[]
+for p in root.glob('bridge-*.jsonl'):
+ for line in p.read_text().splitlines():
+  e=json.loads(line)
+  if e.get('direction')=='command' and e.get('type')=='approval':commands.append({**e,'observer':p.stem})
+r={'checkpoint':sys.argv[1],'owners':rows,'approvalCommands':commands,'providerEffects':sum(json.loads(line).get('kind')=='unexpected-effect' for line in (root/'provider-trace.jsonl').read_text().splitlines())}
+with out.open('a') as f:f.write(json.dumps(r)+'\n')
+print(json.dumps(r,indent=2))

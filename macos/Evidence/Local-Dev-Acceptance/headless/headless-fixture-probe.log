@@ -1,0 +1,14 @@
+{
+  "root": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-dev-fixture-probe-ntww3i3n",
+  "pending": true,
+  "approvalKeys": [
+    "id",
+    "token",
+    "message_index"
+  ],
+  "messages": [
+    "Begin inert pending approval",
+    "web_access #1\n{\"scope\":\"sites\",\"origins\":[\"https://acceptance.example.invalid\"],\"reason\":\"Inert exact-review fixture. Decline this request. No fetch, search, send or external account operation is implemented by this fixture.\",\"search_provider\":\"unavailable: no search provider configured\",\"max_requests\":32,\"max_searches\":8,\"lifetime\":\"This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes.\"}\nUse /approve or /deny."
+  ],
+  "trace": "{\"kind\":\"proposal\",\"tools\":[\"read_file\",\"list_files\",\"search_files\",\"extract_document\",\"inspect_table\",\"chat_search\",\"chat_read\",\"memory_remember\",\"memory_forget\",\"local_plan\",\"local_agenda\",\"suggest_change\",\"list_evidence\",\"read_evidence\",\"search_evidence\",\"check_claims\",\"http_fetch\",\"web_access\",\"gator_request_access\",\"delegate_agents\",\"list_agents\",\"start_agent\",\"inspect_agent\",\"await_agent\",\"steer_agent\",\"answer_agent\",\"cancel_agent\",\"create_agent\",\"agent_profiles\",\"gator_app_inspect\",\"gator_app_update\"],\"selectedToolAvailable\":true}\n"
+}

@@ -1,0 +1,17 @@
+{
+  "pendingApprovalNavigation": "PASS",
+  "sameOwnerInteractionTokenAndReview": true,
+  "presentationOwnerCountUnchanged": true,
+  "returnWithApproveFocusedSentDecision": false,
+  "explicitDeclines": 1,
+  "approvals": 0,
+  "externalEffects": 0,
+  "foregroundDraftPreserved": true,
+  "unrelatedWorkContinuedUntilExplicitFixtureRelease": true,
+  "runtime": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app/Contents/Resources/gator-runtime",
+  "observation": "Transparent test-only stdin/stdout observer, no frame mutations; only hashes retained in evidence",
+  "limits": [
+    "Inert web_access approval declined; no send or external access was authorized.",
+    "First AX focus setter returned success without focusing Approve; the accepted test used actual Tab traversal and verified focus before Return."
+  ]
+}

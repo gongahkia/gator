@@ -41,10 +41,10 @@ func seedReviewConversation(runtime: String, root: URL, environment: [String: St
     let root: URL
     let provider: Process
     let app: ManagedSessionCoordinator
-    init(action: Bool) async throws {
+    init(action: Bool, providerFixture: String = "review-provider") async throws {
         root = try temporaryDirectory(); provider = Process(); let pipe = Pipe()
         provider.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        provider.arguments = ["node", try #require(Bundle.module.url(forResource: "review-provider", withExtension: "mjs", subdirectory: "Fixtures")).path]
+        provider.arguments = ["node", try #require(Bundle.module.url(forResource: providerFixture, withExtension: "mjs", subdirectory: "Fixtures")).path]
         let path = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
         provider.environment = ["PATH": path, "GATOR_FIXTURE_CONTROL": root.path]
         provider.standardOutput = pipe; provider.standardError = FileHandle.standardError

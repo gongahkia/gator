@@ -1,0 +1,12 @@
+{
+  "dotenvVariableNames": [
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL"
+  ],
+  "model": "gpt-5.6-terra",
+  "providerEnvironmentOverridePresent": false,
+  "baseURLEnvironmentOverridePresent": false,
+  "proxyVariableNamesPresent": [],
+  "credentialsPrinted": false,
+  "persistentSettingsModified": false
+}
