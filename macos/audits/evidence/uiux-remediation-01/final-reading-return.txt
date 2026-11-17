@@ -1,0 +1,13 @@
+B -> A -> B; destinations confirmed
+BEFORE
+value=Optional(0.5896583564173592) position=(847.0, 176.0) size=(19.0, 230.0)
+Jump to Latest at (527.5, 373.0) size (135.5, 24.0)
+Retained note B-14 at (353.0, -182.0) size (137.0, 19.12738037109375)
+Retained note B-15 at (353.0, 86.0) size (136.5, 19.12738800048828)
+Retained note B-16 at (353.0, 354.0) size (137.0, 19.127395629882812)
+Retained note B-17 at (353.0, 622.0) size (135.5, 19.12738037109375)
+AFTER
+value=Optional(0.5774515927545284) position=(847.0, 209.0) size=(19.0, 197.0)
+Jump to Latest at (527.5, 373.0) size (135.5, 24.0)
+Retained note B-15 at (353.0, 87.89130401611328) size (136.5, 19.10869598388672)
+Retained note B-16 at (353.0, 355.8913116455078) size (137.0, 19.108688354492188)

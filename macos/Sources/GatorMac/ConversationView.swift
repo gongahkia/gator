@@ -358,10 +358,10 @@ private struct NativeTranscriptView: View {
             }
             .onChange(of: application.transcript) { _, _ in
                 guard !userScrolling else { return }
-                if following { proxy.scrollTo("latest", anchor: .bottom) }
+                if following { scrollToLatest(proxy) }
                 else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
             }
-            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following && !userScrolling { proxy.scrollTo("latest", anchor: .bottom) } }
+            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following && !userScrolling { scrollToLatest(proxy) } }
             .task {
                 await Task.yield()
                 restore(proxy)
@@ -369,7 +369,7 @@ private struct NativeTranscriptView: View {
             .onChange(of: activeState) { _, new in if new == .key && !userScrolling { restore(proxy) } }
             .overlay(alignment: .bottom) {
                 if !following && !nearBottom {
-                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; positions.remember(application.context, anchor: nil, following: true); proxy.scrollTo("latest", anchor: .bottom) }
+                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; positions.remember(application.context, anchor: nil, following: true); scrollToLatest(proxy) }
                         .buttonStyle(.bordered).background(.regularMaterial, in: Capsule()).padding(8)
                 }
             }
@@ -379,8 +379,11 @@ private struct NativeTranscriptView: View {
     private func restore(_ proxy: ScrollViewProxy) {
         let saved = positions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id))
         following = saved.following
-        visibleMessage = saved.anchor
-        if saved.following { proxy.scrollTo("latest", anchor: .bottom) }
-        else if let anchor = saved.anchor { proxy.scrollTo(anchor, anchor: .top) }
+        if saved.following { scrollToLatest(proxy) }
+        else if let anchor = saved.anchor { visibleMessage = anchor; proxy.scrollTo(anchor, anchor: .top) }
+    }
+    private func scrollToLatest(_ proxy: ScrollViewProxy) {
+        visibleMessage = "latest"
+        proxy.scrollTo("latest", anchor: .bottom)
     }
 }

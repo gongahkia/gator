@@ -55,6 +55,8 @@ case "resize":
  guard let window=(attribute(app,"AXWindows") as? [AXUIElement])?.first(where: { str($0,"AXIdentifier")=="conversation" }) else { fatalError("No window") };var value=CGSize(width:Double(CommandLine.arguments[3])!,height:Double(CommandLine.arguments[4])!);print(AXUIElementSetAttributeValue(window,"AXSize" as CFString,AXValueCreate(.cgSize,&value)!).rawValue)
 case "inspect":
  guard let e=find(app,CommandLine.arguments[3]) else { fatalError("Missing element") }; print("enabled=\(attribute(e,"AXEnabled") as Any) position=\(point(e)) size=\(size(e)) value=\(str(e,"AXValue"))")
+case "scrollbars":
+ func visit(_ e:AXUIElement,_ depth:Int=0) { if depth>25{return}; if str(e,"AXRole")=="AXScrollBar" { print("value=\(attribute(e,"AXValue") as Any) position=\(point(e)) size=\(size(e))") };for child in children(e){visit(child,depth+1)} };visit(app)
 case "heads":
  func visit(_ e:AXUIElement,_ depth:Int=0) { if depth>25{return}; if str(e,"AXRole")=="AXHeading" || str(e,"AXDescription")=="Jump to Latest" { print("\(str(e,"AXDescription")) at \(point(e)) size \(size(e))") };for child in children(e){visit(child,depth+1)} };visit(app)
 case "frames":

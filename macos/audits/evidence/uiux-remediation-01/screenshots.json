@@ -248,7 +248,7 @@
         1776,
         1616
       ],
-      "sha256": "89023cca16e83fe580b37d7e2db177ee5a7462c4bb690ff111d2693090cd0754",
+      "sha256": "e5e05dd54e8940dc952a5afb842afdc0621176d4f1f581965ae48682e774ef63",
       "freshDesktopCapture": true,
       "profile": "disposable loopback fixture",
       "unmodifiedCapture": true
@@ -260,7 +260,7 @@
         1216,
         1200
       ],
-      "sha256": "272f976c8bf094befa41fb365d188fd69b2987bded4215b8321dcf2da3528ad8",
+      "sha256": "1d8309448aae215f1c804b62bb3bf2e5a99ebb7f8f8357b49ae3251ef082796e",
       "freshDesktopCapture": true,
       "profile": "disposable loopback fixture",
       "unmodifiedCapture": true
@@ -285,14 +285,14 @@
     },
     "final-verified-executable": {
       "bundle": "/tmp/Gator-Native-UIUX-Verified.app",
-      "swiftExecutableSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
-      "goRuntimeSHA256": "16bd39c27dd370abae7eb35a7816e7c631cfed13b5b94bac6261afff372ba4bb"
+      "swiftExecutableSHA256": "a8a4a5b14dda91c7824833b2aca9f3bf12c6f52f77d0b6572910463908430e3b",
+      "goRuntimeSHA256": "73a602eca084feba208beb4c0eb7d601b0dcde35f0873f81d0f651496aa6bd10"
     },
     "final-desktop-clone": {
       "bundle": "/tmp/Gator-Native-UIUX-Desktop.app",
-      "swiftExecutableSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
-      "goRuntimeSHA256": "16bd39c27dd370abae7eb35a7816e7c631cfed13b5b94bac6261afff372ba4bb"
+      "swiftExecutableSHA256": "a8a4a5b14dda91c7824833b2aca9f3bf12c6f52f77d0b6572910463908430e3b",
+      "goRuntimeSHA256": "73a602eca084feba208beb4c0eb7d601b0dcde35f0873f81d0f651496aa6bd10"
     }
   },
-  "note": "Preview captures are labeled by generation. Final-build captures use a separate-preference-domain clone with byte-identical executables/resources; candidate metadata was not modified. All appearances are process-scoped."
+  "note": "Preview captures are labeled by generation. The final executable includes the corrected binding/proxy Jump target and gesture guards. Final-build captures use a separate-preference-domain clone with byte-identical executables/resources; candidate metadata was not modified. All appearances are process-scoped."
 }

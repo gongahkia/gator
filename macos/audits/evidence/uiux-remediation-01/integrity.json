@@ -34,11 +34,11 @@
   "preservedSafetyBundleSwiftSHA256": "427a0bc7039de3ba7770ca4178cb11219e798bee58824fa355a5d29e4aa70a04",
   "candidateIdentifier": "dev.gator.native",
   "minimumMacOS": "15.0",
-  "candidateSwiftSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
+  "candidateSwiftSHA256": "a8a4a5b14dda91c7824833b2aca9f3bf12c6f52f77d0b6572910463908430e3b",
   "sourceHEADAtCheck": "2a8b22fcbe3efd7f23fe51e551d855052d005465",
   "physicalVoiceOver": "NOT TESTED",
   "physicalIME": "NOT TESTED",
-  "finalObservedHEAD": "a7c910fb11c657c1849161de9199cfb0c5b2bbff",
+  "finalObservedHEAD": "29394118926ac032112b5d075a57bdd251a2d631",
   "finalHEADAdvancedExternally": true,
   "safetyTests": [
     {
@@ -74,5 +74,6 @@
     "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
     "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
   },
-  "checkedAtUTC": "2026-11-17T07:31:43.247103+00:00"
+  "checkedAtUTC": "2026-11-17T08:05:44.931139+00:00",
+  "candidateGoSHA256": "73a602eca084feba208beb4c0eb7d601b0dcde35f0873f81d0f651496aa6bd10"
 }

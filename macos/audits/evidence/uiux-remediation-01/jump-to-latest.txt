@@ -1,8 +1,4 @@
-BEFORE
-Jump to Latest at (527.5, 342.0) size (135.5, 24.0)
-Retained note A-15 at (353.0, 90.0) size (136.5, 19.0)
-Retained note A-16 at (353.0, 358.0) size (137.0, 19.0)
-AFTER
-Retained note A-14 at (353.0, 13.827499389648438) size (137.0, 19.172500610351562)
-Retained note A-15 at (353.0, 281.82749938964844) size (136.5, 19.172500610351562)
-Retained note A-16 at (353.0, 549.8275146484375) size (137.0, 19.1724853515625)
+Explicit native Jump to Latest
+normalized scroll position before=0.5107604017216643
+normalized scroll position after=1.0
+Retained note B-24 at (353.0, 27.5) size (139.0, 19.21428680419922)
