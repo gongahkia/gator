@@ -1,0 +1,16 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.15s)
+Test Suite 'Selected tests' started at 2026-11-17 09:37:03.986.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-17 09:37:03.987.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-17 09:37:03.987.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-17 09:37:03.987.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() started.
+✔ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() passed after 0.848 seconds.
+✔ Test run with 1 test in 0 suites passed after 0.848 seconds.

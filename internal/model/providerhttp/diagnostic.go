@@ -51,6 +51,7 @@ func NewError(provider, label, model, source string, request *http.Request, resp
 	}
 	endpoint := *request.URL
 	endpoint.User, endpoint.RawQuery, endpoint.Fragment, endpoint.RawFragment = nil, "", "", ""
+	endpoint.Path, endpoint.RawPath = clean(endpoint.Path), ""
 	endpoint.ForceQuery = false
 	diagnostic := agent.ProviderDiagnostic{
 		Provider: clean(provider), Model: clean(model), Endpoint: clean(endpoint.String()),

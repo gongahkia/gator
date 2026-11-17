@@ -31,7 +31,7 @@ func TestDiagnosticRetainsUsefulMetadataWithoutErrorBodyOrCredentials(t *testing
 
 func TestDiagnosticRejectsArbitraryFieldsAndUsesRespondingEndpoint(t *testing.T) {
 	original, _ := http.NewRequest("POST", "https://original.test/responses", nil)
-	final, _ := http.NewRequest("POST", "https://final.test/path/sk-proj-PATH_SECRET?token=QUERY_SECRET", nil)
+	final, _ := http.NewRequest("POST", "https://final.test/path/sk-proj-PATH%5FSECRET?token=QUERY_SECRET", nil)
 	response := &http.Response{Request: final, StatusCode: 403, Header: http.Header{"X-Request-Id": {"sk-proj-ECHOED_SECRET"}, "Request-Id": {"req_safe"}}}
 	err := NewError("openai", "OpenAI Responses API", strings.Repeat("m", 300)+"\n", "", original, response,
 		[]byte(`{"error":{"code":"PRIVATE_PROMPT","type":"SECRET_TYPE","param":"SECRET_PARAMETER","message":"SECRET_BODY"}}`), time.Now())

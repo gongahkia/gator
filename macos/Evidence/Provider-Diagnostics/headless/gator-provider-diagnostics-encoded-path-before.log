@@ -1,0 +1,5 @@
+--- FAIL: TestDiagnosticRejectsArbitraryFieldsAndUsesRespondingEndpoint (0.00s)
+    diagnostic_test.go:43: unsafe diagnostic: OpenAI Responses API returned HTTP 403: permission denied; provider_request={"provider":"openai","model":"mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm","endpoint":"https://final.test/path/[redacted]%5FSECRET","method":"POST","streaming":false,"status":403,"elapsed_ms":0,"auth":"none","credential_source":"unspecified","request_id":"req_safe"}
+FAIL
+FAIL	github.com/gongahkia/gator/internal/model/providerhttp	0.159s
+FAIL
