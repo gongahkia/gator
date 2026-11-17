@@ -1,0 +1,298 @@
+{
+  "baselineHEAD": "0b2cae1df6301d8354a4751ded8fc0d6b29afab5",
+  "images": [
+    {
+      "file": "before-reading-A.png",
+      "generation": "before",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "89e0a2dc930278aeec5af71d198a6e68add2cfb6c31f2930e9387d81ebf88b5e",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-return-A.png",
+      "generation": "before",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "acd07f3d341fe372bef86223fb2382a7831aa79c8761023024d1db347d6debab",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-navigation.png",
+      "generation": "before",
+      "pixelSize": [
+        2266,
+        1704
+      ],
+      "sha256": "ed029b7bbb8533f24ee3248e886bf036e2de52bd7e66ffa53f906cbd86ea0d21",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-inspector.png",
+      "generation": "before",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "1a5fc7418e364c85e620d87d739f74c5a92de56b0f7b919550f3b376eabf2e31",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-warning.png",
+      "generation": "before",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "3431cc5d7ddbd0a8c8b4e9375ce541e741efdf11fa572dba0bb1e51d48d4630c",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-slash.png",
+      "generation": "before",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "615a7c39ee7878fe1f6d7dfa4cae935d22209d6f72b7917ff16d5b059938556e",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "before-long-draft.png",
+      "generation": "before",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "edde3383b3d0131b9e1b448e6554329c6726106e4579ee0dc824f3fdf745cfa2",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-return-A.png",
+      "generation": "after-generation-1",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "0db9a379112c4c5d3a1719547d3f2b7da710888c7201b708025e83bc516f2f2e",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-inspector-light.png",
+      "generation": "after-generation-1",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "76919b761151231051e8641255a6d45023d6cd2e540f8699c8bb4e29e8e81c7d",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-small-slash.png",
+      "generation": "after-generation-1",
+      "pixelSize": [
+        1304,
+        1288
+      ],
+      "sha256": "a09ef7a6f3e17148ecb848c062a4afcfafc51743c14670c44f4734990e228828",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-warning-light.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "a5720222b79478b8c909c0ed3b01a9fd3cd872a89adbb429cc89eb07b81df232",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-warning-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "761bbc12641f8fa19f1430d9c0d4be158835bce478934341616ef9f435bdcecf",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-markdown-light.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "b72cc375e5eb164b93514bba294446e933b648f59d3221988ee4cc6abaeacb08",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-background-reading.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "01c8e289d786acdf9c0b73e11da26d7f8a44f9e7379d7d8dad984a28f64e0be5",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-compact-reading-light.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        972,
+        1332
+      ],
+      "sha256": "61d8ccb58349985f9d2126fb7bbd1913ffeab32e27d558df8c942381f9dd55b7",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-inspector-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "2fae452adcb6286ac495fab6b7d62489c06cd4852fa4fce668319ff26693dcb5",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-exact-review-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "cceef59be06a32346f5d229d2b9a8fc31008ff3b24be1c1e82956611a8b0b8b7",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-compact-exact-review-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        972,
+        1332
+      ],
+      "sha256": "ac6861f1ab1d2d28ad6407f45ad1ff8bdc130c59a088a5a21677d6e613954f64",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-plan-review-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        1864,
+        1704
+      ],
+      "sha256": "c83c6a4b43d96f6cecfaa360642119350ff5b41ee7d34e6ac4c2b62d9c986c72",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "after-notch-dark.png",
+      "generation": "after-generation-2",
+      "pixelSize": [
+        840,
+        492
+      ],
+      "sha256": "9e5b2658e48beec8c867d44cef4251cc701db59e5e824a2437f691065b01d08b",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "final-eight-line-editor-light.png",
+      "generation": "final-verified-executable",
+      "pixelSize": [
+        1776,
+        1616
+      ],
+      "sha256": "89023cca16e83fe580b37d7e2db177ee5a7462c4bb690ff111d2693090cd0754",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    },
+    {
+      "file": "final-small-inspector-light.png",
+      "generation": "final-verified-executable",
+      "pixelSize": [
+        1216,
+        1200
+      ],
+      "sha256": "272f976c8bf094befa41fb365d188fd69b2987bded4215b8321dcf2da3528ad8",
+      "freshDesktopCapture": true,
+      "profile": "disposable loopback fixture",
+      "unmodifiedCapture": true
+    }
+  ],
+  "binaries": {
+    "before": {
+      "bundle": "/tmp/Gator-Native-UIUX-Baseline.app",
+      "swiftExecutableSHA256": "a53f43ad8a0bb8e97636a9c4ba07625f23f055d0fcb0b2ab467f108954200b2d"
+    },
+    "after-generation-1": {
+      "bundle": "/tmp/Gator-Native-UIUX-Preview-01.app",
+      "swiftExecutableSHA256": "c1a42d9625ce935b6ff15a3ea1e7ffb1c072f062b221f8d8d2c46934e6d9b39f"
+    },
+    "after-generation-2": {
+      "bundle": "/tmp/Gator-Native-UIUX-Preview.app",
+      "swiftExecutableSHA256": "a9cf8e68b2848647df6f90d89414517d750edc0e3f18dab4312a8118a23c6233"
+    },
+    "preserved-safety": {
+      "bundle": "/tmp/Gator-Native-Safety-Verified.app",
+      "swiftExecutableSHA256": "427a0bc7039de3ba7770ca4178cb11219e798bee58824fa355a5d29e4aa70a04"
+    },
+    "final-verified-executable": {
+      "bundle": "/tmp/Gator-Native-UIUX-Verified.app",
+      "swiftExecutableSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
+      "goRuntimeSHA256": "16bd39c27dd370abae7eb35a7816e7c631cfed13b5b94bac6261afff372ba4bb"
+    },
+    "final-desktop-clone": {
+      "bundle": "/tmp/Gator-Native-UIUX-Desktop.app",
+      "swiftExecutableSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
+      "goRuntimeSHA256": "16bd39c27dd370abae7eb35a7816e7c631cfed13b5b94bac6261afff372ba4bb"
+    }
+  },
+  "note": "Preview captures are labeled by generation. Final-build captures use a separate-preference-domain clone with byte-identical executables/resources; candidate metadata was not modified. All appearances are process-scoped."
+}

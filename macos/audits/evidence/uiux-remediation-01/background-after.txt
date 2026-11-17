@@ -1,0 +1,8 @@
+Jump to Latest at (667.5, 641.0) size (135.5, 24.0)
+Retained note A-24 at (373.0, -131.0) size (139.0, 19.087295532226562)
+A little room in your day at (373.0, 118.0) size (169.0, 19.08730125427246)
+A small example at (373.0, 303.0) size (116.0, 19.087295532226562)
+A little room in your day at (373.0, 599.5) size (169.0, 19.087310791015625)
+A small example at (373.0, 784.5) size (116.0, 19.0872802734375)
+A little room in your day at (373.0, 1081.0) size (169.0, 19.0872802734375)
+A small example at (373.0, 1266.0) size (116.0, 19.0872802734375)

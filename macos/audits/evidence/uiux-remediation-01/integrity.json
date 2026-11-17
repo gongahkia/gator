@@ -1,0 +1,41 @@
+{
+  "safetySources": [
+    {
+      "file": "macos/Sources/GatorCore/NativeDraftStore.swift",
+      "sha256": "3aec34b85e60a3a18c08437b0d243df695b448f499b73647a025912df799fab6",
+      "matchesStartingHEAD": true
+    },
+    {
+      "file": "macos/Sources/GatorCore/GatorApplicationState.swift",
+      "sha256": "88ab986e253566f2e8c2c5dd2518b2610aea57f46987518936a0aeac75fb3ee9",
+      "matchesStartingHEAD": true
+    },
+    {
+      "file": "macos/Sources/GatorCore/ManagedSessionCoordinator.swift",
+      "sha256": "321032f703356e767ed705bd760512dc7cc764b357c171ecb8b2b82bcf69a02b",
+      "matchesStartingHEAD": true
+    },
+    {
+      "file": "macos/Sources/GatorCore/GoBridgeConnection.swift",
+      "sha256": "17ada0b512e8e2120dc818c87079fc4245353275932fd7280f57e299421c9c6e",
+      "matchesStartingHEAD": true
+    },
+    {
+      "file": "macos/Sources/GatorCore/BridgePipeIO.swift",
+      "sha256": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
+      "matchesStartingHEAD": true
+    },
+    {
+      "file": "macos/Sources/GatorMac/AppDelegate.swift",
+      "sha256": "da85923919736ea90bee823a1de4d8b52f78c9d673c8771ee3dc01a37b247c12",
+      "matchesStartingHEAD": true
+    }
+  ],
+  "preservedSafetyBundleSwiftSHA256": "427a0bc7039de3ba7770ca4178cb11219e798bee58824fa355a5d29e4aa70a04",
+  "candidateIdentifier": "dev.gator.native",
+  "minimumMacOS": "15.0",
+  "candidateSwiftSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
+  "sourceHEADAtCheck": "2a8b22fcbe3efd7f23fe51e551d855052d005465",
+  "physicalVoiceOver": "NOT TESTED",
+  "physicalIME": "NOT TESTED"
+}

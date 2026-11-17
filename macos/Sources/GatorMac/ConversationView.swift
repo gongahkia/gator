@@ -357,15 +357,16 @@ private struct NativeTranscriptView: View {
                 if userScrolling { following = near }
             }
             .onChange(of: application.transcript) { _, _ in
+                guard !userScrolling else { return }
                 if following { proxy.scrollTo("latest", anchor: .bottom) }
                 else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
             }
-            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following { proxy.scrollTo("latest", anchor: .bottom) } }
+            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following && !userScrolling { proxy.scrollTo("latest", anchor: .bottom) } }
             .task {
                 await Task.yield()
                 restore(proxy)
             }
-            .onChange(of: activeState) { _, new in if new == .key { restore(proxy) } }
+            .onChange(of: activeState) { _, new in if new == .key && !userScrolling { restore(proxy) } }
             .overlay(alignment: .bottom) {
                 if !following && !nearBottom {
                     Button("Jump to Latest", systemImage: "arrow.down") { following = true; positions.remember(application.context, anchor: nil, following: true); proxy.scrollTo("latest", anchor: .bottom) }

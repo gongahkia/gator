@@ -1,0 +1,386 @@
+[
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "window",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "window",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "text",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "text",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "control",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "control",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "window",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "window",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "text",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "text",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "control",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "control",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "window",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "window",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "text",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "text",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foregroundSRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ],
+    "surface" : "control",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "backgroundSRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 14.938418916797357,
+    "foregroundSRGB" : [
+      0.15294117647058825,
+      0.15294117647058825,
+      0.15294117647058825
+    ],
+    "surface" : "control",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "window",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "window",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "text",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "text",
+    "treatment" : "after: semantic label text"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foregroundSRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ],
+    "surface" : "control",
+    "treatment" : "before: SwiftUI orange"
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "backgroundSRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 12.225809383321625,
+    "foregroundSRGB" : [
+      0.86505190311418689,
+      0.86505190311418689,
+      0.86505190311418689
+    ],
+    "surface" : "control",
+    "treatment" : "after: semantic label text"
+  }
+]
