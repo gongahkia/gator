@@ -5,6 +5,7 @@ package openai
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -34,6 +35,7 @@ func DefaultModel() string {
 // full normalized history on each call, allowing Gator to own persistence and
 // avoid provider-side conversation storage.
 type Responses struct {
+	ProviderID          string
 	APIKey              string
 	CredentialSource    string
 	APIKeyEnv           string
@@ -76,7 +78,7 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 		return agent.Turn{}, fmt.Errorf("read OpenAI response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError("openai", "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(r.ProviderID, "openai"), "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
 	}
 	return decodeResponse(contents)
 }
@@ -113,7 +115,7 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read OpenAI stream error: %w", readErr)
 		}
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError("openai", "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(r.ProviderID, "openai"), "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
 	}
 	return decodeSSE(response.Body, onDelta)
 }

@@ -41,6 +41,7 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 		return Backend{Provider: provider, Model: openai.Responses{
 			APIKey:              credential.value,
 			APIKeyEnv:           credential.source,
+			CredentialSource:    credential.resolution,
 			Model:               config.Model,
 			BaseURL:             baseURL,
 			AuthorizationHeader: credential.header,
@@ -48,16 +49,17 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			Client:              config.Client,
 		}}, nil
 	case Anthropic:
-		apiKey, err := key(config, provider, "ANTHROPIC_API_KEY")
+		apiKey, source, err := resolvedKey(config, provider, "ANTHROPIC_API_KEY")
 		if err != nil {
 			return Backend{}, err
 		}
 		if err := requireKey(apiKey, "ANTHROPIC_API_KEY"); err != nil {
 			return Backend{}, err
 		}
-		return Backend{Provider: provider, Model: anthropic.Messages{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+		return Backend{Provider: provider, Model: anthropic.Messages{CredentialSource: source,
+			APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case KimiCoding:
-		apiKey, err := key(config, provider, "KIMI_API_KEY")
+		apiKey, source, err := resolvedKey(config, provider, "KIMI_API_KEY")
 		if err != nil {
 			return Backend{}, err
 		}
@@ -65,14 +67,15 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: anthropic.Messages{
-			APIKey:     apiKey,
-			Model:      config.Model,
-			BaseURL:    kimiMessagesURL(config.BaseURL),
-			BearerAuth: true,
-			Client:     config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			Model:            config.Model,
+			BaseURL:          kimiMessagesURL(config.BaseURL),
+			BearerAuth:       true,
+			Client:           config.Client,
 		}}, nil
 	case Radius:
-		apiKey, err := key(config, provider, "RADIUS_API_KEY")
+		apiKey, source, err := resolvedKey(config, provider, "RADIUS_API_KEY")
 		if err != nil {
 			return Backend{}, err
 		}
@@ -80,11 +83,12 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: radius.Messages{
-			APIKey:  apiKey,
-			Model:   config.Model,
-			BaseURL: config.BaseURL,
-			Gateway: providerOption(config, "gateway", "GATOR_RADIUS_GATEWAY"),
-			Client:  config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			Model:            config.Model,
+			BaseURL:          config.BaseURL,
+			Gateway:          providerOption(config, "gateway", "GATOR_RADIUS_GATEWAY"),
+			Client:           config.Client,
 		}}, nil
 	case Gemini:
 		apiKey, source, err := resolvedKey(config, provider, "GEMINI_API_KEY")
@@ -103,7 +107,7 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 		if provider == MiniMaxCN {
 			apiKeyEnv = "MINIMAX_CN_API_KEY"
 		}
-		apiKey, err := key(config, provider, apiKeyEnv)
+		apiKey, source, err := resolvedKey(config, provider, apiKeyEnv)
 		if err != nil {
 			return Backend{}, err
 		}
@@ -111,10 +115,11 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: anthropic.Messages{
-			APIKey:  apiKey,
-			Model:   config.Model,
-			BaseURL: miniMaxMessagesURL(config.BaseURL, provider == MiniMaxCN),
-			Client:  config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			Model:            config.Model,
+			BaseURL:          miniMaxMessagesURL(config.BaseURL, provider == MiniMaxCN),
+			Client:           config.Client,
 		}}, nil
 	case OpenCode, OpenCodeGo:
 		return openCodeBackend(provider, config)

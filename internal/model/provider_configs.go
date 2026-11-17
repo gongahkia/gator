@@ -46,17 +46,18 @@ func azureResponsesURL(configured string) (string, error) {
 }
 
 type azureResponsesAuth struct {
-	value  string
-	source string
-	header string
-	prefix string
+	resolution string
+	value      string
+	source     string
+	header     string
+	prefix     string
 }
 
 // azureResponsesCredential resolves an API key using the same explicit,
 // stored, then environment precedence used by the rest of the CLI.
 func azureResponsesCredential(config Config) (azureResponsesAuth, error) {
 	if value := strings.TrimSpace(config.APIKey); value != "" {
-		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", header: "api-key"}, nil
+		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", resolution: "explicit", header: "api-key"}, nil
 	}
 	if config.Credentials != nil {
 		credential, found, err := config.Credentials.Read(string(AzureOpenAIResponses))
@@ -64,11 +65,11 @@ func azureResponsesCredential(config Config) (azureResponsesAuth, error) {
 			return azureResponsesAuth{}, fmt.Errorf("read Gator credential for %q: %w", AzureOpenAIResponses, err)
 		}
 		if found && credential.IsAPIKey() {
-			return azureResponsesAuth{value: credential.Key, source: "Gator Azure OpenAI Responses API-key credential", header: "api-key"}, nil
+			return azureResponsesAuth{value: credential.Key, source: "Gator Azure OpenAI Responses API-key credential", resolution: "gator-store", header: "api-key"}, nil
 		}
 	}
 	if value := strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_KEY")); value != "" {
-		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", header: "api-key"}, nil
+		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", resolution: "environment", header: "api-key"}, nil
 	}
 	return azureResponsesAuth{}, errors.New("AZURE_OPENAI_API_KEY is required")
 }

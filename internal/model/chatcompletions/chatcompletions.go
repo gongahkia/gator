@@ -4,6 +4,7 @@ package chatcompletions
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/model/providerhttp"
 )
 
 const maxResponseBytes = 2 * 1024 * 1024
@@ -22,6 +24,8 @@ const maxResponseBytes = 2 * 1024 * 1024
 // Config describes one OpenAI-compatible Chat Completions endpoint.
 // ProviderName and APIKeyEnv are only used in clear, non-secret errors.
 type Config struct {
+	ProviderID          string
+	CredentialSource    string
 	APIKey              string
 	APIKeySource        func(context.Context) (string, error)
 	APIKeyEnv           string
@@ -104,6 +108,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 			return agent.Turn{}, fmt.Errorf("sign %s request: %w", m.providerName(), err)
 		}
 	}
+	started := time.Now()
 	response, err := m.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request %s response: %w", m.providerName(), err)
@@ -114,7 +119,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 		return agent.Turn{}, fmt.Errorf("read %s response: %w", m.providerName(), err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(m.providerName(), response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.Config.ProviderID, "openai-compatible"), m.providerName(), m.Config.Model, m.Config.CredentialSource, request, response, contents, started, apiKey))
 	}
 	return decodeResponse(contents, m.providerName())
 }
@@ -333,16 +338,4 @@ func decodeResponse(contents []byte, provider string) (agent.Turn, error) {
 		return agent.Turn{}, fmt.Errorf("%s response contained no output text or function calls", provider)
 	}
 	return turn, nil
-}
-
-func describeAPIError(provider string, status int, contents []byte) error {
-	var payload struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(contents, &payload); err == nil && payload.Error.Message != "" {
-		return fmt.Errorf("%s returned HTTP %d: %s", provider, status, payload.Error.Message)
-	}
-	return fmt.Errorf("%s returned HTTP %d", provider, status)
 }

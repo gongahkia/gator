@@ -13,7 +13,7 @@ import (
 )
 
 func cloudflareWorkersConfig(config Config) (chatcompletions.Config, error) {
-	apiKey, err := key(config, CloudflareWorkers, "CLOUDFLARE_API_TOKEN")
+	apiKey, source, err := resolvedKey(config, CloudflareWorkers, "CLOUDFLARE_API_TOKEN")
 	if err != nil {
 		return chatcompletions.Config{}, err
 	}
@@ -32,12 +32,13 @@ func cloudflareWorkersConfig(config Config) (chatcompletions.Config, error) {
 		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", CloudflareWorkers)
 	}
 	return chatcompletions.Config{
-		APIKey:       apiKey,
-		APIKeyEnv:    "CLOUDFLARE_API_TOKEN",
-		BaseURL:      baseURL,
-		Model:        config.Model,
-		ProviderName: "Cloudflare Workers AI",
-		Client:       config.Client,
+		CredentialSource: source,
+		APIKey:           apiKey,
+		APIKeyEnv:        "CLOUDFLARE_API_TOKEN",
+		BaseURL:          baseURL,
+		Model:            config.Model,
+		ProviderName:     "Cloudflare Workers AI",
+		Client:           config.Client,
 	}, nil
 }
 
@@ -50,6 +51,7 @@ const (
 )
 
 type cloudflareGatewayConfig struct {
+	source   string
 	apiKey   string
 	model    string
 	baseURL  string
@@ -69,31 +71,34 @@ func cloudflareGatewayBackend(config Config) (Backend, error) {
 	switch configured.protocol {
 	case cloudflareGatewayOpenAIResponses:
 		return Backend{Provider: CloudflareGateway, Model: openai.Responses{
-			APIKey:    configured.apiKey,
-			APIKeyEnv: "CLOUDFLARE_API_TOKEN",
-			Model:     configured.model,
-			BaseURL:   cloudflareGatewayEndpoint(configured.baseURL, "/responses"),
-			Headers:   headers,
-			Client:    config.Client,
+			CredentialSource: configured.source,
+			APIKey:           configured.apiKey,
+			APIKeyEnv:        "CLOUDFLARE_API_TOKEN",
+			Model:            configured.model,
+			BaseURL:          cloudflareGatewayEndpoint(configured.baseURL, "/responses"),
+			Headers:          headers,
+			Client:           config.Client,
 		}}, nil
 	case cloudflareGatewayAnthropicMessages:
 		return Backend{Provider: CloudflareGateway, Model: anthropic.Messages{
-			APIKey:     configured.apiKey,
-			Model:      configured.model,
-			BaseURL:    cloudflareGatewayEndpoint(configured.baseURL, "/messages"),
-			BearerAuth: true,
-			Headers:    headers,
-			Client:     config.Client,
+			CredentialSource: configured.source,
+			APIKey:           configured.apiKey,
+			Model:            configured.model,
+			BaseURL:          cloudflareGatewayEndpoint(configured.baseURL, "/messages"),
+			BearerAuth:       true,
+			Headers:          headers,
+			Client:           config.Client,
 		}}, nil
 	case cloudflareGatewayWorkersAIChatCompletions:
 		return Backend{Provider: CloudflareGateway, Model: chatcompletions.Model{Config: chatcompletions.Config{
-			APIKey:       configured.apiKey,
-			APIKeyEnv:    "CLOUDFLARE_API_TOKEN",
-			BaseURL:      cloudflareGatewayEndpoint(configured.baseURL, "/chat/completions"),
-			Model:        configured.model,
-			ProviderName: "Cloudflare AI Gateway Workers AI",
-			Headers:      headers,
-			Client:       config.Client,
+			CredentialSource: configured.source,
+			APIKey:           configured.apiKey,
+			APIKeyEnv:        "CLOUDFLARE_API_TOKEN",
+			BaseURL:          cloudflareGatewayEndpoint(configured.baseURL, "/chat/completions"),
+			Model:            configured.model,
+			ProviderName:     "Cloudflare AI Gateway Workers AI",
+			Headers:          headers,
+			Client:           config.Client,
 		}}}, nil
 	default:
 		return Backend{}, fmt.Errorf("unsupported Cloudflare AI Gateway protocol %q", configured.protocol)
@@ -101,7 +106,7 @@ func cloudflareGatewayBackend(config Config) (Backend, error) {
 }
 
 func resolveCloudflareGatewayConfig(config Config) (cloudflareGatewayConfig, error) {
-	apiKey, err := key(config, CloudflareGateway, "CLOUDFLARE_API_TOKEN")
+	apiKey, source, err := resolvedKey(config, CloudflareGateway, "CLOUDFLARE_API_TOKEN")
 	if err != nil {
 		return cloudflareGatewayConfig{}, err
 	}
@@ -146,7 +151,7 @@ func resolveCloudflareGatewayConfig(config Config) (cloudflareGatewayConfig, err
 	if baseURL == "" {
 		baseURL = "https://api.cloudflare.com/client/v4/accounts/" + accountID + "/ai/v1"
 	}
-	return cloudflareGatewayConfig{apiKey: apiKey, model: config.Model, baseURL: baseURL, gateway: gatewayID, protocol: protocol}, nil
+	return cloudflareGatewayConfig{source: source, apiKey: apiKey, model: config.Model, baseURL: baseURL, gateway: gatewayID, protocol: protocol}, nil
 }
 
 func parseCloudflareGatewayProtocol(configured string) (cloudflareGatewayProtocol, error) {

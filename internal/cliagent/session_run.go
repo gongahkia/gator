@@ -38,6 +38,15 @@ type SessionRequest struct {
 // patch inspection. Subsequent assignments resume the native conversation and
 // private checkout, not a summary pasted into a fresh model context.
 func RunSession(ctx context.Context, r SessionRequest) (result Result, err error) {
+	started, phase := time.Now(), "retained checkout/session binding"
+	defer func() {
+		if err != nil {
+			err = cliFailure(r.Config, "rpc", phase, started, err, nil)
+			if r.OnEvent != nil {
+				r.OnEvent(agent.Event{Kind: agent.EventSubagent, At: time.Now(), Text: "External CLI session failure", ProviderDiagnostic: agent.ProviderDiagnosticFrom(err)})
+			}
+		}
+	}()
 	if err := nativeText(r.Task); err != nil {
 		return result, err
 	}
@@ -74,6 +83,7 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 	if err := s.saveLocked(); err != nil {
 		return result, err
 	}
+	phase = "native handshake"
 	p, err := openNativeProcess(ctx, r.Config, directory, filepath.Join(s.path, "home"), s.record.Native.ThreadID, r.Edit, r.Scopes)
 	if err != nil {
 		// openNativeProcess waits for its process to stop on every failure.
@@ -92,6 +102,7 @@ func RunSession(ctx context.Context, r SessionRequest) (result Result, err error
 	if err := s.saveLocked(); err != nil {
 		return result, err
 	}
+	phase = "model turn"
 	id := "turn-" + sessionToken()
 	if _, err := s.admit(id, "send", []byte(r.Task)); err != nil {
 		return result, err

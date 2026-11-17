@@ -4,6 +4,7 @@ package anthropic
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/model/providerhttp"
 )
 
 const (
@@ -25,16 +27,19 @@ const (
 
 // Messages is a stateless Anthropic Messages API adapter.
 type Messages struct {
-	APIKey     string
-	Model      string
-	BaseURL    string
-	BearerAuth bool
-	Headers    http.Header
-	Client     *http.Client
+	CredentialSource string
+	ProviderID       string
+	APIKey           string
+	Model            string
+	BaseURL          string
+	BearerAuth       bool
+	Headers          http.Header
+	Client           *http.Client
 }
 
 // Complete implements agent.Model.
 func (m Messages) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn, error) {
+	started := time.Now()
 	response, err := m.do(ctx, turn, false)
 	if err != nil {
 		return agent.Turn{}, err
@@ -45,7 +50,7 @@ func (m Messages) Complete(ctx context.Context, turn agent.TurnRequest) (agent.T
 		return agent.Turn{}, fmt.Errorf("read Anthropic response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.ProviderID, "anthropic"), "Anthropic Messages API", m.Model, m.CredentialSource, response.Request, response, contents, started, m.APIKey))
 	}
 	return decodeResponse(contents)
 }
@@ -54,6 +59,7 @@ func (m Messages) Complete(ctx context.Context, turn agent.TurnRequest) (agent.T
 // stream. Tool call arguments are assembled only after their complete JSON is
 // received, so the core never receives partial tool requests.
 func (m Messages) CompleteStream(ctx context.Context, turn agent.TurnRequest, onDelta func(string)) (agent.Turn, error) {
+	started := time.Now()
 	response, err := m.do(ctx, turn, true)
 	if err != nil {
 		return agent.Turn{}, err
@@ -64,7 +70,7 @@ func (m Messages) CompleteStream(ctx context.Context, turn agent.TurnRequest, on
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read Anthropic stream error: %w", readErr)
 		}
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.ProviderID, "anthropic"), "Anthropic Messages API", m.Model, m.CredentialSource, response.Request, response, contents, started, m.APIKey))
 	}
 	return decodeSSE(response.Body, onDelta)
 }
@@ -107,6 +113,9 @@ func (m Messages) do(ctx context.Context, turn agent.TurnRequest, stream bool) (
 	response, err := m.client().Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("request Anthropic response: %w", err)
+	}
+	if response.Request == nil {
+		response.Request = request
 	}
 	return response, nil
 }
@@ -407,16 +416,4 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 	turn, err := turnFromBlocks(content)
 	turn.Usage = usage
 	return turn, err
-}
-
-func describeAPIError(status int, contents []byte) error {
-	var payload struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(contents, &payload); err == nil && payload.Error.Message != "" {
-		return fmt.Errorf("Anthropic Messages API returned HTTP %d: %s", status, payload.Error.Message)
-	}
-	return fmt.Errorf("Anthropic Messages API returned HTTP %d", status)
 }

@@ -7,12 +7,15 @@ import (
 
 // ProviderDiagnostic is bounded request metadata, never a request or response body.
 type ProviderDiagnostic struct {
+	Transport        string `json:"transport,omitempty"`
+	Phase            string `json:"phase,omitempty"`
+	ExitCode         *int   `json:"exit_code,omitempty"`
 	Provider         string `json:"provider"`
 	Model            string `json:"model"`
 	Endpoint         string `json:"endpoint"`
 	Method           string `json:"method"`
 	Streaming        bool   `json:"streaming"`
-	Status           int    `json:"status"`
+	Status           int    `json:"status,omitempty"`
 	ElapsedMS        int64  `json:"elapsed_ms"`
 	Auth             string `json:"auth"`
 	CredentialSource string `json:"credential_source"`
@@ -26,6 +29,7 @@ type ProviderDiagnostic struct {
 type ProviderRequestError struct {
 	Diagnostic ProviderDiagnostic
 	Summary    string
+	Cause      error
 }
 
 func (e ProviderRequestError) Error() string {
@@ -41,3 +45,5 @@ func ProviderDiagnosticFrom(err error) *ProviderDiagnostic {
 	diagnostic := request.Diagnostic
 	return &diagnostic
 }
+
+func (e ProviderRequestError) Unwrap() error { return e.Cause }

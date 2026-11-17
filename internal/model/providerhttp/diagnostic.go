@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ func NewError(provider, label, model, source string, request *http.Request, resp
 	if response.Request != nil {
 		request = response.Request
 	}
-	for _, name := range []string{"Authorization", "x-goog-api-key", "api-key"} {
+	for _, name := range []string{"Authorization", "x-goog-api-key", "api-key", "x-api-key", "cf-aig-authorization"} {
 		if value := request.Header.Get(name); value != "" {
 			secrets = append(secrets, value)
 			if strings.HasPrefix(strings.ToLower(value), "bearer ") {
@@ -30,36 +31,15 @@ func NewError(provider, label, model, source string, request *http.Request, resp
 			}
 		}
 	}
-	clean := func(value string) string {
-		for _, secret := range secrets {
-			if secret != "" {
-				value = strings.ReplaceAll(value, secret, "[redacted]")
-			}
-		}
-		value = keyPattern.ReplaceAllString(value, "[redacted]")
-		value = strings.Map(func(r rune) rune {
-			if unicode.IsControl(r) {
-				return ' '
-			}
-			return r
-		}, value)
-		runes := []rune(value)
-		if len(runes) > 256 {
-			value = string(runes[:256])
-		}
-		return value
-	}
-	endpoint := *request.URL
-	endpoint.User, endpoint.RawQuery, endpoint.Fragment, endpoint.RawFragment = nil, "", "", ""
-	endpoint.Path, endpoint.RawPath = clean(endpoint.Path), ""
-	endpoint.ForceQuery = false
+	clean := func(value string) string { return SafeValue(value, secrets...) }
+	endpoint := SafeEndpoint(request.URL.String(), secrets...)
 	diagnostic := agent.ProviderDiagnostic{
-		Provider: clean(provider), Model: clean(model), Endpoint: clean(endpoint.String()),
+		Provider: clean(provider), Model: clean(model), Endpoint: endpoint,
 		Method: request.Method, Streaming: request.Header.Get("Accept") == "text/event-stream",
 		Status: response.StatusCode, ElapsedMS: max(0, time.Since(started).Milliseconds()), Auth: "none",
 	}
 	switch source {
-	case "explicit", "gator-store", "environment":
+	case "explicit", "gator-store", "environment", "none", "dynamic":
 		diagnostic.CredentialSource = source
 	default:
 		diagnostic.CredentialSource = "unspecified"
@@ -69,7 +49,7 @@ func NewError(provider, label, model, source string, request *http.Request, resp
 		if strings.HasPrefix(strings.ToLower(request.Header.Get("Authorization")), "bearer ") {
 			diagnostic.Auth = "bearer"
 		}
-	} else if request.Header.Get("x-goog-api-key") != "" || request.Header.Get("api-key") != "" {
+	} else if request.Header.Get("x-goog-api-key") != "" || request.Header.Get("api-key") != "" || request.Header.Get("x-api-key") != "" {
 		diagnostic.Auth = "api-key-header"
 	}
 	for _, name := range []string{"x-request-id", "request-id", "x-goog-request-id"} {
@@ -121,7 +101,7 @@ func NewError(provider, label, model, source string, request *http.Request, resp
 	case 500, 502, 503, 504:
 		summary = "provider unavailable"
 	}
-	return agent.ProviderRequestError{Diagnostic: diagnostic, Summary: fmt.Sprintf("%s returned HTTP %d: %s", label, response.StatusCode, summary)}
+	return agent.ProviderRequestError{Diagnostic: diagnostic, Summary: fmt.Sprintf("%s returned HTTP %d: %s", clean(label), response.StatusCode, summary)}
 }
 
 // Unknown strings are omitted rather than assuming an arbitrary error field is safe.
@@ -132,4 +112,40 @@ func knownCode(value string) string {
 		return value
 	}
 	return ""
+}
+
+// SafeValue bounds and redacts metadata shared by HTTP and CLI adapters.
+func SafeValue(value string, secrets ...string) string {
+	for _, secret := range secrets {
+		if secret != "" {
+			value = strings.ReplaceAll(value, secret, "[redacted]")
+		}
+	}
+	value = keyPattern.ReplaceAllString(value, "[redacted]")
+	value = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+	runes := []rune(value)
+	if len(runes) > 256 {
+		value = string(runes[:256])
+	}
+	return value
+}
+
+// SafeEndpoint drops credentials and query values before retaining an endpoint.
+func SafeEndpoint(raw string, secrets ...string) string {
+	if raw == "" {
+		return ""
+	}
+	endpoint, err := url.Parse(raw)
+	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
+		return "[invalid endpoint]"
+	}
+	endpoint.User, endpoint.RawQuery, endpoint.Fragment, endpoint.RawFragment = nil, "", "", ""
+	endpoint.Path, endpoint.RawPath = SafeValue(endpoint.Path, secrets...), ""
+	endpoint.ForceQuery = false
+	return SafeValue(endpoint.String(), secrets...)
 }

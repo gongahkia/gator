@@ -11,7 +11,7 @@ import (
 )
 
 func openCodeBackend(provider Provider, config Config) (Backend, error) {
-	apiKey, err := key(config, provider, "OPENCODE_API_KEY")
+	apiKey, source, err := resolvedKey(config, provider, "OPENCODE_API_KEY")
 	if err != nil {
 		return Backend{}, err
 	}
@@ -32,25 +32,28 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 	switch protocol {
 	case openCodeResponses:
 		return Backend{Provider: provider, Model: openai.Responses{
-			APIKey:    apiKey,
-			APIKeyEnv: "OPENCODE_API_KEY",
-			Model:     config.Model,
-			BaseURL:   openCodeEndpoint(baseURL, "/responses"),
-			Client:    config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			APIKeyEnv:        "OPENCODE_API_KEY",
+			Model:            config.Model,
+			BaseURL:          openCodeEndpoint(baseURL, "/responses"),
+			Client:           config.Client,
 		}}, nil
 	case openCodeAnthropic:
 		return Backend{Provider: provider, Model: anthropic.Messages{
-			APIKey:  apiKey,
-			Model:   config.Model,
-			BaseURL: openCodeEndpoint(baseURL, "/messages"),
-			Client:  config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			Model:            config.Model,
+			BaseURL:          openCodeEndpoint(baseURL, "/messages"),
+			Client:           config.Client,
 		}}, nil
 	case openCodeGemini:
 		return Backend{Provider: provider, Model: gemini.GenerateContent{
-			APIKey:  apiKey,
-			Model:   config.Model,
-			BaseURL: openCodeAPIVersionBase(baseURL),
-			Client:  config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			Model:            config.Model,
+			BaseURL:          openCodeAPIVersionBase(baseURL),
+			Client:           config.Client,
 		}}, nil
 	case openCodeChatCompletions:
 		providerName := "OpenCode Zen"
@@ -58,12 +61,13 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 			providerName = "OpenCode Go"
 		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: chatcompletions.Config{
-			APIKey:       apiKey,
-			APIKeyEnv:    "OPENCODE_API_KEY",
-			BaseURL:      openCodeEndpoint(baseURL, "/chat/completions"),
-			Model:        config.Model,
-			ProviderName: providerName,
-			Client:       config.Client,
+			CredentialSource: source,
+			APIKey:           apiKey,
+			APIKeyEnv:        "OPENCODE_API_KEY",
+			BaseURL:          openCodeEndpoint(baseURL, "/chat/completions"),
+			Model:            config.Model,
+			ProviderName:     providerName,
+			Client:           config.Client,
 		}}}, nil
 	default:
 		return Backend{}, fmt.Errorf("model %q has an unsupported %s protocol in catalog version %s", config.Model, openCodeProviderName(provider), openCodeCatalogVersion)

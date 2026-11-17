@@ -4,6 +4,7 @@ package gemini
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -29,6 +30,7 @@ const (
 // the exact provider content for agent messages because Gemini thought
 // signatures must be replayed alongside function calls on later turns.
 type GenerateContent struct {
+	ProviderID       string
 	APIKey           string
 	CredentialSource string
 	Model            string
@@ -69,7 +71,7 @@ func (g GenerateContent) Complete(ctx context.Context, turn agent.TurnRequest) (
 		return agent.Turn{}, fmt.Errorf("read Gemini response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusErrorWithRetry(response.StatusCode, providerhttp.NewError("gemini", "Gemini API", g.Model, g.CredentialSource, request, response, contents, started, g.APIKey), retryDelay(response.Header, contents))
+		return agent.Turn{}, agent.HTTPStatusErrorWithRetry(response.StatusCode, providerhttp.NewError(cmp.Or(g.ProviderID, "gemini"), "Gemini API", g.Model, g.CredentialSource, request, response, contents, started, g.APIKey), retryDelay(response.Header, contents))
 	}
 	return decodeResponse(contents)
 }

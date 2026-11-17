@@ -150,7 +150,13 @@ func newCustomExecutorConfiguration(settings config.Settings, provider config.Cu
 	if provider.APIKeyEnv != "" {
 		apiKey = os.Getenv(provider.APIKeyEnv)
 	}
+	source := "none"
+	if provider.APIKeyEnv != "" {
+		source = "environment"
+	}
 	backend := chatcompletions.Model{Config: chatcompletions.Config{
+		ProviderID:       provider.ID,
+		CredentialSource: source,
 		APIKey:           apiKey,
 		APIKeyEnv:        provider.APIKeyEnv,
 		AllowEmptyAPIKey: provider.APIKeyEnv == "",

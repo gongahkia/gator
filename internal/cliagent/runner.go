@@ -37,8 +37,17 @@ type Result struct {
 	Turns          int
 }
 
-func Run(ctx context.Context, r Request) (Result, error) {
-	result := Result{}
+func Run(ctx context.Context, r Request) (result Result, err error) {
+	started, phase := time.Now(), "configuration"
+	var exitErr error
+	defer func() {
+		if err != nil {
+			err = cliFailure(r.Config, "exec", phase, started, err, exitErr)
+			if r.OnEvent != nil {
+				r.OnEvent(agent.Event{Kind: agent.EventSubagent, At: time.Now(), Text: "External CLI failure", ProviderDiagnostic: agent.ProviderDiagnosticFrom(err)})
+			}
+		}
+	}()
 	if err := r.Config.Validate(); err != nil {
 		return result, err
 	}
@@ -58,6 +67,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 	redact := func(s string) string { return strings.ReplaceAll(s, key, "[redacted]") }
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(r.Config.TimeoutSeconds)*time.Second)
 	defer cancel()
+	phase = "checkout preparation"
 	directory := filepath.Join(r.Scratch, r.ID+"-cli")
 	if err := patch.InitSnapshot(ctx, r.Source, directory); err != nil {
 		return result, err
@@ -101,6 +111,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 		return result, err
 	}
 	defer os.RemoveAll(trustedGit)
+	phase = "sandbox preparation"
 	prepared, err := prepareCLI(ctx, r.Config, directory, "", r.Config.Arguments(r.Edit), r.Edit, r.Scopes, key)
 	if err != nil {
 		return result, err
@@ -123,12 +134,14 @@ func Run(ctx context.Context, r Request) (Result, error) {
 	cmd.Stderr = &stderr
 	stop := ownProcess(cmd)
 	defer func() { stop() }()
+	phase = "process startup"
 	if err := cmd.Start(); err != nil {
 		return result, fmt.Errorf("start CLI: %w", err)
 	}
 	if r.OnEvent != nil {
 		r.OnEvent(agent.Event{Kind: agent.EventSubagent, At: time.Now(), Text: r.Config.Kind + " started in isolated checkout"})
 	}
+	phase = "model turn"
 	scan := bufio.NewScanner(io.LimitReader(stdout, 16*1024*1024+1))
 	scan.Buffer(make([]byte, 4096), 1024*1024)
 	stream := streamState{}
@@ -156,6 +169,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 		cancel()
 	}
 	waitErr := cmd.Wait()
+	exitErr = waitErr
 	stop()
 	stop = func() {}
 	result.Summary, result.Usage, result.Turns = redact(stream.summary), stream.usage, stream.turns
@@ -171,6 +185,7 @@ func Run(ctx context.Context, r Request) (Result, error) {
 	if !stream.complete || stream.failed || strings.TrimSpace(stream.summary) == "" {
 		return result, fmt.Errorf("CLI did not report a successful terminal result: %s", redact(stream.diagnostic))
 	}
+	phase = "patch verification"
 	// A response string is not a patch. Independently export the private tree.
 	if err := os.RemoveAll(filepath.Join(directory, ".git")); err != nil {
 		return result, err

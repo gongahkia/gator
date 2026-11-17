@@ -5,6 +5,7 @@ package radius
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/model/providerhttp"
 )
 
 const (
@@ -27,11 +29,13 @@ const (
 
 // Messages sends a normalized Gator turn to a pi-messages gateway.
 type Messages struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-	Gateway string
-	Client  *http.Client
+	CredentialSource string
+	ProviderID       string
+	APIKey           string
+	Model            string
+	BaseURL          string
+	Gateway          string
+	Client           *http.Client
 }
 
 // Complete implements agent.Model.
@@ -70,6 +74,7 @@ func (m Messages) complete(ctx context.Context, turn agent.TurnRequest, onDelta 
 	request.Header.Set("authorization", "Bearer "+m.APIKey)
 	request.Header.Set("accept", "text/event-stream")
 	request.Header.Set("content-type", "application/json")
+	started := time.Now()
 	response, err := m.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request Radius response: %w", err)
@@ -80,7 +85,7 @@ func (m Messages) complete(ctx context.Context, turn agent.TurnRequest, onDelta 
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read Radius response: %w", readErr)
 		}
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, fmt.Errorf("Radius request returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body))))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.ProviderID, "radius"), "Radius request", m.Model, m.CredentialSource, request, response, body, started, m.APIKey))
 	}
 	return decodeSSE(response.Body, onDelta)
 }
@@ -105,6 +110,7 @@ func (m Messages) endpoint(ctx context.Context) (string, error) {
 	}
 	request.Header.Set("accept", "application/json")
 	request.Header.Set("authorization", "Bearer "+m.APIKey)
+	started := time.Now()
 	response, err := m.client().Do(request)
 	if err != nil {
 		return "", fmt.Errorf("request Radius config: %w", err)
@@ -115,7 +121,7 @@ func (m Messages) endpoint(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("read Radius config: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return "", fmt.Errorf("Radius config returned HTTP %d", response.StatusCode)
+		return "", agent.ProviderHTTPError{Status: response.StatusCode, Err: providerhttp.NewError(cmp.Or(m.ProviderID, "radius"), "Radius config", m.Model, m.CredentialSource, request, response, contents, started, m.APIKey)}
 	}
 	var config struct {
 		BaseURL string `json:"baseUrl"`

@@ -12,7 +12,7 @@ func compatibleConfig(provider Provider, config Config) (chatcompletions.Config,
 	if !ok {
 		return chatcompletions.Config{}, fmt.Errorf("provider %q is not OpenAI-compatible", provider)
 	}
-	apiKey, err := key(config, provider, definition.apiKeyEnv)
+	apiKey, source, err := resolvedKey(config, provider, definition.apiKeyEnv)
 	if err != nil {
 		return chatcompletions.Config{}, err
 	}
@@ -30,7 +30,7 @@ func compatibleConfig(provider Provider, config Config) (chatcompletions.Config,
 		return chatcompletions.Config{}, fmt.Errorf("--base-url or GATOR_BASE_URL is required for provider %q", provider)
 	}
 	return chatcompletions.Config{
-		APIKey:              apiKey,
+		CredentialSource: source, APIKey: apiKey,
 		APIKeyEnv:           definition.apiKeyEnv,
 		BaseURL:             baseURL,
 		Model:               config.Model,

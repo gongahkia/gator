@@ -3,7 +3,6 @@ package cliagent
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +21,7 @@ type nativeProcess struct {
 // Gator session and survives process exit, allowing native session resumption.
 // The caller owns checkout creation, leases, snapshots and durable admission.
 func openNativeProcess(ctx context.Context, cfg Config, directory, home, threadID string, edit bool, scopes []string) (*nativeProcess, error) {
+	started := time.Now()
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -110,11 +110,12 @@ func openNativeProcess(ctx context.Context, cfg Config, directory, home, threadI
 	}
 	wire := newProtocolWire(out, in, cfg.Kind == "pi", cfg.Kind == "claude")
 	p := &nativeProcess{stop: cancel, done: make(chan struct{})}
+	var waitErr error
 	go func() {
 		<-wire.done
 		cancel()
 		stop()
-		_ = cmd.Wait()
+		waitErr = cmd.Wait()
 		prepared.Cleanup()
 		close(p.done)
 	}()
@@ -124,7 +125,7 @@ func openNativeProcess(ctx context.Context, cfg Config, directory, home, threadI
 	if err != nil {
 		wire.Close()
 		<-p.done
-		return nil, fmt.Errorf("native handshake: %w: %s", err, strings.ReplaceAll(stderr.String(), key, "[redacted]"))
+		return nil, cliFailure(cfg, "rpc", "native handshake", started, err, waitErr)
 	}
 	p.client = client
 	return p, nil
