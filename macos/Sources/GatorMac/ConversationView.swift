@@ -140,6 +140,7 @@ struct ConversationView: View {
                 Text("Proposed actions still require exact review.")
             }
             Toggle("Notch Quick Access", isOn: $notchEnabled)
+            MenuBarVisibilityToggle()
             Button("Connection & Model Details") { connectionDetails = true }
             Divider()
             Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)

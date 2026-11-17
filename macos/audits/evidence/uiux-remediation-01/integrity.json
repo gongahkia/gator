@@ -38,7 +38,7 @@
   "sourceHEADAtCheck": "2a8b22fcbe3efd7f23fe51e551d855052d005465",
   "physicalVoiceOver": "NOT TESTED",
   "physicalIME": "NOT TESTED",
-  "finalObservedHEAD": "29394118926ac032112b5d075a57bdd251a2d631",
+  "finalObservedHEAD": "c748d94ad39589fcf069cef7fe31b979bfc92787",
   "finalHEADAdvancedExternally": true,
   "safetyTests": [
     {
@@ -74,6 +74,6 @@
     "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
     "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
   },
-  "checkedAtUTC": "2026-11-17T08:05:44.931139+00:00",
+  "checkedAtUTC": "2026-11-17T08:15:44.730159+00:00",
   "candidateGoSHA256": "73a602eca084feba208beb4c0eb7d601b0dcde35f0873f81d0f651496aa6bd10"
 }

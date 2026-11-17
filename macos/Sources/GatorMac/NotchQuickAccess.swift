@@ -223,9 +223,8 @@ struct GatorMenuBarLabel: View {
         }.help("Gator · \(status)").accessibilityLabel("Gator, \(status)")
         .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: status)
         .task {
-            delegate.application = sessions
-            if delegate.quickAccess == nil { delegate.quickAccess = NotchQuickAccess(sessions: sessions) { openWindow(id: "conversation"); NSApp.activate(ignoringOtherApps: true) } }
-            await sessions.start()
+            let open = openWindow
+            await delegate.startPresentation(sessions) { open(id: "conversation"); NSApp.activate(ignoringOtherApps: true) }
         }
     }
 }

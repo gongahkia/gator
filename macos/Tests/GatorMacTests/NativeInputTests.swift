@@ -116,3 +116,13 @@ import Testing
     #expect(full.identifier?.rawValue == "conversation-scene")
     full.close()
 }
+
+@Test @MainActor func reopeningGatorWithoutVisibleWindowsUsesTheExistingConversationScene() {
+    let delegate = AppDelegate()
+    var opens = 0
+    delegate.openConversationWindow = { opens += 1 }
+    #expect(delegate.applicationShouldHandleReopen(.shared, hasVisibleWindows: false))
+    #expect(opens == 1)
+    #expect(delegate.applicationShouldHandleReopen(.shared, hasVisibleWindows: true))
+    #expect(opens == 2)
+}

@@ -5,6 +5,7 @@ import GatorCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var application: ManagedSessionCoordinator?
     var quickAccess: NotchQuickAccess?
+    var openConversationWindow: (() -> Void)?
     private var terminating = false
     private var mayTerminate = false
     private var presentationObservers: [NSObjectProtocol] = []
@@ -25,6 +26,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         presentationObservers.removeAll()
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        // a notch panel may be visible even when the conversation is closed.
+        openConversationWindow?()
+        return true
+    }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if mayTerminate { return .terminateNow }
         requestQuit()

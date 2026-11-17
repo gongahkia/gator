@@ -8,29 +8,24 @@ struct GatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var application = NativeEnvironment.application()
     @State private var readingPositions = NativeReadingPositions()
+    @AppStorage("gator.menuBar.enabled") private var menuBarEnabled = true
 
     var body: some Scene {
-        MenuBarExtra {
-            ConversationView(compact: true, quit: { delegate.requestQuit(application) })
-                .environment(application)
-                .environment(readingPositions)
+        MenuBarExtra(isInserted: $menuBarEnabled) {
+            NativeConversationContent(sessions: application, readingPositions: readingPositions, delegate: delegate, compact: true)
                 .frame(width: 440, height: 620)
-                .task { delegate.application = application; await application.start() }
         } label: {
             GatorMenuBarLabel(sessions: application, delegate: delegate)
         }
         .menuBarExtraStyle(.window)
 
         Window("Gator", id: "conversation") {
-            ConversationView(compact: false, quit: { delegate.requestQuit(application) })
-                .environment(application)
-                .environment(readingPositions)
+            NativeConversationContent(sessions: application, readingPositions: readingPositions, delegate: delegate, compact: false)
                 .frame(minWidth: 540, minHeight: 480)
-                .task { delegate.application = application; await application.start() }
         }
         .defaultSize(width: 820, height: 740)
         .windowToolbarStyle(.unified)
-        .defaultLaunchBehavior(ProcessInfo.processInfo.arguments.contains("--open-window") ? .presented : .suppressed)
+        .defaultLaunchBehavior(!menuBarEnabled || ProcessInfo.processInfo.arguments.contains("--open-window") ? .presented : .suppressed)
         .commands {
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
@@ -44,6 +39,7 @@ struct GatorApp: App {
             }
             CommandMenu("Conversation") {
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
+                MenuBarVisibilityToggle()
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(delegate.quickAccess?.canShow != true)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
@@ -58,6 +54,32 @@ struct GatorApp: App {
                     .keyboardShortcut("n").disabled(!application.canNavigate)
             }
         }
+    }
+}
+
+private struct NativeConversationContent: View {
+    let sessions: ManagedSessionCoordinator
+    let readingPositions: NativeReadingPositions
+    let delegate: AppDelegate
+    let compact: Bool
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        ConversationView(compact: compact, quit: { delegate.requestQuit(sessions) })
+            .environment(sessions)
+            .environment(readingPositions)
+            .task {
+                let open = openWindow
+                await delegate.startPresentation(sessions) { open(id: "conversation"); NSApp.activate(ignoringOtherApps: true) }
+            }
+    }
+}
+
+extension AppDelegate {
+    func startPresentation(_ sessions: ManagedSessionCoordinator, openWindow: @escaping () -> Void) async {
+        application = sessions
+        openConversationWindow = openWindow
+        if quickAccess == nil { quickAccess = NotchQuickAccess(sessions: sessions, openWindow: openWindow) }
+        await sessions.start()
     }
 }
 
