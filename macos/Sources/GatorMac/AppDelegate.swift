@@ -4,6 +4,7 @@ import GatorCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var application: ManagedSessionCoordinator?
+    var quickAccess: NotchQuickAccess?
     private var terminating = false
     private var mayTerminate = false
     private var presentationObservers: [NSObjectProtocol] = []
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NativeApplicationPresentation.update()
     }
     func applicationWillTerminate(_ notification: Notification) {
+        quickAccess?.stop()
         for observer in presentationObservers { NotificationCenter.default.removeObserver(observer) }
         presentationObservers.removeAll()
     }

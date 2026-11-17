@@ -1,0 +1,32 @@
+{
+  "adapter": "internal/cliagent.Run (Pi)",
+  "diagnostic": {
+    "transport": "cli",
+    "phase": "model turn",
+    "provider": "pi",
+    "model": "gpt-5.6-terra",
+    "endpoint": "",
+    "method": "exec",
+    "streaming": false,
+    "elapsed_ms": 2385,
+    "auth": "child-environment",
+    "credential_source": "environment",
+    "code": "cli_failure"
+  },
+  "elapsedMS": 2385,
+  "model": "gpt-5.6-terra",
+  "passed": false,
+  "patchBytes": 0,
+  "persistentConfigurationChanged": false,
+  "protocolOverride": "Disposable Pi wrapper selects known-working OpenAI Chat Completions; output capped at 512 tokens; tools disabled",
+  "responseText": "",
+  "turns": 1,
+  "usage": {
+    "unknown_requests": 0,
+    "model_requests": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "reported": true,
+    "estimated": false
+  }
+}

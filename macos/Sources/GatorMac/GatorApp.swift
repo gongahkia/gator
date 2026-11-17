@@ -15,7 +15,7 @@ struct GatorApp: App {
                 .frame(width: 440, height: 620)
                 .task { delegate.application = application; await application.start() }
         } label: {
-            Image(nsImage: GatorBrand.menuBarIcon).accessibilityLabel("Gator")
+            GatorMenuBarLabel(sessions: application, delegate: delegate)
         }
         .menuBarExtraStyle(.window)
 
@@ -40,6 +40,8 @@ struct GatorApp: App {
                 Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
             }
             CommandMenu("Conversation") {
+                Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
+                    .disabled(delegate.quickAccess?.geometry == nil)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
                 Button("Inspect Current Task") { application.inspectTask(application.current.conversationID) }.keyboardShortcut("i")
                 Button("Review Pending Action") { application.closeTaskInspection(); application.current.openApprovalReview() }.keyboardShortcut("r", modifiers: [.command, .shift]).disabled(!application.current.hasReviewableApproval)
@@ -72,7 +74,7 @@ enum NativeEnvironment {
 }
 
 @MainActor
-private enum GatorBrand {
+enum GatorBrand {
     static let menuBarIcon: NSImage = {
         let image = Bundle.main.url(forResource: "GatorMenuBar", withExtension: "png")
             .flatMap(NSImage.init(contentsOf:))

@@ -1,0 +1,30 @@
+{
+  "adapter": "existing internal/model/chatcompletions.Responses.Complete; ephemeral outbound transport cap only",
+  "elapsedMS": 1510.515,
+  "endpoint": "https://api.openai.com/v1/chat/completions",
+  "httpStatus": 200,
+  "maxOutputTokens": 512,
+  "model": "gpt-5.6-terra",
+  "passed": true,
+  "persistentConfigurationChanged": false,
+  "provider": "openai",
+  "requests": 1,
+  "responseText": "Gator model integration received this message.",
+  "toolCalls": 0,
+  "usage": {
+    "completion_tokens": 11,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens": 46,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0
+    },
+    "total_tokens": 57
+  }
+}

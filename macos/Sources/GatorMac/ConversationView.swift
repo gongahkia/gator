@@ -11,6 +11,7 @@ struct ConversationView: View {
     @Environment(\.openWindow) private var openWindow
     let compact: Bool
     let quit: () -> Void
+    @AppStorage("gator.notch.enabled") private var notchEnabled = true
     @State private var following = true
     @State private var nearBottom = true
     @State private var phase = ScrollPhase.idle
@@ -132,6 +133,7 @@ struct ConversationView: View {
                 }
                 Text("Proposed actions still require exact review.")
             }
+            Toggle("Notch Quick Access", isOn: $notchEnabled)
             Button("Connection & Model Details") { connectionDetails = true }
             Divider()
             Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)
