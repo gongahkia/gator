@@ -10,10 +10,12 @@ struct RecoveryInspectorContent: View {
         if let recovery = owner.recovery, recovery.relevant || owner.receiptOperation != nil || owner.recoveryPreparation != nil {
             VStack(alignment: .leading, spacing: 14) {
                 Label("Recovery and retained evidence", systemImage: "clock.arrow.circlepath").font(.headline).accessibilityAddTraits(.isHeader)
-                Text("Inspection never resumes work, grants access, approves an action or resends anything.").font(.callout)
+                Text("Inspect what happened before choosing a next step. Nothing runs or sends when you inspect.").font(.callout)
                 if let preparation = owner.recoveryPreparation {
                     Label(preparation.status, systemImage: "list.bullet.clipboard").textSelection(.enabled)
-                    Text(verbatim: "Original task: " + preparation.taskID + " · preparation request: " + preparation.id).font(.caption).textSelection(.enabled)
+                    DisclosureGroup("Preparation identity") {
+                        Text(verbatim: "Original task: " + preparation.taskID + "\nPreparation request: " + preparation.id).textSelection(.enabled)
+                    }.font(.caption)
                     if ["plan_ready", "reconciled"].contains(preparation.phase), let summary = owner.snapshot?.value["task_plans"].array.first(where: { $0["id"].string == preparation.taskID }), let identity = NativePlanIdentity(conversationID: owner.conversationID, summary: summary) {
                         Button("Inspect Recovery Plan") { Task { await sessions.loadPlan(identity, owner: owner) } }.focusable()
                             .disabled(owner !== sessions.current || !owner.isConnected || !owner.operation.isEmpty)
@@ -27,7 +29,7 @@ struct RecoveryInspectorContent: View {
                     }.font(.caption)
                 }
                 if !owner.isConnected { Label("Owner disconnected · retained snapshot may be out of date", systemImage: "exclamationmark.triangle") }
-                if recovery.unresolved { Text("This owner retains unresolved evidence. It may keep a cached slot until the original work can be safely inspected; work is never cancelled to free a slot.").font(.caption).foregroundStyle(.secondary) }
+                if recovery.unresolved { NativeStatusMessage(text: "Some outcomes still need review. Inspect the evidence before preparing any next step.").font(.callout) }
                 ForEach(Array(recovery.notices.enumerated()), id: \.offset) { _, notice in
                     Label { Text(verbatim: notice).textSelection(.enabled) } icon: { Image(systemName: "exclamationmark.triangle") }
                 }
@@ -47,14 +49,15 @@ struct RecoveryInspectorContent: View {
                 ForEach(recovery.receipts) { receipt in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(verbatim: receipt.title).font(.body.weight(.medium)).accessibilityAddTraits(.isHeader)
-                        Text(verbatim: "Run: " + receipt.runID + (receipt.at.isEmpty ? "" : " · " + receipt.at)).font(.caption).textSelection(.enabled)
+                        if !receipt.at.isEmpty { Text(verbatim: receipt.at).font(.caption).textSelection(.enabled) }
                         if receipt.live { Text("Go reports this attempt as live; a lost connection does not establish failure.").font(.caption) }
                         ForEach(receipt.fields.filter { !["ID", "CorrelationID"].contains($0.id) }) { field in Text(verbatim: field.text).textSelection(.enabled) }
                         DisclosureGroup("Exact receipt identity") {
+                            Text(verbatim: "Run: " + receipt.runID).textSelection(.enabled)
                             ForEach(receipt.fields.filter { ["ID", "CorrelationID"].contains($0.id) }) { field in Text(verbatim: field.text).textSelection(.enabled) }
                             if let identity = receipt.identity { Text(verbatim: "Manifest: " + identity.manifestSHA256).textSelection(.enabled) }
                         }.font(.caption)
-                        if receipt.value["Status"].string == "unknown" { Text("External outcome uncertain. Neither a disconnect nor an unconfirmed check proves this action failed. No Resend is available.").font(.callout) }
+                        if receipt.value["Status"].string == "unknown" { NativeStatusMessage(text: "External outcome uncertain. Neither a disconnect nor an unconfirmed check proves this action failed. No Resend is available.").font(.callout) }
                         if let identity = receipt.identity {
                             if let pending = owner.receiptOperation, pending.identity == identity {
                                 Label(pending.summary, systemImage: "info.circle").textSelection(.enabled)

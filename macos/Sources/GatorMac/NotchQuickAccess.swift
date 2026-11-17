@@ -28,6 +28,8 @@ final class NotchQuickAccess {
     private(set) var geometry: NotchGeometry?
     private(set) var expanded = false
     private(set) var keyboardActive = false
+    private(set) var enabled = true
+    var canShow: Bool { enabled && geometry != nil }
     private var panel: QuickAccessPanel?
     private var pending: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
@@ -51,7 +53,7 @@ final class NotchQuickAccess {
     }
     private func configure() {
         let next = NSScreen.screens.compactMap { NotchGeometry.detect(frame: $0.frame, safeTop: $0.safeAreaInsets.top, left: $0.auxiliaryTopLeftArea, right: $0.auxiliaryTopRightArea) }.first
-        let enabled = UserDefaults.standard.object(forKey: "gator.notch.enabled") as? Bool ?? true
+        enabled = UserDefaults.standard.object(forKey: "gator.notch.enabled") as? Bool ?? true
         guard enabled, let next else {
             pending?.cancel(); expanded = false; keyboardActive = false; panel?.acceptsKeyboard = false; panel?.orderOut(nil); geometry = next; return
         }
@@ -81,7 +83,7 @@ final class NotchQuickAccess {
         }
     }
     func show() {
-        guard geometry != nil, panel?.isVisible == true else { return }
+        guard canShow, panel?.isVisible == true else { return }
         pending?.cancel(); previousWindow = NSApp.keyWindow
         setExpanded(true); keyboardActive = true; panel?.acceptsKeyboard = true
         NSApp.activate(ignoringOtherApps: true); panel?.makeKeyAndOrderFront(nil)

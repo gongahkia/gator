@@ -16,7 +16,16 @@ struct NativeMessageBody: View {
                     }.padding(10).background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
                         .accessibilityElement(children: .contain).accessibilityLabel(language.isEmpty ? "Code" : language + " code")
-                case .paragraph, .list:
+                case .list:
+                    if let item = block.listItem {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(verbatim: item.marker).monospacedDigit().fixedSize().frame(minWidth: 18, alignment: .trailing)
+                            inline(item.text).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, CGFloat(min(item.depth, 8)) * 14)
+                        .accessibilityElement(children: .combine).accessibilityHint("List level \(item.depth + 1)")
+                    }
+                case .paragraph:
                     inline(block.text).fixedSize(horizontal: false, vertical: true)
                 }
             }

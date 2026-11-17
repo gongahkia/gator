@@ -11,6 +11,7 @@ struct NativeComposer: NSViewRepresentable {
     var onDropFiles: ([URL]) -> Bool
     var onDragTarget: (Bool) -> Void
     var onPasteImage: () -> Bool
+    var onContentHeight: (CGFloat) -> Void = { _ in }
     var onSend: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -39,6 +40,7 @@ struct NativeComposer: NSViewRepresentable {
         guard let view = scroll.documentView as? ComposerTextView else { return }
         view.onDropFiles = onDropFiles; view.onDragTarget = onDragTarget
         view.onPasteImage = onPasteImage
+        view.onContentHeight = onContentHeight
         view.onRejectedText = onEdit
         view.isEditable = editable
         if editable { view.requestComposerFocus(focusRequest) }
@@ -48,6 +50,7 @@ struct NativeComposer: NSViewRepresentable {
             let length = (text as NSString).length
             view.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
         }
+        DispatchQueue.main.async { [weak view] in view?.reportContentHeight() }
     }
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -70,6 +73,16 @@ struct NativeComposer: NSViewRepresentable {
 /// Keep that request until attachment/key activation; streaming never creates one.
 @MainActor
 final class ComposerTextView: NSTextView {
+    var onContentHeight: ((CGFloat) -> Void)?
+    private var reportedHeight: CGFloat = 0
+    override func layout() { super.layout(); reportContentHeight() }
+    func reportContentHeight() {
+        guard let layoutManager, let textContainer else { return }
+        layoutManager.ensureLayout(for: textContainer)
+        let height = ceil(layoutManager.usedRect(for: textContainer).height + textContainerInset.height * 2)
+        guard abs(height - reportedHeight) >= 1 else { return }
+        reportedHeight = height; onContentHeight?(height)
+    }
     var onDropFiles: (([URL]) -> Bool)?
     var onDragTarget: ((Bool) -> Void)?
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {

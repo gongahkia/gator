@@ -7,6 +7,7 @@ struct ComposerView: View {
     @Environment(GatorApplicationState.self) private var application
     @Environment(ManagedSessionCoordinator.self) private var sessions
     @State private var dropTargeted = false
+    @State private var contentHeight: CGFloat = 0
     var compact: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -16,12 +17,12 @@ struct ComposerView: View {
                     Spacer()
                     Button("Cancel Correction") { application.cancelCorrection() }.disabled(application.pendingSubmission != nil)
                 }
-                if let issue = sessions.correctionUnavailableReason { Text(verbatim: issue).font(.caption).foregroundStyle(.orange) }
+                if let issue = sessions.correctionUnavailableReason { NativeStatusMessage(text: issue).font(.caption) }
                 Button("Inspect Correction Target") { sessions.inspectTask(target.ownerID) }.font(.caption)
             }
             AttachmentSelectionView(compact: compact)
             if !application.attachmentStatus.isEmpty { Label(application.attachmentStatus, systemImage: "arrow.down.doc").font(.caption) }
-            if !application.attachmentIssue.isEmpty { Text(verbatim: application.attachmentIssue).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
+            if !application.attachmentIssue.isEmpty { NativeStatusMessage(text: application.attachmentIssue, severity: .error).font(.caption) }
             ZStack(alignment: .topLeading) {
                 if application.draftText.isEmpty {
                     Text("Message Gator…").font(.body).foregroundStyle(.tertiary).padding(.top, 4).padding(.leading, 2).allowsHitTesting(false)
@@ -30,14 +31,19 @@ struct ComposerView: View {
                     let owner = application
                     guard let request = owner.beginAttachmentImport() else { return false }
                     Task { await owner.importFiles(urls, request: request) }; return true
-                }, onDragTarget: { dropTargeted = $0 }, onPasteImage: { NativeAttachmentActions.pasteImage(owner: application, explicitly: false) }) {
+                }, onDragTarget: { dropTargeted = $0 }, onPasteImage: { NativeAttachmentActions.pasteImage(owner: application, explicitly: false) }, onContentHeight: { contentHeight = $0 }) {
                     if sessions.canSubmit { let owner = application; Task { await sessions.submit(from: owner) } }
                 }
                 // A native input context/undo stack must never be reused for a
                 // different conversation or replacement execution owner.
                 .id(application.context + ":" + application.generation.uuidString)
             }
-            .frame(height: compact ? 56 : 76)
+            .frame(height: NativeComposerPresentation.editorHeight(contentHeight: contentHeight, compact: compact))
+            if let reason = NativeComposerPresentation.slashFeedback(application.draftText) {
+                NativeStatusMessage(text: reason, severity: .information).font(.caption)
+                    .accessibilityIdentifier("gator.composer.slash-feedback")
+                    .background(NativeAccessibilityStatus(status: "Messages cannot start with a slash here. Add a word before the path, or use native conversation controls.").frame(width: 0, height: 0))
+            }
             HStack {
                 Button { NativeAttachmentActions.pick(owner: application, sessions: sessions) } label: { Image(systemName: "paperclip") }
                     .focusable().accessibilityLabel("Attach Files").help(NativeUploadLimits.hint).disabled(!application.canImportAttachments)

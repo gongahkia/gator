@@ -7,11 +7,13 @@ import GatorCore
 struct GatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var application = NativeEnvironment.application()
+    @State private var readingPositions = NativeReadingPositions()
 
     var body: some Scene {
         MenuBarExtra {
             ConversationView(compact: true, quit: { delegate.requestQuit(application) })
                 .environment(application)
+                .environment(readingPositions)
                 .frame(width: 440, height: 620)
                 .task { delegate.application = application; await application.start() }
         } label: {
@@ -22,6 +24,7 @@ struct GatorApp: App {
         Window("Gator", id: "conversation") {
             ConversationView(compact: false, quit: { delegate.requestQuit(application) })
                 .environment(application)
+                .environment(readingPositions)
                 .frame(minWidth: 540, minHeight: 480)
                 .task { delegate.application = application; await application.start() }
         }
@@ -41,7 +44,7 @@ struct GatorApp: App {
             }
             CommandMenu("Conversation") {
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
-                    .disabled(delegate.quickAccess?.geometry == nil)
+                    .disabled(delegate.quickAccess?.canShow != true)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
                 Button("Inspect Current Task") { application.inspectTask(application.current.conversationID) }.keyboardShortcut("i")
                 Button("Review Pending Action") { application.closeTaskInspection(); application.current.openApprovalReview() }.keyboardShortcut("r", modifiers: [.command, .shift]).disabled(!application.current.hasReviewableApproval)

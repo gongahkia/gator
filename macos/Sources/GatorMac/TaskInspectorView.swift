@@ -13,6 +13,7 @@ struct TaskInspectorView: View {
                 Spacer()
                 Button("Back to Conversation") { sessions.closeTaskInspection() }.focusable().keyboardShortcut(.escape, modifiers: [])
             }
+            if let owner { Text("Conversation: " + owner.title).font(.callout.weight(.medium)).textSelection(.enabled) }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if let owner, let snapshot = owner.snapshot {
@@ -21,8 +22,10 @@ struct TaskInspectorView: View {
                         Label(task.state, systemImage: snapshot.hasApproval ? "hand.raised" : snapshot.running ? "clock" : "text.bubble")
                             .accessibilityLabel("Task status: " + task.state)
                             .background(NativeAccessibilityStatus(status: "Task: " + task.title + ". " + task.state).frame(width: 0, height: 0))
-                        if !sessions.isInspectionCurrent { Text("This owner changed. Close these details and inspect the task again before requesting any controls.").foregroundStyle(.orange) }
-                        if !task.summary.isEmpty { Text("Public retained summary · open the conversation for full output").font(.caption).foregroundStyle(.secondary); Text(verbatim: task.summary).textSelection(.enabled) }
+                        if !sessions.isInspectionCurrent { NativeStatusMessage(text: "This owner changed. Close these details and inspect the task again before requesting any controls.") }
+                        if !task.summary.isEmpty {
+                            DisclosureGroup("Task summary") { Text(verbatim: task.summary).textSelection(.enabled) }
+                        }
                         if !task.issue.isEmpty { Label("Task needs attention", systemImage: "exclamationmark.triangle"); Text(verbatim: task.issue).textSelection(.enabled) }
                         if owner !== sessions.current {
                             Text("Work continues in its original conversation while you inspect it.").font(.caption).foregroundStyle(.secondary)
@@ -33,14 +36,13 @@ struct TaskInspectorView: View {
                             if !task.parentID.isEmpty { Text(verbatim: "Requesting conversation: " + task.parentID) }
                             if !task.turnID.isEmpty { Text(verbatim: "Original turn: " + task.turnID) }
                             Text("Owner connection: " + owner.connectionStatus.rawValue)
+                            if let retention = sessions.retainedOwnerExplanation(owner) { Text(verbatim: retention) }
                         }.font(.caption).textSelection(.enabled)
                         if !task.publicActivity.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Public work activity").font(.headline)
+                            DisclosureGroup("Work activity") {
                                 ForEach(Array(task.publicActivity.enumerated()), id: \.offset) { _, entry in Text(verbatim: entry) }
                             }.textSelection(.enabled)
                         }
-                        if let retention = sessions.retainedOwnerExplanation(owner) { Text(verbatim: retention).font(.caption).textSelection(.enabled) }
                         RecoveryInspectorContent(owner: owner, generation: inspection.generation)
                         let capability = snapshot.value["dialogue_task"]
                         if capability["can_guide"].bool || capability["can_stop"].bool || capability["can_correct_action"].bool || capability["can_revise_plan"].bool {
@@ -86,7 +88,8 @@ struct TaskInspectorView: View {
             if !summary["issue"].string.isEmpty { Text(verbatim: summary["issue"].string).textSelection(.enabled) }
             if let review = owner.planReviews[identity.taskID] {
                 let fresh = owner.isCurrentPlanReview(review)
-                Text(fresh ? review.status : "This read belongs to an older plan, scope or task state. Inspect the current review again.").font(.callout).foregroundStyle(fresh ? Color.primary : .orange)
+                if fresh { Text(verbatim: review.status).font(.callout) }
+                else { NativeStatusMessage(text: "This read belongs to an older plan, scope or task state. Inspect the current review again.").font(.callout) }
                 PlanReviewContent(review: review, owner: owner)
                 if fresh, owner === sessions.current, summary["phase"].string == "review" {
                     Button("Request Plan Revision") { Task { await sessions.requestPlanRevision(owner: owner, review: review) } }.focusable()

@@ -9,6 +9,11 @@ struct AttachmentSelectionView: View {
         if !owner.draftUploads.isEmpty {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Attachments · selected, not sent").font(.caption.weight(.medium))
+                let duplicates = NativeComposerPresentation.duplicateNames(owner.draftUploads)
+                if !duplicates.isEmpty {
+                    NativeStatusMessage(text: "Gator cannot send files with the same name together: " + duplicates.joined(separator: ", ") + ". Remove one copy and send it in a separate message.")
+                        .font(.caption).accessibilityIdentifier("gator.attachments.duplicate-names")
+                }
                 ScrollView {
                     LazyVStack(spacing: 6) {
                         ForEach(owner.draftUploads) { file in

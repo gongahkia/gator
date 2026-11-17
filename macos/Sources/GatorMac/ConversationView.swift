@@ -12,10 +12,7 @@ struct ConversationView: View {
     let compact: Bool
     let quit: () -> Void
     @AppStorage("gator.notch.enabled") private var notchEnabled = true
-    @State private var following = true
-    @State private var nearBottom = true
-    @State private var phase = ScrollPhase.idle
-    @State private var activityExpanded = false
+    @State private var contentSize = CGSize(width: 540, height: 480)
     @State private var sessionsExpanded = false
     @State private var connectionDetails = false
     @State private var noticesHeight: CGFloat = 24
@@ -24,7 +21,7 @@ struct ConversationView: View {
         VStack(spacing: 0) {
             if compact { header.padding(.horizontal, 14).padding(.vertical, 10); Divider() }
             if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
-            if let inspection = sessions.inspection {
+            if compact, let inspection = sessions.inspection {
                 TaskInspectorView(inspection: inspection, owner: sessions.inspectedOwner, compact: compact).padding(12)
             } else if let review = application.review {
                 ApprovalReviewView(review: review, compact: compact).padding(12)
@@ -36,7 +33,7 @@ struct ConversationView: View {
                         Text("What can I help with?").font(compact ? .title3.weight(.medium) : .title2.weight(.medium))
                         Text("Ask a question, make a plan, or pick up where you left off.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 330)
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else { transcript }
+                } else { NativeTranscriptView(compact: compact).id(application.context) }
             }
             ScrollView {
                 notices.padding(.horizontal, 14).padding(.vertical, 4)
@@ -46,12 +43,21 @@ struct ConversationView: View {
                 Button { application.openApprovalReview() } label: { Label("An action needs your review", systemImage: "hand.raised").frame(maxWidth: .infinity) }
                     .buttonStyle(.bordered).padding(.horizontal, 14).padding(.top, 6)
             }
-            if application.review == nil && sessions.inspection == nil { ComposerView(compact: compact).padding(12) }
+            if application.review == nil && (!compact || sessions.inspection == nil) { ComposerView(compact: compact).padding(12) }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .background(NativeWindowConfiguration(compact: compact).frame(width: 0, height: 0))
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
+        .sheet(isPresented: Binding(get: { !compact && sessions.inspection != nil }, set: { if !$0 { sessions.closeTaskInspection() } })) {
+            if let inspection = sessions.inspection {
+                TaskInspectorView(inspection: inspection, owner: sessions.inspectedOwner, compact: false)
+                    .padding(12)
+                    .frame(width: max(400, min(660, contentSize.width - 48)), height: max(280, min(620, contentSize.height - 64)))
+            }
+        }
         .toolbar {
             if !compact {
+                ToolbarItem(placement: .navigation) { RecentConversationsMenu() }
                 ToolbarItemGroup(placement: .primaryAction) { headerActions }
             }
         }
@@ -81,7 +87,7 @@ struct ConversationView: View {
             Button { Task { await sessions.newConversation() } } label: { Image(systemName: "square.and.pencil") }
                 .disabled(!sessions.canNavigate).help("New Conversation · ⌘N").accessibilityLabel("New Conversation")
         }
-        Button { sessions.inspectTask(application.conversationID) } label: { Image(systemName: "sidebar.right") }
+        Button { sessions.inspectTask(application.conversationID) } label: { Image(systemName: "doc.text.magnifyingglass") }
             .help("Inspect current task · ⌘I").accessibilityLabel("Inspect Current Task").disabled(application.snapshot == nil || sessions.switching).focusable()
         if let parent = application.snapshot?.value["dialogue_task"]["parent_id"].string, !parent.isEmpty {
             Button { Task { await sessions.openConversation(parent) } } label: { Image(systemName: "arrow.uturn.backward") }
@@ -178,58 +184,6 @@ struct ConversationView: View {
         }.font(.caption).help("Inspect or return to an original chat without moving its work")
     }
 
-    private var transcript: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    if application.transcript.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("What can I help with?").font(.title2.weight(.medium))
-                            Text("Ask a question, work through an idea, or get something done.").foregroundStyle(.secondary)
-                        }.padding(.vertical, 24)
-                    }
-                    if application.snapshot?.value["dialogue_more"].bool == true {
-                        Text("Earlier conversation history is available in the terminal app.").font(.caption).foregroundStyle(.secondary)
-                    }
-                    ForEach(application.transcript.filter(\.hasVisibleContent)) { message in MessageRow(message: message).equatable() }
-                    if application.snapshot?.running == true {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
-                            ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).enumerated()), id: \.offset) { _, entry in
-                                // Public assistant stream uses the same bounded native Markdown
-                                // presentation as retained prose, including incomplete code fences.
-                                // Structured tool activity and exact reviews remain literal.
-                                if entry["kind"].string == "text" { NativeMessageBody(text: entry["text"].string) }
-                            }
-                            DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
-                                ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in
-                                    Text(verbatim: entry["tool"].string + " · " + entry["state"].string).textSelection(.enabled)
-                                }
-                                Button("Inspect Current Task") { sessions.inspectTask(application.conversationID) }
-                                Text("Public task status and retained evidence are available in the inspector.")
-                            }.font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Color.clear.frame(height: 1).id("latest")
-                }.padding(compact ? 16 : 24).frame(maxWidth: 780, alignment: .leading).frame(maxWidth: .infinity)
-            }
-            .defaultScrollAnchor(.bottom)
-            .onScrollPhaseChange { _, new in phase = new }
-            .onScrollGeometryChange(for: Bool.self) { geometry in geometry.contentSize.height - geometry.visibleRect.maxY < 80 } action: { _, near in
-                nearBottom = near
-                if phase == .interacting || phase == .decelerating { following = near }
-            }
-            .onChange(of: application.transcript) { _, _ in if following { proxy.scrollTo("latest", anchor: .bottom) } }
-            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following { proxy.scrollTo("latest", anchor: .bottom) } }
-            .onChange(of: application.context) { _, _ in following = true; proxy.scrollTo("latest", anchor: .bottom) }
-            .overlay(alignment: .bottom) {
-                if !following && !nearBottom {
-                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; proxy.scrollTo("latest", anchor: .bottom) }
-                        .buttonStyle(.bordered).background(.regularMaterial, in: Capsule()).padding(8)
-                }
-            }
-        }
-    }
     @ViewBuilder private var notices: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
@@ -338,5 +292,94 @@ private struct MessageRow: View, Equatable {
     private var validTaskLink: Bool {
         let id = message.result["preview"]["task_chat"].string
         return !id.isEmpty && sessions.current.snapshot?.value["dialogue"].array.contains(where: { $0["task_chat"].string == id }) == true
+    }
+}
+
+private struct NativeTranscriptView: View {
+    @Environment(GatorApplicationState.self) private var application
+    @Environment(ManagedSessionCoordinator.self) private var sessions
+    @Environment(NativeReadingPositions.self) private var positions
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.controlActiveState) private var activeState
+    let compact: Bool
+    @State private var following = true
+    @State private var nearBottom = true
+    @State private var userScrolling = false
+    @State private var visibleMessage: String?
+    @State private var activityExpanded = false
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    if application.transcript.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("What can I help with?").font(.title2.weight(.medium))
+                            Text("Ask a question, work through an idea, or get something done.").foregroundStyle(.secondary)
+                        }.padding(.vertical, 24)
+                    }
+                    if application.snapshot?.value["dialogue_more"].bool == true {
+                        Text("Earlier conversation history is available in the terminal app.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(application.transcript.filter(\.hasVisibleContent)) { message in MessageRow(message: message).equatable() }
+                    if application.snapshot?.running == true {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
+                            ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).enumerated()), id: \.offset) { _, entry in
+                                // Public assistant stream uses the same bounded native Markdown
+                                // presentation as retained prose, including incomplete code fences.
+                                // Structured tool activity and exact reviews remain literal.
+                                if entry["kind"].string == "text" { NativeMessageBody(text: entry["text"].string) }
+                            }
+                            DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
+                                ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in
+                                    Text(verbatim: entry["tool"].string + " · " + entry["state"].string).textSelection(.enabled)
+                                }
+                                Button("Inspect Current Task") { sessions.inspectTask(application.conversationID) }
+                                Text("Public task status and retained evidence are available in the inspector.")
+                            }.font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Color.clear.frame(height: 1).id("latest")
+                }.scrollTargetLayout().padding(compact ? 16 : 24).frame(maxWidth: 780, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .defaultScrollAnchor(.bottom)
+            .scrollPosition(id: $visibleMessage, anchor: .top)
+            .onScrollPhaseChange { _, new in
+                if new == .interacting || new == .decelerating || new == .tracking { userScrolling = true }
+                if new == .idle, userScrolling {
+                    following = nearBottom
+                    positions.remember(application.context, anchor: visibleMessage, following: following)
+                    userScrolling = false
+                }
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in geometry.contentSize.height - geometry.visibleRect.maxY < 80 } action: { _, near in
+                nearBottom = near
+                if userScrolling { following = near }
+            }
+            .onChange(of: application.transcript) { _, _ in
+                if following { proxy.scrollTo("latest", anchor: .bottom) }
+                else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
+            }
+            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following { proxy.scrollTo("latest", anchor: .bottom) } }
+            .task {
+                await Task.yield()
+                restore(proxy)
+            }
+            .onChange(of: activeState) { _, new in if new == .key { restore(proxy) } }
+            .overlay(alignment: .bottom) {
+                if !following && !nearBottom {
+                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; positions.remember(application.context, anchor: nil, following: true); proxy.scrollTo("latest", anchor: .bottom) }
+                        .buttonStyle(.bordered).background(.regularMaterial, in: Capsule()).padding(8)
+                }
+            }
+        }
+    }
+
+    private func restore(_ proxy: ScrollViewProxy) {
+        let saved = positions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id))
+        following = saved.following
+        visibleMessage = saved.anchor
+        if saved.following { proxy.scrollTo("latest", anchor: .bottom) }
+        else if let anchor = saved.anchor { proxy.scrollTo(anchor, anchor: .top) }
     }
 }
