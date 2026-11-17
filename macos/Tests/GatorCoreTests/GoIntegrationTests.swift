@@ -105,3 +105,21 @@ final class GoTestConnections: @unchecked Sendable {
     #expect(app.snapshot?.running == false); #expect(app.snapshot?.value["queued"].int == 0)
     #expect(await app.shutdown())
 }
+
+@Test @MainActor func shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() async throws {
+    let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+    let source = try #require(Bundle.module.url(forResource: "bridge-fixture", withExtension: "mjs", subdirectory: "Fixtures"))
+    let executable = root.appendingPathComponent("killed-fixture.mjs")
+    var bytes = Data("#!/usr/bin/env node\n".utf8); bytes.append(try Data(contentsOf: source)); try bytes.write(to: executable)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+    var environment = ProcessInfo.processInfo.environment; environment["GATOR_FIXTURE_NO_READ"] = "1"
+    let transport = GoBridgeConnection()
+    try await transport.start(BridgeLaunchConfiguration(runtime: executable, workspace: root, environment: environment))
+    var events = transport.events.makeAsyncIterator(); _ = await events.next()
+    let pid = try #require(await transport.processIdentifier()); #expect(kill(pid, SIGKILL) == 0)
+    while let event = await events.next() { if case .disconnected = event { break } }
+    let start = ContinuousClock.now
+    await transport.shutdown()
+    #expect(ContinuousClock.now - start < .seconds(2))
+    #expect(kill(pid, 0) != 0)
+}

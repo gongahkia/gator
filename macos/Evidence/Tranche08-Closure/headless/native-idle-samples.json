@@ -1,0 +1,10 @@
+{
+  "selectedConversation": "controlled failed recovery",
+  "goOwners": 3,
+  "samplesPID_RSSKiB_CPUPercent": [
+    "7482  66544   0.0\n 7484  17548   0.0\n10685  25252   0.0\n11325  21516   0.0",
+    "7482  66544   0.0\n 7484  17548   0.0\n10685  25252   0.0\n11325  21516   0.0",
+    "7482  66544   0.0\n 7484  17548   0.0\n10685  25252   0.0\n11325  21516   0.0"
+  ],
+  "method": "Three settled ps samples200ms apart; not instantaneous scheduler sampling"
+}

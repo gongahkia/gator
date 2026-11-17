@@ -1,0 +1,19 @@
+Another instance of SwiftPM is already running using '/tmp/gator-native-build', waiting until that process has finished execution...[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--1AB21518FC5DEDBE.txt
+[3/6] Emitting module GatorCoreTests
+[4/6] Compiling GatorCoreTests GoIntegrationTests.swift
+[4/6] Write Objects.LinkFileList
+[5/6] Linking GatorNativePackageTests
+Build complete! (5.16s)
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+◇ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() started.
+✔ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() passed after 5.823 seconds.
+◇ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() started.
+✔ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() passed after 0.412 seconds.
+◇ Test realGoInterruptedPlanRestoresOriginalIdentityWithoutReplay() started.
+✔ Test realGoInterruptedPlanRestoresOriginalIdentityWithoutReplay() passed after 1.616 seconds.
+✔ Test run with 3 tests passed after 7.853 seconds.

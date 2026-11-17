@@ -82,7 +82,7 @@ Before evidence is preserved. The remediation below is implemented; desktop acce
 | Finding | Implemented resolution | After evidence / assessment |
 | --- | --- | --- |
 | 01 | Extracted native editor; explicit responder paste, standard Edit commands, plain-text precedence and composition guard | Real hardware-style CG Command-V reached `paste`, staged pixels and required Send. Earlier Unicode-injected event never reached the responder. Headless AppKit event tests also pass. |
-| 02 | Typed file-URL/legacy file-list handling; rejects textual paths/web URLs, captures original import context | Component and actual Go staging tests pass. Native drag source/Finder automation did not establish an actual drop/chip; **NOT TESTED at desktop boundary**. No false success from a source drag operation alone. |
+| 02 | Typed file-URL/legacy file-list handling; rejects textual paths/web URLs, captures original import context | Component and actual Go staging tests pass. The initial unbundled drag helper had no visible source window. With a bundled AppKit drag source, actual document and PNG destination callbacks and unsent chips were observed; `gui-app-dark.log` records both. |
 | 03 | Shared native Markdown block presentation preserves fenced whitespace, headings and lists | `final/full-conversation-light.png`, `final/conversation.ax.txt`; literal commands/reviews bypass the renderer. |
 | 04–06 | Standard full-window toolbar/subtitle; centered welcome; plain assistant prose and expandable result/context sections | Compare before/full-idle and full-conversation with final counterparts. No coding sidebar or dashboard. |
 | 07,10–11 | Bounded actionable notice region, complete expandable errors, grouped native model/session/work-mode menus | Full/compact attachment and plan screenshots; connection label explicitly does not certify provider authentication. |
@@ -104,7 +104,7 @@ Native configuration also preserves SwiftUI's own window identifier. Weak refere
 
 ### Remaining acceptance limits
 
-- Actual native drag-and-drop into the composer is unverified. No unrestricted path fallback was added.
+- Actual document and image drops are now observed. Multiple displays, real Finder variants and physical accessibility still require operator acceptance. No unrestricted path fallback was added.
 - Some AX menu/session interactions timed out or lost their target window. Main-thread sampling included an idle AppKit event loop, so these observations do not prove a product deadlock. Broad desktop/menu restoration acceptance remains **PARTIAL**.
 - Final screenshots do not cover every requested review/recovery/background/streaming/long-history state. Missing evidence is listed in the verification matrix.
 - Physical VoiceOver, physical IME, preference variants, multiple displays and Spaces require operator acceptance.
@@ -120,3 +120,19 @@ Finding 15 also covers native editor lifetime: reusing one NSTextView across con
 Fresh native profiles now request Go's existing `GATOR_UI_BOOT_MODE=new` so the initial editable conversation has a Go-created durable ID before typing/imports. Existing archives/drafts/uncertain workspace admissions retain their original restore path. A real Go test verifies initial identity, one owner, no model invocation/task/plan and idempotent second-surface startup. This uses existing protocol; it neither creates hidden work nor replaces the coordinator.
 
 The standalone marked-text/focus component fixture initially had a zero-size button and default released-on-close NSWindow. Corrected fixture geometry, explicit focusability and owned window lifetime preserve the same Tab/Shift-Tab assertions; six component cases then passed. No production timing assertion was relaxed.
+
+### Final interaction follow-up
+
+A bundled controlled AppKit drag source established both actual native file drops: `drop-document.md` and `drop-image.png`. The application logged `drop received files=1 accepted=true` twice and its AX tree showed both removable unsent chips. This supersedes the earlier inconclusive drag attempts. No Send occurred on drop. The helper itself is test evidence only; it is not bundled in Gator.
+
+The first final127-test run had one existing lost-admission fixture disconnect/timeout. The unchanged focused rerun passed in2.425s, and a complete unchanged127-test rerun passed in72.105s. Initial failure is retained, not erased. Cause is not proven; resource pressure is a possible contributor.
+
+Activation now remains regular after the full app has opened, preserving normal Dock/menu presence until Quit. Menu-bar-only launch still starts accessory. This avoids downgrading activation policy during popover/sheet/Space transitions. It does not change Go ownership, execution or presentation-close semantics.
+
+### Reproduced shutdown hang (P1), remediated
+
+A subsequent sequential regression run hung during `realGoInterruptedPlanRestoresOriginalIdentityWithoutReplay`. A process sample identifies `GoBridgeConnection.shutdown` blocked in Foundation `Process.waitUntilExit()` after an externally killed/reconnected owner; this is stronger evidence than an AX timeout. Removed the redundant synchronous wait and asynchronously confirms Foundation's process-exit observation after the existing bounded graceful/SIGTERM/SIGKILL sequence. No task Stop control uses process termination. Presentation dismissal still never calls shutdown. The existing blocked-stdin shutdown assertion remains under7s (5.823s observed). New killed-owner test passed0.412s; actual interrupted Go-plan recovery passed1.616s. Three focused cases passed7.853s total. Full final suite and final packaging follow in the verification report.
+
+Final post-fix full regression: **128 Swift tests PASS /60.960s**. Settled2,000-row decode50.487ms/projection2.570ms confirms the measured fast path without reducing retained history. Final app launch/connection and two distinct native Command-V image selections observed; screenshots are indexed in the verification report. Physical accessibility and the incomplete broader desktop matrix remain partial.
+
+P2 residual: duplicate user-selected document basenames can still be rejected by Go. Drafts/files are preserved with the exact error; no user original is modified. A reviewed native naming/disambiguation flow is optional follow-up, distinct from the fixed generated screenshot-name bug.

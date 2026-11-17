@@ -42,10 +42,15 @@ struct NativeWindowConfiguration: NSViewRepresentable {
         if compact { compactWindow = window } else { fullWindow = window }
     }
     static func isCompact(_ window: NSWindow?) -> Bool { window != nil && window === compactWindow }
-    static func policy(hasFullWindow: Bool) -> NSApplication.ActivationPolicy { hasFullWindow ? .regular : .accessory }
+    // Once the full application has been presented, keep its standard Dock/
+    // menu presence until Quit. Downgrading while a popover, sheet or Space is
+    // transitioning can hide another presentation unexpectedly.
+    static func policy(hasFullWindow: Bool, current: NSApplication.ActivationPolicy = .accessory) -> NSApplication.ActivationPolicy {
+        hasFullWindow || current == .regular ? .regular : .accessory
+    }
     static func update() {
         let full = fullWindow?.isVisible == true
-        let desired = policy(hasFullWindow: full)
+        let desired = policy(hasFullWindow: full, current: NSApp.activationPolicy())
         if NSApp.activationPolicy() != desired { NSApp.setActivationPolicy(desired) }
     }
 }

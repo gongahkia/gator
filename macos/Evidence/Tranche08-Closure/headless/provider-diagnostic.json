@@ -1,0 +1,26 @@
+{
+  "configPath": "/Users/gabrielongtemasek/.config/gator/config.json",
+  "authPath": "/Users/gabrielongtemasek/.local/state/gator/auth.json",
+  "defaults": {
+    "provider": "gemini",
+    "model": "gemini-3.5-flash"
+  },
+  "geminiEndpoint": {
+    "scheme": "https",
+    "host": "generativelanguage.googleapis.com",
+    "path": "/v1beta",
+    "hasURLCredentials": false,
+    "hasQuery": false
+  },
+  "geminiCredential": {
+    "present": true,
+    "type": "api_key",
+    "nonemptyKey": true
+  },
+  "geminiEnvironmentKeyPresent": false,
+  "otherCredentialProviders": [],
+  "customProviderCount": 0,
+  "newProviderCalls": 0,
+  "previousFailure": "Gemini HTTP401: API key not valid",
+  "diagnosis": "Credential rejection at configured endpoint; not a Swift UI failure. Model compatibility cannot be established before successful authentication."
+}

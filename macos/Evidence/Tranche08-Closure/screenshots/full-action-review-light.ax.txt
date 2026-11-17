@@ -1,0 +1,67 @@
+AXApplication | Gator |  | 
+AXWindow | Gator – Prepare controlled fixture scope |  | 
+AXGroup |  |  | 
+AXHeading |  | Review this exact action | 
+AXStaticText |  |  | Owner: Prepare controlled fixture scope
+AXScrollArea |  |  | 
+AXHeading |  | Review requested action | 
+AXStaticText |  |  | Request: 1
+AXStaticText |  |  | Action: action
+AXStaticText |  |  | connector id: google
+AXStaticText |  |  | target: http://127.0.0.1:56230/gmail/v1/users/me/messages/send
+AXStaticText |  |  | operation: gmail_send
+AXStaticText |  |  | capability: publish
+AXStaticText |  |  | preview / from: me@example.invalid
+AXStaticText |  |  | preview / to: team@example.invalid
+AXStaticText |  |  | preview / subject: Project Update — review before sending
+AXStaticText |  |  | preview / body: Hello team,
+
+This is a controlled native review. The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+The full exact content remains selectable and needs explicit approval.
+
+FINAL REVIEW LINE
+AXDisclosureTriangle |  | Complete exact review data | 
+AXStaticText |  |  | Approving permits exactly this proposed operation. Only Gator's retained outcome can confirm execution or delivery.
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  | Back to Conversation | 
+AXButton |  | Request Correction | 
+AXStaticText |  |  | Space or click chooses · Return never approves
+AXButton |  | Decline | 
+AXButton |  | Approve Exact Action | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXPopUpButton |  | Select Model | 
+AXStaticText |  |  | Request: running
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXButton |  | Stop | 
+AXGroup |  |  | 
+AXPopUpButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Prepare controlled fixture scope
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

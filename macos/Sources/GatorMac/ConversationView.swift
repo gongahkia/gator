@@ -194,7 +194,10 @@ struct ConversationView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
                             ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).enumerated()), id: \.offset) { _, entry in
-                                if entry["kind"].string == "text" { Text(verbatim: entry["text"].string).textSelection(.enabled) }
+                                // Public assistant stream uses the same bounded native Markdown
+                                // presentation as retained prose, including incomplete code fences.
+                                // Structured tool activity and exact reviews remain literal.
+                                if entry["kind"].string == "text" { NativeMessageBody(text: entry["text"].string) }
                             }
                             DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
                                 ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in

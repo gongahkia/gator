@@ -180,8 +180,18 @@ actor GoBridgeConnection: BridgeTransport {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if let process, process.isRunning { kill(process.processIdentifier, SIGKILL) }
-        // waitUntilExit reaps the child after the bounded escalation above.
-        process?.waitUntilExit()
+        // Foundation already observes/reaps Process termination. Calling
+        // waitUntilExit again can block its run-loop notification path after
+        // an externally killed/reconnected owner. Yield while confirming exit
+        // instead of synchronously blocking this actor/executor.
+        for _ in 0..<100 {
+            if process?.isRunning != true { break }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        guard process?.isRunning != true else {
+            fail("Gator shutdown could not be confirmed. Inspect the original owner before restarting.")
+            return
+        }
         await outputTask?.value; await errorTask?.value
         fail("Gator closed.")
     }

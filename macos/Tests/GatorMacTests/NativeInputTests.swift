@@ -68,6 +68,7 @@ import Testing
 @Test @MainActor func fullWindowUsesStandardApplicationMenusWhileMenuBarOnlyStaysAccessory() {
     #expect(NativeApplicationPresentation.policy(hasFullWindow: true) == .regular)
     #expect(NativeApplicationPresentation.policy(hasFullWindow: false) == .accessory)
+    #expect(NativeApplicationPresentation.policy(hasFullWindow: false, current: .regular) == .regular)
 }
 @Test @MainActor func oversizedPlainTextPasteLeavesCurrentNativeDraftIntact() {
     let view = ComposerTextView(); view.isEditable = true; view.string = "Keep this draft"

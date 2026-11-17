@@ -1,0 +1,79 @@
+AXApplication | Gator |  | 
+AXWindow | Gator – Prepare controlled fixture scope |  | 
+AXGroup |  |  | 
+AXDisclosureTriangle |  | Another chat needs attention | 
+AXScrollArea |  |  | 
+AXButton |  | Open chat: Prepare controlled fixture scope · Failed | 
+AXButton |  | Inspect task: Prepare controlled fixture scope | 
+AXButton |  | Open chat: Show a short controlled conversation · Completed | 
+AXButton |  | Inspect task: Show a short controlled conversation | 
+AXButton |  | Open chat: hi brother · Completed | 
+AXButton |  | Inspect task: hi brother | 
+AXHeading |  | Task details | 
+AXButton |  | Back to Conversation | 
+AXScrollArea |  |  | 
+AXStaticText |  |  | Prepare controlled fixture scope
+AXStaticText |  |  | Task status: Failed
+AXStaticText |  |  | Public retained summary · open the conversation for full output
+AXStaticText |  |  | I couldn't finish that run: model turn 1: custom provider fixture returned HTTP 503: Controlled provider unavailable. Original evidence is retained.
+AXDisclosureTriangle |  | Task identity and ownership | 
+AXStaticText |  |  | Unresolved retained work or action evidence keeps this cached owner available for inspection. It will not be evicted to make room for another chat.
+AXHeading |  | Recovery and retained evidence | 
+AXStaticText |  |  | Inspection never resumes work, grants access, approves an action or resends anything.
+AXStaticText |  |  | This owner retains unresolved evidence. It may keep a cached slot until the original work can be safely inspected; work is never cancelled to free a slot.
+AXStaticText |  |  | Retained work activity
+AXStaticText |  |  | Retained work status: Failed · recorded error
+AXStaticText |  |  | Retained text may be partial. It does not establish completed execution.
+AXDisclosureTriangle |  | Evidence for Failed · recorded error | 
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Completed · retained evidence
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Completed · retained evidence | 
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Completed · retained evidence
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Completed · retained evidence | 
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Completed · retained evidence
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Completed · retained evidence | 
+AXStaticText |  |  | Retained result bundle
+AXStaticText |  |  | Retained work status: Failed · recorded error
+AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed.
+AXDisclosureTriangle |  | Evidence for Failed · recorded error | 
+AXHeading |  | gmail_send · Recorded state: denied | 
+AXStaticText |  |  | Run: work-20261116T090852-40a3a80ac582
+AXStaticText |  |  | ConnectorID: google
+AXStaticText |  |  | Operation: gmail_send
+AXStaticText |  |  | Status: denied
+AXStaticText |  |  | Recipient: team@example.invalid
+AXStaticText |  |  | Subject: Project Update — review before sending
+AXDisclosureTriangle |  | Exact receipt identity | 
+AXStaticText |  |  | No eligible exact sealed-bundle identity is available for a receipt check. This evidence cannot authorize an external lookup or retry.
+AXDisclosureTriangle |  | Retained proposal · no approval authority | 
+AXScrollBar |  |  | 
+AXValueIndicator |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXPopUpButton |  | Select Model | 
+AXStaticText |  |  | Request: failed
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Inspect Current Task | 
+AXGroup |  |  | 
+AXPopUpButton |  | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Prepare controlled fixture scope
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator |  | 

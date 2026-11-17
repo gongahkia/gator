@@ -1,0 +1,7 @@
+Another instance of SwiftPM is already running using '/tmp/gator-native-build', waiting until that process has finished execution...[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--1AB21518FC5DEDBE.txt
+Build complete! (1.25s)
+/tmp/gator-native-app.0IadXD/Gator.app/Contents/Info.plist: OK
+Built /tmp/Gator-Native-Tranche08-Final-Repack.app
+Launch: open '/tmp/Gator-Native-Tranche08-Final-Repack.app'
