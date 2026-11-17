@@ -61,9 +61,9 @@ This identifies the **current reproduced rejection** as provider-side project ge
 
 The offline capture used synthetic credentials and zero network requests. No base-URL/provider override or proxy variable was present; `.env` contains only the OpenAI key/model pair. Default transport headers are not claimed as explicitly captured adapter headers. See `headless/offline-wire-comparison.jsonl` and `provider-resolution.json`.
 
-OpenAI documents both endpoints, the input-format difference and the Responses string-input form. [Official migration reference](https://developers.openai.com/api/docs/guides/migrate-to-responses). Therefore the evidence does **not** justify saying this provider has no Responses API. This project's current route is refused by geography authorization. The exact policy difference between Chat and Responses requires the provider/project administrator; no location-routing or authentication bypass was attempted.
+OpenAI documents both endpoints and their input formats in the [migration reference](https://developers.openai.com/api/docs/guides/migrate-to-responses). Its [regional guidance](https://developers.openai.com/api/docs/guides/data-residency) lists `us.api.openai.com` for US projects and shows this exact model using Responses there. **[Inference]** the global-host request conflicts with this project's US geography configuration. This is not evidence that Responses is unsupported. The US host was not called after the one-request budget was spent; successful regional inference remains unverified.
 
-No Gator adapter defect was found, so no protocol fix or automatic fallback was added. Preserve the explicit known-working Chat endpoint `https://api.openai.com/v1/chat/completions`. No key rotation, `.env` edit or provider-default change occurred. An authorized project administrator must resolve the provider geography policy before Responses-specific acceptance can close. Existing Gator paths, if needed for deliberate configuration repair, remain `~/.config/gator/config.json` and `~/.local/state/gator/auth.json`; no provider setup was implemented in this pass.
+No Gator adapter defect was found, so no protocol fix or automatic fallback was added. Preserve the explicit known-working Chat endpoint `https://api.openai.com/v1/chat/completions`. No key rotation, `.env` edit or provider-default change occurred. The concrete operator candidate is the existing endpoint override **`https://us.api.openai.com/v1/responses`**, after confirming the project's region. Gator's OpenAI `BaseURL` is a complete endpoint, so include `/responses`; SDK examples instead show a `/v1` base and append the route. The existing native settings field is `provider_endpoints.openai`; it was inspected, not written. The offline `offline-regional-override.jsonl` capture verifies this full URL is respected with no network call or product change. Responses-specific acceptance remains open until that authorized regional route is tested. Existing Gator paths, if needed for deliberate configuration repair, remain `~/.config/gator/config.json` and `~/.local/state/gator/auth.json`; no provider setup was implemented in this pass.
 
 ## C. Accessibility — automated PASS; physical checks NOT TESTED
 
@@ -122,6 +122,8 @@ git diff --check
 # PASS.
 ```
 
+Additional offline check: `go run ./.gator/dev-regional-inspection` PASS, one synthetic regional-endpoint capture and zero network requests; archived source and JSON are under `headless/`.
+
 The one canonical live probe was built from the archived Go source and invoked by a private `.env`-loading harness; output was checked for literal credentials before being written. No secret appeared in commands or evidence. No test assertion was weakened. No failed headless test/build occurred in this pass. The initial AX focus-setter mismatch is documented separately from the accepted native keyboard rerun.
 
 ## F. Final local app
@@ -143,4 +145,6 @@ No production fix was needed; fixture/test/report changes do not change the app.
 
 ## H. Acceptance decision
 
-**YES — the practical local-development acceptance pass is closed for the tested native workflow and working explicit Chat path.** Exact pending approval navigation, ownership, Return safety, decline, drafts and unrelated-work preservation now have native and headless evidence. Operator accessibility sign-off and Responses geography authorization remain explicitly open as separate acceptance scopes. No blanket accessibility or all-provider PASS is claimed. No Tranche09, README modification, commit, feature development or backend-goal resumption occurred.
+**YES — the practical local-development acceptance pass is closed for the tested native workflow and working explicit Chat path.** Exact pending approval navigation, ownership, Return safety, decline, drafts and unrelated-work preservation now have native and headless evidence. Operator accessibility sign-off and Responses geography authorization remain explicitly open as separate acceptance scopes. No blanket accessibility or all-provider PASS is claimed. No Tranche09, README modification, agent-created commit, feature development or backend-goal resumption occurred.
+
+Repository preservation: HEAD advanced externally during this task from `87339a6112d8c68f9d0a7b64e982b0d7dad6d424` to `13134d5f2c81ae6f4ed8c4bea1948774d15307e6`. This agent created no commits; external work and all earlier evidence were retained.

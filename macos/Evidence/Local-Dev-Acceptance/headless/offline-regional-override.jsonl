@@ -1,0 +1,1 @@
+{"authentication":"Bearer","headerNames":["Authorization","Content-Type"],"method":"POST","model":"gpt-5.6-terra","networkRequests":0,"requestKeys":["input","model","store"],"route":"Responses US endpoint override","store":false,"syntheticInputShape":[{"content":"Synthetic regional endpoint inspection","role":"user"}],"url":"https://us.api.openai.com/v1/responses"}

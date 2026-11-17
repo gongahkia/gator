@@ -1,0 +1,179 @@
+{
+  "head": "13134d5f2c81ae6f4ed8c4bea1948774d15307e6",
+  "status": " M macos/PROVIDER-DIAGNOSTICS.md\n M macos/TRANCHE08-ACCEPTANCE-CLOSURE.md\n M macos/TRANCHE08-LOCAL-DEV-ACCEPTANCE.md\n?? macos/Evidence/Local-Dev-Acceptance/headless/final-integrity.json\n?? macos/Evidence/Local-Dev-Acceptance/headless/offline-regional-override.go.txt\n?? macos/Evidence/Local-Dev-Acceptance/headless/offline-regional-override.jsonl\n",
+  "files": {
+    "macos/Sources/GatorCore/NativeDraftAttachments.swift": {
+      "sha256": "96da89b97e3d43c9c8d2e67534b605fb8320f4d509bfac317e8510b1ee5f0a6a",
+      "lines": 16
+    },
+    "macos/Sources/GatorCore/NativeUploadStore.swift": {
+      "sha256": "94dc5406ef0a1d1a579efcbf3c60d9d862aeca487947be4c91096810382ef8d3",
+      "lines": 188
+    },
+    "macos/Sources/GatorCore/NativeDraftStore.swift": {
+      "sha256": "429c5426754d04dc808a243f77f1245cbe187259a17c1b64a4fe035521209ae6",
+      "lines": 161
+    },
+    "macos/Sources/GatorCore/GoBridgeConnection.swift": {
+      "sha256": "3dd00053bad336f7f6e1c623be5798a6e0020adf908fce58368778a115bc029b",
+      "lines": 198
+    },
+    "macos/Sources/GatorCore/ManagedSessionProtocol.swift": {
+      "sha256": "34cc34459cb4ff9f37b62bd951961db7df5d813fdc479ca545044c6c0bc84c64",
+      "lines": 69
+    },
+    "macos/Sources/GatorCore/NativePlanExecution.swift": {
+      "sha256": "51bab4b25fb2663e8dbd64368639e8297c57caea9275aa3ddca72e84a31761ad",
+      "lines": 65
+    },
+    "macos/Sources/GatorCore/ManagedSessionCoordinator.swift": {
+      "sha256": "27d966a042c7dcdf9484c95c854a904f705ec7a386c37bd679922dbc1ff093d1",
+      "lines": 507
+    },
+    "macos/Sources/GatorCore/NativeMessageContent.swift": {
+      "sha256": "cb5d36fd311f0beb17fa664d054babf1807ef93e7ae6cea445e8f98269b3e890",
+      "lines": 38
+    },
+    "macos/Sources/GatorCore/NativeRecoveryPreparation.swift": {
+      "sha256": "c385d82523b2ce2dd73e35514482e6197e10426da4babff98561fe26383cf81b",
+      "lines": 65
+    },
+    "macos/Sources/GatorCore/GatorApplicationState.swift": {
+      "sha256": "1c39767baa755d801ecbd628b2e7fea68deedbbc5de5008360eb630d6018892b",
+      "lines": 885
+    },
+    "macos/Sources/GatorCore/BridgeProtocol.swift": {
+      "sha256": "a7a44457c6ab3ff4f36d99dc455d6f61f5ed8b9eafc35e191b0ff8ed2131ad57",
+      "lines": 231
+    },
+    "macos/Sources/GatorCore/NativeTaskReview.swift": {
+      "sha256": "bcf3d6512609df35239375294fcb0909c58cc3ca0f78e31a5a7ff0a8810c769e",
+      "lines": 156
+    },
+    "macos/Sources/GatorCore/NativeRecovery.swift": {
+      "sha256": "fc0bf267ebce16d1f80e33e34a1a4ed607b9ad89e62f063e9ff91498e8e7172d",
+      "lines": 159
+    },
+    "macos/Sources/GatorMac/GatorApp.swift": {
+      "sha256": "23c38cf451152b921a248a8ccb56d55cba223463f6921b68ddac1fa5148c3d91",
+      "lines": 87
+    },
+    "macos/Sources/GatorMac/NativeDropInput.swift": {
+      "sha256": "5d44085f428002d68eefc01641646ab3435e450471022cdbffed476160647e04",
+      "lines": 22
+    },
+    "macos/Sources/GatorMac/NativeWindowConfiguration.swift": {
+      "sha256": "4137a999b003256a55b9dae802e5f0424050226667521017aac6f1432f64a88d",
+      "lines": 56
+    },
+    "macos/Sources/GatorMac/ConversationView.swift": {
+      "sha256": "f1e293ec3970a1ab20dcada8636b050e3413ccedc4ab3c42f9b3a80b764c5a6a",
+      "lines": 342
+    },
+    "macos/Sources/GatorMac/AttachmentSelectionView.swift": {
+      "sha256": "cb79f43d3106617eba59b536ae6455c46bc8d4ba74060ef51d0bb12d8ac1351e",
+      "lines": 43
+    },
+    "macos/Sources/GatorMac/RecoveryInspectorContent.swift": {
+      "sha256": "c9b8e19cd24a65e0416d2d081af85aaac9e1dfb593d27b8616550f3b0f0971aa",
+      "lines": 84
+    },
+    "macos/Sources/GatorMac/ApprovalReviewView.swift": {
+      "sha256": "88631bb3fc1f40c74bc3d7cd2b22c3eff54caa6ef537ba0fc3464c73beef51ec",
+      "lines": 51
+    },
+    "macos/Sources/GatorMac/NativeErrorDisclosure.swift": {
+      "sha256": "aca64b90e959723f381041c4952f39d3021bcbf48694a7626bf6ea9b1d9705dc",
+      "lines": 12
+    },
+    "macos/Sources/GatorMac/NativeMessageBody.swift": {
+      "sha256": "32cf9a49938ac2d88513b5a4e740272f0820a67ad7d2987f8ff39898897ad8ab",
+      "lines": 28
+    },
+    "macos/Sources/GatorMac/PlanReviewContent.swift": {
+      "sha256": "0bb53a3b001561061a5b8bd83548f6df88d475258a865665d80db10bd58f87a1",
+      "lines": 90
+    },
+    "macos/Sources/GatorMac/NativeAccessibilityStatus.swift": {
+      "sha256": "508942f8e21dba4f562bd11eb616571bb82a9854066e0bfa3a07c019214de599",
+      "lines": 16
+    },
+    "macos/Sources/GatorMac/RecoveryPreparationView.swift": {
+      "sha256": "d27c97da9db42f389845f59443f38874d627ebce368111da828dcc1e79dc35db",
+      "lines": 80
+    },
+    "macos/Sources/GatorMac/NativeComposer.swift": {
+      "sha256": "cc8f0dce4bf0fdfef6155c08d0b93f66704bf9a4825ee6e925f5df3ae9e18af9",
+      "lines": 157
+    },
+    "macos/Sources/GatorMac/ExactDecisionButton.swift": {
+      "sha256": "67b002bd150f72d76acf777e86bf61ce979c6be113c00eb3f6ad525491e9654d",
+      "lines": 86
+    },
+    "macos/Sources/GatorMac/ComposerView.swift": {
+      "sha256": "1bc2162ff5ee07d58fabacde7547893d00fe657c27a388c4b8e1f7a5a3b41d86",
+      "lines": 76
+    },
+    "macos/Sources/GatorMac/NativeAttachmentActions.swift": {
+      "sha256": "be94463ec61ce6e50d8e43f5acd408c4c3c13c372016edabafa242a35f740ac8",
+      "lines": 61
+    },
+    "macos/Sources/GatorMac/NotchQuickAccess.swift": {
+      "sha256": "37c8169bc0dcfcf146be90a1298ac9e17e56d24328d83e0b1096bb95eeadb615",
+      "lines": 239
+    },
+    "macos/Sources/GatorMac/AppDelegate.swift": {
+      "sha256": "e78f1dae41779e3a2152e13f3995679c7205df75f2a004a165810c43b00ee8b1",
+      "lines": 61
+    },
+    "macos/Sources/GatorMac/TaskInspectorView.swift": {
+      "sha256": "0bac8148be0c0af947621ef20c5b0e0e84ea411c06488a6315726d092aef3659",
+      "lines": 107
+    },
+    "macos/Sources/GatorMac/ExactReviewContent.swift": {
+      "sha256": "afd37aca239c45c85490bb6b1d65e748ef8cf9fb29806a6446405f124534ef5c",
+      "lines": 22
+    },
+    "macos/Resources/GatorHead.png": {
+      "sha256": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+      "lines": 187
+    },
+    "macos/Resources/GatorMenuBar.png": {
+      "sha256": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+      "lines": 9
+    },
+    "macos/Resources/Info.plist": {
+      "sha256": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+      "lines": 17
+    },
+    "macos/scripts/build-dev-app.sh": {
+      "sha256": "994930f94f2b3a02134a0f4b23f39fde023331a3b11be179c98dd565450f1d47",
+      "lines": 26
+    },
+    "macos/scripts/make-app-icon.swift": {
+      "sha256": "68d4d38043bb03a4fae8f5ff61834e75e209c067bd0727493f8a568b38ea794d",
+      "lines": 68
+    },
+    "macos/Package.swift": {
+      "sha256": "277c9d2f22aa056d967bbc73125d813629e151baa4757908c8886b1839fe5623",
+      "lines": 14
+    },
+    "macos/TRANCHE08-ACCEPTANCE-CLOSURE.md": {
+      "sha256": "49c19fa2a7027b678e0a965b7324e3023b6d02a3183de8ae280d80e05a7395cb",
+      "lines": 191
+    },
+    "macos/TRANCHE08-LOCAL-DEV-ACCEPTANCE.md": {
+      "sha256": "b8ac27a407c52b84cfbda4d540a5c503d5943d0a65485bc25629c511119f21c3",
+      "lines": 150
+    },
+    "macos/MENUBAR-NOTCH-VERIFICATION.md": {
+      "sha256": "c84381b570bc1778524fd5b35c04c9d8411fefa9f0cc3f691700fa8e80f70fe6",
+      "lines": 78
+    },
+    "macos/TRANCHE08-OPERATOR-ACCEPTANCE.md": {
+      "sha256": "cdd54357756bda8b5367c9081bd2a69a7c1b39854c3237a574fea01b4c87aa4c",
+      "lines": 57
+    }
+  },
+  "missingReports": []
+}

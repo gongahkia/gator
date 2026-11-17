@@ -1,0 +1,10 @@
+{
+  "candidateUnchanged": true,
+  "credentialScanPassed": true,
+  "filesScanned": 31,
+  "diffCheckPassed": true,
+  "finalHead": "13134d5f2c81ae6f4ed8c4bea1948774d15307e6",
+  "oneLiveRequestOnly": true,
+  "productionFilesChangedByPass": false,
+  "agentCreatedCommits": false
+}
