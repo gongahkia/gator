@@ -24,6 +24,10 @@ protocol BridgeTransport: Sendable {
     func start(_ configuration: BridgeLaunchConfiguration) async throws
     func send(_ command: BridgeCommand, nonce: String) async throws
     func shutdown() async
+    func shutdownConfirmed() async -> Bool
+}
+extension BridgeTransport {
+    func shutdownConfirmed() async -> Bool { await shutdown(); return true }
 }
 
 actor GoBridgeConnection: BridgeTransport {
@@ -33,6 +37,12 @@ actor GoBridgeConnection: BridgeTransport {
     private var input: FileHandle?
     private var outputTask: Task<Void, Never>?
     private var errorTask: Task<Void, Never>?
+    private var cleanupTask: Task<Void, Never>?
+    private var shutdownTask: Task<Bool, Never>?
+    private var readersFinished = 0
+    private let readCancellation = BridgeIOCancellation()
+    private let writeCancellation = BridgeIOCancellation()
+    private var acknowledgementTasks: [String: Task<Void, Never>] = [:]
     private var framer = BridgeFramer()
     private var diagnostics = Data()
     private var waiters: [String: CheckedContinuation<Void, any Error>] = [:]
@@ -69,47 +79,63 @@ actor GoBridgeConnection: BridgeTransport {
         environment["GATOR_UI_BACKEND"] = "1"
         environment["GATOR_DESKTOP_UPLOAD_DIR"] = configuration.nativeUploadDirectory.path
         p.environment = environment; p.standardInput = stdin; p.standardOutput = stdout; p.standardError = stderr
+        p.terminationHandler = { [weak self] _ in
+            Task { await self?.finishIO() }
+        }
         process = p; input = stdin.fileHandleForWriting
         do { try p.run() }
         catch { process = nil; input = nil; throw error }
         let reader = stdout.fileHandleForReading, errors = stderr.fileHandleForReading
+        do {
+            try BridgePipeIO.prepare(reader); try BridgePipeIO.prepare(errors)
+            try BridgePipeIO.prepare(stdin.fileHandleForWriting)
+        } catch {
+            try? reader.close(); try? errors.close()
+            fail(error.localizedDescription)
+            throw error
+        }
+        let readCancellation = readCancellation
         outputTask = Task.detached { [weak self] in
             do {
-                while true {
-                    let bytes = try await Self.readChunk(reader)
+                while !Task.isCancelled {
+                    guard let bytes = try await BridgePipeIO.read(reader, cancellation: readCancellation) else { continue }
                     if bytes.isEmpty { break }
                     guard let self else { break }; await self.receive(bytes)
                 }
-                await self?.endOfOutput()
+                await self?.outputEnded()
+            } catch is CancellationError {
+                // direct-owner exit bounds draining even if a descendant holds the pipe.
             } catch { await self?.fail("Reading Gator failed: " + error.localizedDescription) }
             try? reader.close()
+            await self?.readerFinished()
         }
         errorTask = Task.detached { [weak self] in
-            while let bytes = try? await Self.readChunk(errors), !bytes.isEmpty { await self?.receiveDiagnostics(bytes) }
+            do {
+                while !Task.isCancelled {
+                    guard let bytes = try await BridgePipeIO.read(errors, cancellation: readCancellation) else { continue }
+                    if bytes.isEmpty { break }
+                    await self?.receiveDiagnostics(bytes)
+                }
+            } catch { /* diagnostics are best effort; owner exit still controls cleanup. */ }
             try? errors.close()
+            await self?.readerFinished()
         }
     }
-
-    // Foundation read(upToCount:) can wait to fill a pipe read on macOS. A
-    // single POSIX read returns currently available bytes; blocking IO stays off
-    // Swift's cooperative executor, so an idle stderr pipe cannot starve actors.
-    nonisolated private static func readChunk(_ handle: FileHandle) async throws -> Data {
-        try await withCheckedThrowingContinuation { done in
-            DispatchQueue.global(qos: .utility).async {
-                var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-                var count: Int
-                repeat { count = Darwin.read(handle.fileDescriptor, &buffer, buffer.count) } while count < 0 && errno == EINTR
-                if count < 0 { done.resume(throwing: BridgeFailure("The Gator pipe could not be read.")) }
-                else { done.resume(returning: Data(buffer.prefix(count))) }
-            }
-        }
+    private func readerFinished() { readersFinished += 1 }
+    private func outputEnded() { _ = beginIOCleanup() }
+    func cleanupIsComplete() -> Bool {
+        outputTask == nil && errorTask == nil && input == nil && waiters.isEmpty && acknowledgementTasks.isEmpty
     }
+    func diagnosticByteCount() -> Int { diagnostics.count }
 
     private func receive(_ bytes: Data) {
         guard !closed else { return }
         do {
             for event in try framer.append(bytes) {
-                if case .acknowledged(let nonce) = event { waiters.removeValue(forKey: nonce)?.resume() }
+                if case .acknowledged(let nonce) = event {
+                    acknowledgementTasks.removeValue(forKey: nonce)?.cancel()
+                    waiters.removeValue(forKey: nonce)?.resume()
+                }
                 continuation.yield(event)
             }
         } catch { fail(error.localizedDescription) }
@@ -128,18 +154,20 @@ actor GoBridgeConnection: BridgeTransport {
         guard !closed else { return }; closed = true
         for waiter in waiters.values { waiter.resume(throwing: BridgeFailure(reason)) }; waiters.removeAll()
         continuation.yield(.disconnected(reason)); continuation.finish()
-        try? input?.close(); input = nil
+        for task in acknowledgementTasks.values { task.cancel() }; acknowledgementTasks.removeAll()
+        writeCancellation.cancel()
+        if let input { writeQueue.async { try? input.close() } }
         if let process, process.isRunning { process.terminate() }
     }
 
     func send(_ command: BridgeCommand, nonce: String) async throws {
-        guard !closed, let input, process?.isRunning == true else { throw BridgeFailure("Gator is disconnected.") }
+        guard shutdownTask == nil, !closed, let input, process?.isRunning == true else { throw BridgeFailure("Gator is disconnected.") }
         let bytes = try command.data(nonce: nonce)
         // focus_session deliberately publishes state without action_applied.
         // Its caller must await the exact foreground projection, not a nonce.
         if case .host(.focus) = command {
-            writeQueue.async { [weak self] in
-                do { try input.write(contentsOf: bytes) }
+            writeQueue.async { [weak self, writeCancellation] in
+                do { try BridgePipeIO.write(bytes, to: input, cancellation: writeCancellation) }
                 catch { Task { await self?.fail("Gator did not confirm focus. Original work was not moved.") } }
             }
             return
@@ -147,29 +175,41 @@ actor GoBridgeConnection: BridgeTransport {
         guard waiters[nonce] == nil else { throw BridgeFailure("Duplicate transport identity.") }
         try await withCheckedThrowingContinuation { waiter in
             waiters[nonce] = waiter
-            writeQueue.async { [weak self] in
-                do { try input.write(contentsOf: bytes) }
+            writeQueue.async { [weak self, writeCancellation] in
+                do { try BridgePipeIO.write(bytes, to: input, cancellation: writeCancellation) }
                 catch { Task { await self?.fail("Writing to Gator failed. Admission is unconfirmed.") } }
             }
-            Task { [weak self, acknowledgementTimeout] in
-                try? await Task.sleep(for: acknowledgementTimeout)
+            acknowledgementTasks[nonce] = Task { [weak self, acknowledgementTimeout] in
+                do { try await Task.sleep(for: acknowledgementTimeout) } catch { return }
                 await self?.expire(nonce)
             }
         }
     }
     private func expire(_ nonce: String) {
+        acknowledgementTasks.removeValue(forKey: nonce)?.cancel()
         waiters.removeValue(forKey: nonce)?.resume(throwing: BridgeFailure("Gator did not acknowledge this action. Inspect its retained state before retrying."))
     }
 
     func processIdentifier() -> Int32? { process?.processIdentifier }
 
-    func shutdown() async {
+    func shutdown() async { _ = await shutdownConfirmed() }
+    func shutdownConfirmed() async -> Bool {
+        if let shutdownTask { return await shutdownTask.value }
+        let task = Task { await performShutdown() }
+        shutdownTask = task
+        let confirmed = await task.value
+        if !confirmed { shutdownTask = nil }
+        return confirmed
+    }
+    private func performShutdown() async -> Bool {
         deliberate = true
         if let input, !closed, let data = try? BridgeCommand.exit.data(nonce: "") {
-            // A full stdin pipe must not prevent the escalation timer from running.
-            writeQueue.async { try? input.write(contentsOf: data); try? input.close() }
+            writeQueue.async { [writeCancellation] in
+                try? BridgePipeIO.write(data, to: input, cancellation: writeCancellation)
+                try? input.close()
+            }
         }
-        // Presentation dismissal never calls this method. Only guarded app shutdown/reconnect does.
+        // keep the existing graceful / SIGTERM / SIGKILL escalation windows.
         for _ in 0..<25 {
             if process?.isRunning != true { break }
             try? await Task.sleep(for: .milliseconds(100))
@@ -180,19 +220,40 @@ actor GoBridgeConnection: BridgeTransport {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if let process, process.isRunning { kill(process.processIdentifier, SIGKILL) }
-        // Foundation already observes/reaps Process termination. Calling
-        // waitUntilExit again can block its run-loop notification path after
-        // an externally killed/reconnected owner. Yield while confirming exit
-        // instead of synchronously blocking this actor/executor.
+        // Foundation reaps Process asynchronously; never call waitUntilExit here.
         for _ in 0..<100 {
             if process?.isRunning != true { break }
             try? await Task.sleep(for: .milliseconds(20))
         }
-        guard process?.isRunning != true else {
-            fail("Gator shutdown could not be confirmed. Inspect the original owner before restarting.")
-            return
+        let confirmed = process?.isRunning != true
+        if !confirmed { fail("Gator shutdown could not be confirmed. Inspect the original owner before restarting.") }
+        await finishIO()
+        if confirmed {
+            process?.terminationHandler = nil; process = nil
         }
-        await outputTask?.value; await errorTask?.value
-        fail("Gator closed.")
+        return confirmed
+    }
+    private func finishIO() async { await beginIOCleanup().value }
+    private func beginIOCleanup() -> Task<Void, Never> {
+        if let cleanupTask { return cleanupTask }
+        let task = Task {
+            // drain available final frames/diagnostics, independently of inherited EOF.
+            let deadline = ContinuousClock.now + .milliseconds(250)
+            while readersFinished < (outputTask == nil ? 0 : 1) + (errorTask == nil ? 0 : 1), ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            readCancellation.cancel(); outputTask?.cancel(); errorTask?.cancel()
+            await outputTask?.value; await errorTask?.value
+            outputTask = nil; errorTask = nil
+            writeCancellation.cancel()
+            let input = input
+            await withCheckedContinuation { done in
+                writeQueue.async { try? input?.close(); done.resume() }
+            }
+            self.input = nil
+            endOfOutput()
+        }
+        cleanupTask = task
+        return task
     }
 }

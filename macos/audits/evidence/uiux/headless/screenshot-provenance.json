@@ -1,0 +1,178 @@
+[
+  {
+    "id": "S01",
+    "path": "macos/Evidence/Local-Dev-Acceptance/notch-pending-approval.png",
+    "sha256": "2c44a1d258adf4203dd936ffd5f6a048511c9b725ea9f1952a98678e34f1ba46",
+    "pixelSize": [
+      840,
+      492
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "S02",
+    "path": "macos/Evidence/Local-Dev-Acceptance/compact-exact-review.png",
+    "sha256": "c9893395da60ad60724326626d7e1df985913edfe4b8defb9e48181fa17b60c6",
+    "pixelSize": [
+      880,
+      1240
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "S03",
+    "path": "macos/Evidence/Local-Dev-Acceptance/full-exact-review-window.png",
+    "sha256": "88b5ddc304bebcb07f0add767e5be1cb4c9aeadd202ff753a13cf3e5735fbbe8",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate; before accepted keyboard traversal",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "S04",
+    "path": "macos/Evidence/Notch-Quick-Access/final-full-recovery-screen.png",
+    "sha256": "834ef505ee73585019d63c775e2aa744e7b3d2caac71518a6c6ea42a1f8396d9",
+    "pixelSize": [
+      1640,
+      1480
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "S05",
+    "path": "macos/Evidence/Notch-Quick-Access/final-compact-recovery-screen.png",
+    "sha256": "9665f11cf85de3270a704a3e9526a0fd7eb191edb22b000e71b0f0cb1e5c8cdc",
+    "pixelSize": [
+      880,
+      1240
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "S06",
+    "path": "macos/Evidence/Notch-Quick-Access/final-expanded-screen-region.png",
+    "sha256": "8f980e99aa33dfac3339b9b782e2e94847ee9242fbe9ac0b3c9b050d9820bd57",
+    "pixelSize": [
+      840,
+      492
+    ],
+    "provenance": "enhanced-final; prior native acceptance; same candidate",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H01",
+    "path": "macos/Evidence/Tranche08/final/compact-idle-light.png",
+    "sha256": "20e071d8bab544ea0357bbdccd59be4dfb397dd70247e1cd8c49ffa12f6da315",
+    "pixelSize": [
+      972,
+      1332
+    ],
+    "provenance": "original Tranche08; historical generation",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H02",
+    "path": "macos/Evidence/Tranche08-Closure/continuation/screenshots/full-empty-light.png",
+    "sha256": "374d9900a910a6b3ebc666b61c3febac534494f78dee0047c1422d33643e2600",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "closure pre-icon generation; historical",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H03",
+    "path": "macos/Evidence/Tranche08/final/full-conversation-light.png",
+    "sha256": "ad8fb28371d9de14b33be4e437d0afe76c89bd2f4fd672d354022f7a5ffa6c5e",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "original Tranche08; historical generation",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H04",
+    "path": "macos/Evidence/Tranche08-Closure/continuation/screenshots/final-conversation-complete-dark.png",
+    "sha256": "f4caab4d52f16cda26308a0c897435188c0fea617f3c6fb77582c48f0becfd67",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "closure acceptance generation; predates enhanced-final",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H05",
+    "path": "macos/Evidence/Tranche08/final/full-history-narrow-dark.png",
+    "sha256": "8e1e4ee094e84f5375eeb44e70bd5450e041aaa4ba92843c97345bb3f2985a2a",
+    "pixelSize": [
+      1304,
+      1288
+    ],
+    "provenance": "original Tranche08; historical generation",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H06",
+    "path": "macos/Evidence/Tranche08/final/final-full-attachments-dark.png",
+    "sha256": "387b7e000013d73da5515ed2d12f5914f41643982763934a5546e9c93762db89",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "original Tranche08; historical generation",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H07",
+    "path": "macos/Evidence/Tranche08/final/plan-review-light.png",
+    "sha256": "2119fd4fa14a3a43dad0dca13ef8bf07ae6d0ecb825032fa453a27fb2d0459e5",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "original Tranche08; historical generation",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H08",
+    "path": "macos/Evidence/Tranche08-Closure/continuation/screenshots/final-token-stream-compact-dark.png",
+    "sha256": "7e6cfe8542ca43e72952e5de817313dd261729cef016c1cc50905a0d5039cf6e",
+    "pixelSize": [
+      972,
+      1332
+    ],
+    "provenance": "closure acceptance generation; predates enhanced-final",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H09",
+    "path": "macos/Evidence/Tranche08-Closure/continuation/screenshots/full-background-work-light.png",
+    "sha256": "9de13471060b235a484d1409314c6a7c1ae56810f7a0de045233d23fce89bfb8",
+    "pixelSize": [
+      1864,
+      1704
+    ],
+    "provenance": "closure pre-icon generation; historical",
+    "freshCaptureThisAudit": false
+  },
+  {
+    "id": "H10",
+    "path": "macos/Evidence/Notch-Quick-Access/final-working.png",
+    "sha256": "5c4a5202bdf7fd8408c1813d0ef34fe1ce36a1084ee369f378e4a45a6bec8cc3",
+    "pixelSize": [
+      840,
+      492
+    ],
+    "provenance": "enhanced intermediate; predates final keyboard fix",
+    "freshCaptureThisAudit": false
+  }
+]

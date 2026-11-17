@@ -1,0 +1,12 @@
+{
+  "app": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app",
+  "historyWorkTurns": 40,
+  "fixtureOnly": true,
+  "network": "loopback only",
+  "paidModelCalls": 0,
+  "traceCounts": {
+    "model-response": 80
+  },
+  "guiLaunched": false,
+  "fixturePaidCalls": 0
+}

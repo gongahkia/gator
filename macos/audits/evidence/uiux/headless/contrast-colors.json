@@ -1,0 +1,194 @@
+[
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "background" : "window",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "background" : "control",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAqua",
+    "background" : "text",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "background" : "window",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "background" : "control",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameDarkAqua",
+    "background" : "text",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "background" : "window",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "background" : "control",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityAqua",
+    "background" : "text",
+    "backgroundRGB" : [
+      1,
+      1,
+      1
+    ],
+    "contrast" : 2.3095726488538513,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.55294120311737061,
+      0.15686275064945221
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "background" : "window",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "background" : "control",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  },
+  {
+    "appearance" : "NSAppearanceNameAccessibilityDarkAqua",
+    "background" : "text",
+    "backgroundRGB" : [
+      0.11764705882352941,
+      0.11764705882352941,
+      0.11764705882352941
+    ],
+    "contrast" : 7.4672763950499172,
+    "foreground" : "SwiftUI Color.orange",
+    "foregroundRGB" : [
+      1,
+      0.57254904508590698,
+      0.18823529779911041
+    ]
+  }
+]

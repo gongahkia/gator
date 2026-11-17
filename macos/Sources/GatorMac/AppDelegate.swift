@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !success {
                 terminating = false
                 let alert = NSAlert(); alert.messageText = "Gator stayed open"
-                alert.informativeText = application.persistenceIssue.isEmpty ? "Work changed while preparing to quit. Review it and try again." : application.persistenceIssue
+                alert.informativeText = application.persistenceIssue.isEmpty ? (application.issue.isEmpty ? "Work changed while preparing to quit. Review it and try again." : application.issue) : application.persistenceIssue
                 alert.runModal()
             }
             if success { mayTerminate = true; NSApp.terminate(nil) }

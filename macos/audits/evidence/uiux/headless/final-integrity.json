@@ -1,0 +1,14 @@
+{
+  "startingHEAD": "13134d5f2c81ae6f4ed8c4bea1948774d15307e6",
+  "finalHEAD": "137fb7ea923d14149badbb02e102ffdfb6e34bed",
+  "changesToBaselinedFiles": [],
+  "productionFilesUnchanged": true,
+  "auditAppLaunched": false,
+  "userDesktopControlled": false,
+  "paidCalls": 0,
+  "providerCleanupRequested": true,
+  "existingBundleUnchanged": true,
+  "auditRelativeLinksValid": true,
+  "markdownProbeMatchesCurrentParser": true,
+  "providerCleanupVerified": true
+}

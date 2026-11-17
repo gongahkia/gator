@@ -16,6 +16,7 @@ public final class GatorApplicationState {
     public private(set) var operation = ""
     public private(set) var approvalSending = false
     public private(set) var stopping = false
+    public private(set) var closing = false
     public private(set) var generation = UUID()
     public private(set) var started = false
     public private(set) var draftText = ""
@@ -53,6 +54,8 @@ public final class GatorApplicationState {
     @ObservationIgnored private var archive = NativeArchive()
     @ObservationIgnored private var loaded = false
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var saveSequence = 0
+    @ObservationIgnored private var savedBaseline = NativeArchiveBaseline()
     @ObservationIgnored private var deadlineTask: Task<Void, Never>?
     @ObservationIgnored private var startupDeadline: Task<Void, Never>?
     @ObservationIgnored private var submissionNonce: String?
@@ -87,7 +90,7 @@ public final class GatorApplicationState {
     public var pendingSubmission: PendingSubmission? { archive.pending }
     var draftRevision: UUID? { archive.drafts[context]?.revision }
     public var isConnected: Bool { connectionStatus == .connected }
-    public var canEditDraft: Bool { loaded && !context.isEmpty }
+    public var canEditDraft: Bool { loaded && !closing && connectionStatus != .closed && !context.isEmpty }
     public var readiness: JSONValue { snapshot?.composer["readiness"] ?? .null }
     public var composerModels: [JSONValue] { snapshot?.composer["models"].array ?? [] }
     public var modelLabel: String {
@@ -95,12 +98,13 @@ public final class GatorApplicationState {
         return [snapshot.value["provider"].string, snapshot.value["model"].string].filter { !$0.isEmpty }.joined(separator: " / ")
     }
     public var canNavigate: Bool {
-        isConnected && operation.isEmpty && !approvalSending && archive.pending == nil && !(snapshot?.unsafeToNavigate ?? true)
+        !closing && isConnected && operation.isEmpty && !approvalSending && archive.pending == nil && !(snapshot?.unsafeToNavigate ?? true)
     }
     public var canConfigureModel: Bool {
         canNavigate && snapshot?.value["mode"].string == "chat" && snapshot?.composer["disabled"].string.isEmpty == true
     }
     public var sendUnavailableReason: String? {
+        if closing { return "Gator is closing. Your accepted draft changes are being saved." }
         if attachmentImport != nil { return "Finish choosing or importing attachments before sending." }
         if !persistenceIssue.isEmpty { return "Draft storage needs attention. Sending is disabled to preserve your request." }
         if !isConnected { return "Reconnect to Gator before sending." }
@@ -119,10 +123,10 @@ public final class GatorApplicationState {
     public var hasReviewableApproval: Bool { snapshot?.hasApproval == true && !retiredApprovalTokens.contains(snapshot?.value["pending_approval"]["token"].string ?? "") }
     public var canSend: Bool { sendUnavailableReason == nil && (!draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !draftUploads.isEmpty) }
     public var canStop: Bool {
-        isConnected && snapshot?.running == true && snapshot?.cancelling == false && snapshot?.value["mode"].string == "chat" && snapshot?.value["queued"].int == 0 && snapshot?.hasExternal == false && snapshot?.value["task_plans"].array.contains(where: { ["preparing", "revising"].contains($0["phase"].string) }) != true && !stopping && operation.isEmpty
+        !closing && isConnected && snapshot?.running == true && snapshot?.cancelling == false && snapshot?.value["mode"].string == "chat" && snapshot?.value["queued"].int == 0 && snapshot?.hasExternal == false && snapshot?.value["task_plans"].array.contains(where: { ["preparing", "revising"].contains($0["phase"].string) }) != true && !stopping && operation.isEmpty
     }
     public var canRetryAdmission: Bool {
-        isConnected && archive.pending?.phase == .uncertain && archive.pending?.context == context && snapshot?.unsafeToNavigate == false && operation.isEmpty && persistenceIssue.isEmpty
+        !closing && isConnected && archive.pending?.phase == .uncertain && archive.pending?.context == context && snapshot?.unsafeToNavigate == false && operation.isEmpty && persistenceIssue.isEmpty
     }
     public var reservesPlanCapacity: Bool {
         guard let pending = planOperation else { return false }
@@ -145,7 +149,7 @@ public final class GatorApplicationState {
     public func start() async {
         guard !started else { return }; started = true
         do {
-            archive = try await store.load(); loaded = true
+            archive = try await store.load(); savedBaseline = archive.baseline; loaded = true
             if configuration.conversationID.isEmpty && configuration.bootMode != "new" { configuration.conversationID = archive.selectedConversationID }
             // Allocate an idle durable identity before exposing a fresh native
             // composer. Existing drafts/uncertain workspace admissions keep the
@@ -169,6 +173,7 @@ public final class GatorApplicationState {
         await connect()
     }
     private func connect() async {
+        guard !closing else { return }
         connectionStatus = .starting; generation = UUID(); let ownerGeneration = generation
         let owner = factory(); transport = owner
         eventTask = Task { [weak self] in
@@ -318,7 +323,7 @@ public final class GatorApplicationState {
     }
 
     public func editDraft(_ text: String) {
-        guard loaded, !context.isEmpty else { return }
+        guard canEditDraft else { return }
         guard text.utf8.count <= (correctionTarget == nil ? 128 : 120) * 1024 else { issue = "The draft exceeds 128 KiB. Previous text is kept."; return }
         var draft = archive.drafts[context] ?? NativeDraft()
         if draft.correction != nil { draft.correction?.text = text } else { draft.text = text }
@@ -329,21 +334,26 @@ public final class GatorApplicationState {
     private func persist() {
         guard loaded else { return }
         let value = archive, previous = saveTask, store = store
-        let contexts = promotedDraftContexts.union([context]).union(archive.pending.map { [$0.context] } ?? [])
+        let contexts = promotedDraftContexts.union([context]).union(archive.pending.map { [$0.context] } ?? []).filter { !$0.isEmpty }
+        saveSequence += 1
         saveTask = Task { [weak self] in
             await previous?.value
+            guard let self else { return }
+            var next = value; next.baseline = self.savedBaseline
             do {
-                if self?.managed == true { for ownedContext in contexts where !ownedContext.isEmpty { try await store.saveOwner(value, context: ownedContext) } }
-                else { try await store.save(value) }
-                self?.persistenceIssue = ""
-            }
-            catch { self?.persistenceIssue = "Native drafts could not be saved: " + error.localizedDescription }
+                let receipt = self.managed ? try await store.saveOwners(next, contexts: Set(contexts)) : try await store.save(next)
+                self.savedBaseline.apply(receipt)
+                self.persistenceIssue = ""
+            } catch { self.persistenceIssue = "Native drafts could not be saved: " + error.localizedDescription }
         }
     }
     public func flushDrafts() async -> Bool {
-        await saveTask?.value
-        // An unreadable store disables editing/sending. It must still be possible
-        // to quit without rewriting that original file.
+        // edits accepted while an earlier save awaits disk must join this flush.
+        while let task = saveTask {
+            let sequence = saveSequence
+            await task.value
+            if sequence == saveSequence { break }
+        }
         return !loaded || persistenceIssue.isEmpty
     }
     private func markUncertain() {
@@ -364,7 +374,7 @@ public final class GatorApplicationState {
         await dispatchSubmission(pending)
     }
     private func dispatchSubmission(_ pending: PendingSubmission) async {
-        guard let owner = transport, isConnected, pending.context == context else { markUncertain(); return }
+        guard !closing, let owner = transport, isConnected, pending.context == context else { markUncertain(); return }
         let ownerGeneration = generation, nonce = UUID().uuidString
         do { try await uploads.check(pending.uploads ?? []) }
         catch {
@@ -372,7 +382,7 @@ public final class GatorApplicationState {
             var failed = pending; failed.phase = .failed; submission = failed; archive.pending = nil
             attachmentIssue = error.localizedDescription; issue = "Attachments were not sent. " + error.localizedDescription; persist(); return
         }
-        guard generation == ownerGeneration, isConnected, context == pending.context, archive.pending?.id == pending.id else { markUncertain(); return }
+        guard !closing, generation == ownerGeneration, isConnected, context == pending.context, archive.pending?.id == pending.id else { markUncertain(); return }
         submissionNonce = nonce; startDeadline { [weak self] in
             guard self?.archive.pending?.id == pending.id else { return }
             self?.markUncertain(); self?.issue = "Admission is unconfirmed. The original identity is kept. Reconnect and inspect before explicitly retrying."
@@ -460,7 +470,7 @@ public final class GatorApplicationState {
         return !retiredApprovalTokens.contains(candidate.token) && exactResult && candidate.interactionID > 0 && candidate.interactionID == pending["id"].int && candidate.token.count == 64 && candidate.token == pending["token"].string && candidate.messageIndex == pending["message_index"].int
     }
     public func respondToApproval(_ candidate: ApprovalReview, approved: Bool) async {
-        guard !approvalSending, isCurrentReview(candidate), !approved || candidate.inspectable, let owner = transport else { return }
+        guard !closing, !approvalSending, isCurrentReview(candidate), !approved || candidate.inspectable, let owner = transport else { return }
         if approved {
             guard candidate.messageIndex >= 0, candidate.messageIndex < messages.count, messages[candidate.messageIndex].result == candidate.result else { issue = "Approval details changed. Reopen the exact review."; return }
         }
@@ -472,24 +482,53 @@ public final class GatorApplicationState {
     }
 
     public func reconnect() async {
-        guard connectionStatus == .disconnected || connectionStatus == .idle else { return }
+        guard !closing, connectionStatus == .disconnected || connectionStatus == .idle else { return }
         markUncertain(); markPlanUncertain("Owner reconnect requested."); guard await flushDrafts() else { return }
         operation = "Reconnecting…"
-        await transport?.shutdown(); eventTask?.cancel(); transport = nil
+        if let transport, !(await transport.shutdownConfirmed()) {
+            operation = ""; issue = "Original Go owner exit is unconfirmed. No replacement owner was started."; return
+        }
+        eventTask?.cancel(); transport = nil
         configuration.conversationID = archive.selectedConversationID
         review = nil; operation = ""; issue = ""
         await connect()
         // Deliberately no send here: restore is not a resubmission or approval replay.
     }
+    func beginClosing() {
+        guard !closing else { return }
+        closing = true
+        if attachmentImport != nil {
+            attachmentImport = nil; attachmentStatus = ""
+            attachmentIssue = "An unfinished import was cancelled while closing. Existing draft selections are kept; choose unfinished files again if closing is cancelled."
+        }
+    }
+    func cancelClosing() {
+        closing = false
+        if connectionStatus == .closed || connectionStatus == .stopping { connectionStatus = .disconnected }
+    }
+    func prepareForShutdown() async -> Bool {
+        beginClosing()
+        markRecoveryUncertain(); markReceiptUncertain(); markUncertain()
+        markPlanUncertain("Application shutdown requested.")
+        // retry the latest accepted state after a recoverable disk failure.
+        persist()
+        return await flushDrafts()
+    }
     public func shutdown(confirmed: Bool = false) async -> Bool {
+        if connectionStatus == .closed { return true }
         guard confirmed || quitGuard == nil else { return false }
-        attachmentImport = nil
-        markRecoveryUncertain(); recoveryDeadline?.cancel()
-        markReceiptUncertain()
-        markUncertain(); markPlanUncertain("Application shutdown requested."); guard await flushDrafts() else { return false }
+        guard await prepareForShutdown() else { cancelClosing(); return false }
         connectionStatus = .stopping
         deadlineTask?.cancel(); startupDeadline?.cancel(); planControlDeadline?.cancel()
-        await transport?.shutdown(); eventTask?.cancel(); transport = nil
+        recoveryDeadline?.cancel(); receiptDeadline?.cancel()
+        if let transport, !(await transport.shutdownConfirmed()) {
+            issue = "Gator shutdown could not be confirmed. The original owner is retained; no replacement was started."
+            cancelClosing(); return false
+        }
+        // consume final result/disconnect events before the final durable boundary.
+        await eventTask?.value
+        transport = nil
+        guard await flushDrafts() else { cancelClosing(); return false }
         connectionStatus = .closed; review = nil; return true
     }
 
@@ -565,7 +604,7 @@ public final class GatorApplicationState {
         restoreDraft(context); persist(); requestComposerFocus(); return true
     }
     public func cancelCorrection() {
-        guard archive.pending == nil, var draft = archive.drafts[context] else { return }
+        guard canEditDraft, archive.pending == nil, var draft = archive.drafts[context] else { return }
         draft.correction = nil; draft.revision = UUID(); draft.updated = Date(); archive.drafts[context] = draft
         restoreDraft(context); persist(); requestComposerFocus()
     }
@@ -593,7 +632,7 @@ public final class GatorApplicationState {
     private func planAuthorizationIssue(_ review: NativePlanReview, action: NativePlanAction, permittedPendingID: String? = nil) -> String? {
         if recoveryPreparation?.blocks == true { return "Recovery preparation is pending or unconfirmed. Inspect its resulting plan before any separate authorization." }
         let ownPrepared = permittedPendingID != nil && planOperation?.id == permittedPendingID && planOperation?.phase == .submitted
-        guard managed, isConnected, let snapshot, snapshot.value["foreground"].bool else { return "Open and focus the original connected owner, then inspect again." }
+        guard !closing, managed, isConnected, let snapshot, snapshot.value["foreground"].bool else { return "Open and focus the original connected owner, then inspect again." }
         guard isCurrentPlanReview(review), planReviews[review.identity.taskID] == review else { return "This review changed. Inspect the exact current plan again." }
         guard review.summaryAtInspection != nil, review.scopeAtInspection != nil, NativePlanPresentation.complete(review) else { return "The full authoritative review is incomplete. Approval is unavailable." }
         if planOperation?.blocksAuthorization == true && !ownPrepared { return "A prior authorization is unconfirmed. Reconnect and inspect; do not repeat it." }
@@ -677,7 +716,7 @@ public final class GatorApplicationState {
     public func recoveryUnavailable(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction) -> String? { recoveryEligibility(candidate, action: action) }
     private func recoveryEligibility(_ candidate: NativeRequestRecovery, action: NativeRecoveryAction, pendingID: String? = nil) -> String? {
         let ownPending = pendingID != nil && recoveryPreparation?.id == pendingID && recoveryPreparation?.phase == "submitted"
-        guard isCurrentRecovery(candidate), let snapshot, snapshot.value["foreground"].bool else { return "Open the original connected owner and inspect its current recovery state." }
+        guard !closing, isCurrentRecovery(candidate), let snapshot, snapshot.value["foreground"].bool else { return "Open the original connected owner and inspect its current recovery state." }
         if recoveryPreparation?.blocks == true && !ownPending { return "An earlier preparation is pending or uncertain. Inspect its original task; it cannot be retried automatically." }
         if (!operation.isEmpty && !ownPending) || archive.pending != nil || approvalSending || snapshot.busy || snapshot.hasApproval || snapshot.hasExternal || snapshot.value["dialogue_dispatch"] != .null || snapshot.value["session_request"] != .null || snapshot.value["mode"].string != "chat" || snapshot.value["panel"] != .null { return "Return to the idle original owner before reviewing recovery." }
         if !persistenceIssue.isEmpty { return "Native operation storage needs attention. Nothing will be submitted." }
@@ -782,7 +821,7 @@ public final class GatorApplicationState {
     }
 
     public func receiptUnavailable(_ candidate: NativeRecoveryReceipt, generation expected: UUID) -> String? {
-        guard isConnected, generation == expected, candidate.identity?.conversationID == conversationID else { return "Open the original connected owner and inspect its current evidence." }
+        guard !closing, isConnected, generation == expected, candidate.identity?.conversationID == conversationID else { return "Open the original connected owner and inspect its current evidence." }
         guard let current = recovery?.receipts.first(where: { $0.id == candidate.id }), current == candidate, current.identity != nil else { return "Exact retained bundle identity is missing or changed. A journal receipt alone cannot authorize a check." }
         if receiptOperation?.unresolved == true { return "A prior check is unconfirmed. Its request identity is retained; no automatic retry. Reconnect and inspect retained evidence." }
         guard operation.isEmpty, snapshot?.value["receipt_busy"].bool != true else { return "Wait for the current owner operation." }
@@ -841,6 +880,7 @@ public final class GatorApplicationState {
     func awaitReady(timeout: Duration = .seconds(15)) async throws {
         let deadline = ContinuousClock.now + timeout
         while !isConnected {
+            if closing { throw BridgeFailure("Gator is closing.") }
             if connectionStatus == .disconnected || connectionStatus == .closed { throw BridgeFailure(issue.isEmpty ? "Go owner could not open." : issue) }
             guard ContinuousClock.now < deadline else { throw BridgeFailure("Go did not confirm this chat. Original work was kept.") }
             try await Task.sleep(for: .milliseconds(10))

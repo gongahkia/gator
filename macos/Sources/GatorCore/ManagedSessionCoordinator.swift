@@ -496,12 +496,22 @@ public final class ManagedSessionCoordinator {
         try await parent.host(.result(turn: raw["turn_id"].string, child: raw["child_id"].string, error: errorText, cancelledPlan: cancelled, revisingPlan: revising), timeout: operationTimeout) { $0.value["dialogue_dispatch"] != raw }
     }
     public func shutdown(confirmed: Bool = false) async -> Bool {
+        if stopping { return records.values.allSatisfy { $0.connectionStatus == .closed && $0.persistenceIssue.isEmpty } }
         guard confirmed || quitGuard == nil else { return false }
         stopping = true
+        // one synchronous barrier covers every owner before the first await.
+        for owner in records.values { owner.beginClosing() }
+        var success = false
+        defer {
+            if !success {
+                stopping = false
+                for owner in records.values { owner.cancelClosing() }
+            }
+        }
         await transition?.value
-        for owner in records.values { if !(await owner.flushDrafts()) { stopping = false; return false } }
-        var success = true
-        for owner in records.values { if !(await owner.shutdown(confirmed: true)) { success = false } }
-        return success
+        for owner in records.values { if !(await owner.prepareForShutdown()) { return false } }
+        for owner in records.values { if !(await owner.shutdown(confirmed: true)) { issue = owner.issue; return false } }
+        success = true
+        return true
     }
 }

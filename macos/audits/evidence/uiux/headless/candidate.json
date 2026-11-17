@@ -1,0 +1,14 @@
+{
+  "application": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app",
+  "hashes": {
+    "Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "Contents/MacOS/GatorMac": "feefc29f67c0d0fd73d771225f6050c489de7ccf345798626ddcc7f26b3e5b7a",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/gator-runtime": "0ec32bf877b1cad3393bd51d9ebc3e1897e7efd01acbf50cc84e858edd253904",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
+  },
+  "matchesAcceptedCandidate": true,
+  "runningUserAppObserved": true,
+  "runningUserAppWasNotInspectedOrControlled": true
+}
