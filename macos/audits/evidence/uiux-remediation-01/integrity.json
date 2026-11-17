@@ -37,5 +37,42 @@
   "candidateSwiftSHA256": "546f49a3ca40983a0f12dc206db288e283ae28e1d810d49754980a7a8edaf93d",
   "sourceHEADAtCheck": "2a8b22fcbe3efd7f23fe51e551d855052d005465",
   "physicalVoiceOver": "NOT TESTED",
-  "physicalIME": "NOT TESTED"
+  "physicalIME": "NOT TESTED",
+  "finalObservedHEAD": "a7c910fb11c657c1849161de9199cfb0c5b2bbff",
+  "finalHEADAdvancedExternally": true,
+  "safetyTests": [
+    {
+      "file": "macos/Tests/GatorCoreTests/NativeArchiveSafetyTests.swift",
+      "matchesStartingHEAD": true,
+      "sha256": "5febae12a5d4afc6ad218dad056a97276201e7f52139d7f519845f3110462bba"
+    },
+    {
+      "file": "macos/Tests/GatorCoreTests/NativeClosingSafetyTests.swift",
+      "matchesStartingHEAD": true,
+      "sha256": "ef210eb2e2f597164d2264a0b84f9233947c0076d8a217dd7c621e0e99d4c4a4"
+    },
+    {
+      "file": "macos/Tests/GatorCoreTests/BridgeShutdownSafetyTests.swift",
+      "matchesStartingHEAD": true,
+      "sha256": "e955688ce49ec0a4ffb90abf3f9dcca5396e78c0b0b141a8f6124f600932707c"
+    },
+    {
+      "file": "macos/Tests/GatorCoreTests/Fixtures/native-archive-writer.swift",
+      "matchesStartingHEAD": true,
+      "sha256": "23eb05e17ed268c50ed3dc0a97d5cb905b045547e311e30faf67b7c83ed9deca"
+    },
+    {
+      "file": "macos/Tests/GatorCoreTests/Fixtures/pipe-lifecycle.py",
+      "matchesStartingHEAD": true,
+      "sha256": "bb8f2037137f59233f5f7c63dcba2c1d1b2f2042a894689db89436a0349ee1a3"
+    }
+  ],
+  "preservedSafetyBundleFiles": {
+    "Contents/MacOS/GatorMac": "427a0bc7039de3ba7770ca4178cb11219e798bee58824fa355a5d29e4aa70a04",
+    "Contents/Resources/gator-runtime": "6c86d10d25077267a87dfbc6dd9abd5fc5ec11a3e22ad9286e9ea5dc8bf906ba",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
+  },
+  "checkedAtUTC": "2026-11-17T07:31:43.247103+00:00"
 }
