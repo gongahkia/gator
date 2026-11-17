@@ -3,13 +3,20 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/telemetry"
 )
 
 func TestResponsesCompleteConvertsToolCall(t *testing.T) {
@@ -293,4 +300,57 @@ func TestResponsesCompleteStreamForwardsDeltasAndReturnsCompletedTurn(t *testing
 	if strings.Join(deltas, "") != "hello world" || turn.Text != "hello world" {
 		t.Fatalf("deltas = %#v, turn = %#v", deltas, turn)
 	}
+}
+
+func TestProviderFailureSurvivesRunnerAndPrivateTraceWithoutRetryOrContent(t *testing.T) {
+	for _, streaming := range []bool{false, true} {
+		t.Run(fmt.Sprint(streaming), func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.Header().Set("x-request-id", "req_diagnostic")
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = io.WriteString(w, `{"error":{"code":"invalid_api_key","type":"invalid_request_error","message":"sk-proj-DO_NOT_RETAIN PRIVATE_PROMPT"}}`)
+			}))
+			defer server.Close()
+			adapter := Responses{APIKey: "sk-proj-DO_NOT_RETAIN", Model: "test-model", BaseURL: server.URL, Client: server.Client()}
+			var backend agent.Model = adapter
+			if !streaming {
+				backend = completeOnly{adapter}
+			}
+			trace := telemetry.New("diagnostic-run", time.Now())
+			_, err := (agent.Runner{Model: backend}).Run(context.Background(), agent.RunOptions{Task: "PRIVATE_PROMPT", MaxSteps: 1, OnEvent: trace.Record})
+			var status agent.ProviderHTTPError
+			if calls != 1 || !errors.As(err, &status) || status.Status != 401 || agent.IsTransient(err) {
+				t.Fatalf("calls=%d error=%v", calls, err)
+			}
+			errorText := err.Error()
+			d := agent.ProviderDiagnosticFrom(err)
+			if d == nil || d.Streaming != streaming || d.RequestID != "req_diagnostic" || d.Code != "invalid_api_key" || d.Model != "test-model" {
+				t.Fatalf("diagnostic = %+v", d)
+			}
+			directory := t.TempDir()
+			if err := trace.Finish(directory, ""); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(directory, "trace.json")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(path)
+			if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+				t.Fatalf("trace permissions: %v", err)
+			}
+			if !strings.Contains(string(data), `"request_id": "req_diagnostic"`) || !strings.Contains(string(data), `"code": "invalid_api_key"`) || strings.Contains(string(data)+errorText, "PRIVATE_PROMPT") || strings.Contains(string(data)+errorText, "DO_NOT_RETAIN") {
+				t.Fatalf("unsafe or missing trace diagnostics: %s", data)
+			}
+		})
+	}
+}
+
+type completeOnly struct{ model Responses }
+
+func (m completeOnly) Complete(ctx context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	return m.model.Complete(ctx, request)
 }

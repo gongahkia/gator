@@ -172,3 +172,21 @@ func TestGenerateContentEncodesPDFAttachment(t *testing.T) {
 		t.Fatalf("complete PDF attachment: %v", err)
 	}
 }
+
+func TestGeminiFailureRetainsReasonRequestIDAndRetryPolicyWithoutRawMessage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("x-goog-request-id", "gemini_req_1")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"error":{"code":403,"status":"PERMISSION_DENIED","message":"PRIVATE_PROMPT test-key","details":[{"reason":"API_KEY_SERVICE_BLOCKED"}]}}`)
+	}))
+	defer server.Close()
+	adapter := GenerateContent{APIKey: "test-key", CredentialSource: "gator-store", Model: "test-model", BaseURL: server.URL, Client: server.Client()}
+	_, err := adapter.Complete(context.Background(), agent.TurnRequest{})
+	d := agent.ProviderDiagnosticFrom(err)
+	if d == nil || d.Status != 403 || d.Code != "API_KEY_SERVICE_BLOCKED" || d.RequestID != "gemini_req_1" || d.Auth != "api-key-header" || d.CredentialSource != "gator-store" || agent.IsTransient(err) {
+		t.Fatalf("diagnostic = %+v; error = %v", d, err)
+	}
+	if strings.Contains(err.Error(), "PRIVATE_PROMPT") || strings.Contains(err.Error(), "test-key") {
+		t.Fatalf("private response retained: %v", err)
+	}
+}

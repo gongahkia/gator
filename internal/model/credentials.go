@@ -7,19 +7,24 @@ import (
 )
 
 func key(config Config, provider Provider, environment string) (string, error) {
+	value, _, err := resolvedKey(config, provider, environment)
+	return value, err
+}
+
+func resolvedKey(config Config, provider Provider, environment string) (string, string, error) {
 	if config.APIKey != "" {
-		return config.APIKey, nil
+		return config.APIKey, "explicit", nil
 	}
 	if config.Credentials != nil {
 		credential, found, err := config.Credentials.Read(string(provider))
 		if err != nil {
-			return "", fmt.Errorf("read Gator credential for %q: %w", provider, err)
+			return "", "", fmt.Errorf("read Gator credential for %q: %w", provider, err)
 		}
 		if found && credential.IsAPIKey() {
-			return credential.Key, nil
+			return credential.Key, "gator-store", nil
 		}
 	}
-	return os.Getenv(environment), nil
+	return os.Getenv(environment), "environment", nil
 }
 
 func providerOption(config Config, name, environment string) string {

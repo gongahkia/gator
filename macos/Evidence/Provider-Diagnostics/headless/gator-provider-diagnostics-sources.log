@@ -1,0 +1,4 @@
+ok  	github.com/gongahkia/gator/internal/model	3.520s
+ok  	github.com/gongahkia/gator/internal/model/providerhttp	3.195s
+ok  	github.com/gongahkia/gator/internal/model/openai	3.354s
+ok  	github.com/gongahkia/gator/internal/model/gemini	3.660s

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/model/providerhttp"
 )
 
 const (
@@ -34,6 +35,7 @@ func DefaultModel() string {
 // avoid provider-side conversation storage.
 type Responses struct {
 	APIKey              string
+	CredentialSource    string
 	APIKeyEnv           string
 	Model               string
 	BaseURL             string
@@ -62,6 +64,7 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 		return agent.Turn{}, fmt.Errorf("create OpenAI request: %w", err)
 	}
 	r.setHeaders(request, false)
+	started := time.Now()
 	response, err := r.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request OpenAI response: %w", err)
@@ -73,7 +76,7 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 		return agent.Turn{}, fmt.Errorf("read OpenAI response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError("openai", "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
 	}
 	return decodeResponse(contents)
 }
@@ -99,6 +102,7 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 		return agent.Turn{}, fmt.Errorf("create OpenAI stream request: %w", err)
 	}
 	r.setHeaders(request, true)
+	started := time.Now()
 	response, err := r.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request OpenAI stream: %w", err)
@@ -109,7 +113,7 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read OpenAI stream error: %w", readErr)
 		}
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError("openai", "OpenAI Responses API", modelOrDefault(r.Model), r.CredentialSource, request, response, contents, started, r.APIKey))
 	}
 	return decodeSSE(response.Body, onDelta)
 }
@@ -569,16 +573,4 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 		return agent.Turn{}, errors.New("OpenAI event stream ended without a completed response")
 	}
 	return *completed, nil
-}
-
-func describeAPIError(status int, contents []byte) error {
-	var payload struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(contents, &payload); err == nil && payload.Error.Message != "" {
-		return fmt.Errorf("OpenAI Responses API returned HTTP %d: %s", status, payload.Error.Message)
-	}
-	return fmt.Errorf("OpenAI Responses API returned HTTP %d", status)
 }

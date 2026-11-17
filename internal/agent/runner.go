@@ -86,7 +86,7 @@ turnLoop:
 				turn, err = r.Model.Complete(ctx, request)
 			}
 			usage := turn.Usage
-			r.emit(options.OnEvent, Event{Kind: EventModelAttemptFinished, At: now(), Step: step, Attempt: attempt, Usage: &usage})
+			r.emit(options.OnEvent, Event{Kind: EventModelAttemptFinished, At: now(), Step: step, Attempt: attempt, Usage: &usage, ProviderDiagnostic: ProviderDiagnosticFrom(err)})
 			if err == nil {
 				break
 			}

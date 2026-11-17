@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/model/providerhttp"
 )
 
 const (
@@ -28,10 +29,11 @@ const (
 // the exact provider content for agent messages because Gemini thought
 // signatures must be replayed alongside function calls on later turns.
 type GenerateContent struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-	Client  *http.Client
+	APIKey           string
+	CredentialSource string
+	Model            string
+	BaseURL          string
+	Client           *http.Client
 }
 
 // Complete implements agent.Model.
@@ -56,6 +58,7 @@ func (g GenerateContent) Complete(ctx context.Context, turn agent.TurnRequest) (
 	}
 	request.Header.Set("x-goog-api-key", g.APIKey)
 	request.Header.Set("content-type", "application/json")
+	started := time.Now()
 	response, err := g.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request Gemini response: %w", err)
@@ -66,7 +69,7 @@ func (g GenerateContent) Complete(ctx context.Context, turn agent.TurnRequest) (
 		return agent.Turn{}, fmt.Errorf("read Gemini response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusErrorWithRetry(response.StatusCode, describeAPIError(response.StatusCode, contents), retryDelay(response.Header, contents))
+		return agent.Turn{}, agent.HTTPStatusErrorWithRetry(response.StatusCode, providerhttp.NewError("gemini", "Gemini API", g.Model, g.CredentialSource, request, response, contents, started, g.APIKey), retryDelay(response.Header, contents))
 	}
 	return decodeResponse(contents)
 }
@@ -387,16 +390,4 @@ func finishReason(value string) string {
 		return "unspecified"
 	}
 	return value
-}
-
-func describeAPIError(status int, contents []byte) error {
-	var payload struct {
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(contents, &payload); err == nil && payload.Error.Message != "" {
-		return fmt.Errorf("Gemini API returned HTTP %d: %s", status, payload.Error.Message)
-	}
-	return fmt.Errorf("Gemini API returned HTTP %d", status)
 }

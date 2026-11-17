@@ -182,16 +182,17 @@ const (
 // Event is intentionally structured so the UI, journal, and tests observe the
 // same behavior. Details is never used for unbounded raw model transcripts.
 type Event struct {
-	Attempt    int       `json:"attempt,omitempty"`
-	Usage      *Usage    `json:"usage,omitempty"`
-	TaskID     string    `json:"task_id,omitempty"`
-	Kind       EventKind `json:"kind"`
-	At         time.Time `json:"at"`
-	Step       int       `json:"step"`
-	ToolCall   *ToolCall `json:"tool_call,omitempty"`
-	ToolError  string    `json:"tool_error,omitempty"`
-	Text       string    `json:"text,omitempty"`
-	ToolResult string    `json:"-"`
+	ProviderDiagnostic *ProviderDiagnostic `json:"provider_diagnostic,omitempty"`
+	Attempt            int                 `json:"attempt,omitempty"`
+	Usage              *Usage              `json:"usage,omitempty"`
+	TaskID             string              `json:"task_id,omitempty"`
+	Kind               EventKind           `json:"kind"`
+	At                 time.Time           `json:"at"`
+	Step               int                 `json:"step"`
+	ToolCall           *ToolCall           `json:"tool_call,omitempty"`
+	ToolError          string              `json:"tool_error,omitempty"`
+	Text               string              `json:"text,omitempty"`
+	ToolResult         string              `json:"-"`
 	// Argv is the effective process invocation for command-approval events.
 	// The event journal does not persist it.
 	Argv []string `json:"argv,omitempty"`

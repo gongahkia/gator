@@ -18,14 +18,14 @@ import (
 func newBackend(provider Provider, config Config) (Backend, error) {
 	switch provider {
 	case OpenAI:
-		apiKey, err := key(config, provider, "OPENAI_API_KEY")
+		apiKey, source, err := resolvedKey(config, provider, "OPENAI_API_KEY")
 		if err != nil {
 			return Backend{}, err
 		}
 		if err := requireKey(apiKey, "OPENAI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
-		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, CredentialSource: source, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case AzureOpenAIResponses:
 		if strings.TrimSpace(config.Model) == "" {
 			return Backend{}, fmt.Errorf("--model is required for provider %q; use the Azure deployment name", provider)
@@ -87,14 +87,14 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			Client:  config.Client,
 		}}, nil
 	case Gemini:
-		apiKey, err := key(config, provider, "GEMINI_API_KEY")
+		apiKey, source, err := resolvedKey(config, provider, "GEMINI_API_KEY")
 		if err != nil {
 			return Backend{}, err
 		}
 		if err := requireKey(apiKey, "GEMINI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
-		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, CredentialSource: source, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case MiniMax, MiniMaxCN:
 		if strings.TrimSpace(config.Model) == "" {
 			return Backend{}, fmt.Errorf("--model is required for provider %q", provider)

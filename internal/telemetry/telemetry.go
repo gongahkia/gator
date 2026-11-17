@@ -21,15 +21,16 @@ import (
 )
 
 type Span struct {
-	ID      string       `json:"id"`
-	Parent  string       `json:"parent,omitempty"`
-	Name    string       `json:"name"`
-	Start   time.Time    `json:"start"`
-	End     time.Time    `json:"end"`
-	Task    string       `json:"task,omitempty"`
-	Step    int          `json:"step,omitempty"`
-	Attempt int          `json:"attempt,omitempty"`
-	Usage   *agent.Usage `json:"usage,omitempty"`
+	ProviderDiagnostic *agent.ProviderDiagnostic `json:"provider_diagnostic,omitempty"`
+	ID                 string                    `json:"id"`
+	Parent             string                    `json:"parent,omitempty"`
+	Name               string                    `json:"name"`
+	Start              time.Time                 `json:"start"`
+	End                time.Time                 `json:"end"`
+	Task               string                    `json:"task,omitempty"`
+	Step               int                       `json:"step,omitempty"`
+	Attempt            int                       `json:"attempt,omitempty"`
+	Usage              *agent.Usage              `json:"usage,omitempty"`
 }
 type Trace struct {
 	Version     int    `json:"version"`
@@ -64,6 +65,7 @@ func (t *Trace) Record(event agent.Event) {
 		if index, ok := t.open[key]; ok {
 			t.Spans[index].End = event.At
 			t.Spans[index].Usage = event.Usage
+			t.Spans[index].ProviderDiagnostic = event.ProviderDiagnostic
 			delete(t.open, key)
 			return
 		}
