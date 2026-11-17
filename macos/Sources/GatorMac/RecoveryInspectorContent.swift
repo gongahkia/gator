@@ -71,7 +71,7 @@ struct RecoveryInspectorContent: View {
                                 Button("Check Sent Read-only") { check(receipt, .checkSent) }.focusable()
                                     .help("Explicitly query Sent for this exact unknown Gmail send. Never resends.")
                             }.disabled(reason != nil || owner !== sessions.current || sessions.switching || !sessions.isInspectionCurrent)
-                            if let reason { Text(verbatim: reason).font(.caption).foregroundStyle(.secondary) }
+                            if let reason { NativeStatusMessage(text: reason, severity: .information).font(.caption) }
                             if owner !== sessions.current { Text("Open the original owning chat and inspect its current receipt before requesting a check.").font(.caption) }
                         } else {
                             Text("No eligible exact sealed-bundle identity is available for a receipt check. This evidence cannot authorize an external lookup or retry.").font(.caption).foregroundStyle(.secondary)

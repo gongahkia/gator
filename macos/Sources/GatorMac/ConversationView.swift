@@ -235,9 +235,9 @@ struct ConversationView: View {
             if application.snapshot?.running == true && application.review == nil {
                 Text(application.snapshot?.value["dialogue_active"].bool == true ? "Work continues independently. You can keep talking here; Gator decides how to route your message." : "Preparing conversation during work… Your draft is kept.").font(.caption).foregroundStyle(.secondary)
             }
-            if sessions.inspection == nil, application.review == nil, let notice = application.snapshot?.unsupportedNotice, application.snapshot?.value["dialogue_dispatch"] == .null, application.snapshot?.value["session_request"] == .null { Text(verbatim: notice).font(.caption).foregroundStyle(.secondary).lineLimit(3) }
+            if sessions.inspection == nil, application.review == nil, let notice = application.snapshot?.unsupportedNotice, application.snapshot?.value["dialogue_dispatch"] == .null, application.snapshot?.value["session_request"] == .null { NativeStatusMessage(text: notice, severity: .information).font(.caption) }
             if application.readiness["state"].string != "configured", application.isConnected {
-                Text("\(application.readiness["issue"].string) Provider setup is available in Gator’s terminal app; your draft stays here.").font(.caption).foregroundStyle(.secondary)
+                NativeStatusMessage(text: "\(application.readiness["issue"].string) Provider setup is available in Gator’s terminal app; your draft stays here.").font(.caption)
             }
         }.popover(isPresented: $connectionDetails, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {

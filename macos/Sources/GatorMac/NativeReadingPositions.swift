@@ -19,7 +19,8 @@ import Observation
     }
     func restored(_ context: String, available: [String]) -> Position {
         guard var position = positions[context], !position.following else { return Position() }
-        if position.anchor == nil || !available.contains(position.anchor!) { position.anchor = available.first }
+        if let anchor = position.anchor, available.contains(anchor) { return position }
+        position.anchor = available.first
         return position
     }
 }

@@ -32,6 +32,9 @@ struct NativeMessageBody: View {
         }.textSelection(.enabled).lineSpacing(3).frame(maxWidth: .infinity, alignment: .leading)
     }
     private func inline(_ text: String) -> Text {
-        Text((try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text))
+        Text(Self.inlineContent(text))
+    }
+    static func inlineContent(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
     }
 }

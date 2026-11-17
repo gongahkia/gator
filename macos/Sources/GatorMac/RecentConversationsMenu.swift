@@ -18,6 +18,18 @@ struct RecentConversationsMenu: View {
     @Environment(ManagedSessionCoordinator.self) private var sessions
     var body: some View {
         Menu {
+            RecentConversationItems(sessions: sessions)
+        } label: { Label("Recent Conversations", systemImage: "clock") }
+        .labelStyle(.titleAndIcon)
+        .focusable()
+        .help("Choose a recent conversation. Older history is available in the terminal app.")
+        .accessibilityIdentifier("gator.recent-conversations")
+    }
+}
+
+struct RecentConversationItems: View {
+    let sessions: ManagedSessionCoordinator
+    var body: some View {
             let items = NativeRecentConversation.items(sessions.current.snapshot?.value["recent_conversations"].array ?? [], activity: sessions.activity, current: sessions.current.conversationID)
             ForEach(items) { item in
                 Button {
@@ -33,10 +45,5 @@ struct RecentConversationsMenu: View {
             if items.isEmpty { Text("No recent conversations") }
             Divider()
             Text("Recent conversations reported by Gator")
-        } label: { Label("Recent Conversations", systemImage: "clock") }
-        .labelStyle(.titleAndIcon)
-        .keyboardShortcut("h", modifiers: [.command, .shift])
-        .help("Recent conversations · ⇧⌘H. Older history is available in the terminal app.")
-        .accessibilityIdentifier("gator.recent-conversations")
     }
 }

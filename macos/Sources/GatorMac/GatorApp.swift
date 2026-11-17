@@ -43,6 +43,7 @@ struct GatorApp: App {
                 Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
             }
             CommandMenu("Conversation") {
+                Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(delegate.quickAccess?.canShow != true)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")

@@ -63,7 +63,7 @@ struct RecoveryPreparationView: View {
                 let reviewedAccess = owner.recoveryAccess[recovery.id]
                 Task { await sessions.prepareRecovery(owner: owner, recovery: recovery, action: action, reviewedAccess: reviewedAccess) }
             }
-            if let reason { Text(verbatim: reason).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+            if let reason { NativeStatusMessage(text: reason, severity: .information).font(.caption) }
             Text("For account repair, open /connections in Gator’s terminal app; inspect permissions with /permissions. Provider setup uses /models. Recovery does not run these commands or change those settings.").font(.caption).foregroundStyle(.secondary)
         }.accessibilityIdentifier("gator.recovery.prepare." + recovery.id)
     }
