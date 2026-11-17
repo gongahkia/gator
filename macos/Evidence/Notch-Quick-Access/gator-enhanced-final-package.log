@@ -1,0 +1,7 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.14s)
+/tmp/gator-native-app.SBprQW/Gator.app/Contents/Info.plist: OK
+Built /tmp/Gator-Native-Tranche08-Enhanced.app
+Launch: open '/tmp/Gator-Native-Tranche08-Enhanced.app'

@@ -1,0 +1,17 @@
+ok  	github.com/gongahkia/gator/internal/model	3.262s
+ok  	github.com/gongahkia/gator/internal/model/anthropic	3.352s
+ok  	github.com/gongahkia/gator/internal/model/chatcompletions	3.489s
+ok  	github.com/gongahkia/gator/internal/model/gemini	3.772s
+ok  	github.com/gongahkia/gator/internal/model/openai	4.040s
+ok  	github.com/gongahkia/gator/internal/model/providerhttp	3.892s
+ok  	github.com/gongahkia/gator/internal/model/radius	3.631s
+--- FAIL: TestEveryCLIReportsProcessFailureWithoutOutput (0.52s)
+    --- FAIL: TestEveryCLIReportsProcessFailureWithoutOutput/codex (0.18s)
+        diagnostic_test.go:29: missing CLI diagnostic: codex CLI failed during model turn; provider_request={"transport":"cli","phase":"model turn","exit_code":1,"provider":"codex","model":"fixture-model","endpoint":"","method":"exec","streaming":false,"elapsed_ms":181,"auth":"child-environment","credential_source":"environment","code":"cli_failure"}
+    --- FAIL: TestEveryCLIReportsProcessFailureWithoutOutput/claude (0.17s)
+        diagnostic_test.go:29: missing CLI diagnostic: claude CLI failed during model turn; provider_request={"transport":"cli","phase":"model turn","exit_code":1,"provider":"claude","model":"fixture-model","endpoint":"","method":"exec","streaming":false,"elapsed_ms":167,"auth":"child-environment","credential_source":"environment","code":"cli_failure"}
+--- FAIL: TestCLIDiagnosticPreservesCancellationAndSanitizesEndpoint (0.00s)
+    diagnostic_test.go:45: wrong cancellation diagnostic: pi CLI failed during model turn; provider_request={"transport":"cli","phase":"model turn","provider":"pi","model":"","endpoint":"https://example.test/%5Bredacted%5D","method":"rpc","streaming":false,"elapsed_ms":0,"auth":"child-environment","credential_source":"environment","code":"cli_cancelled"}
+FAIL
+FAIL	github.com/gongahkia/gator/internal/cliagent	7.447s
+FAIL

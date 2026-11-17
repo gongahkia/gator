@@ -119,7 +119,11 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 		return agent.Turn{}, fmt.Errorf("read %s response: %w", m.providerName(), err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.Config.ProviderID, "openai-compatible"), m.providerName(), m.Config.Model, m.Config.CredentialSource, request, response, contents, started, apiKey))
+		source := m.Config.CredentialSource
+		if source == "" && m.Config.APIKeySource != nil {
+			source = "dynamic"
+		}
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, providerhttp.NewError(cmp.Or(m.Config.ProviderID, "openai-compatible"), m.providerName(), m.Config.Model, source, request, response, contents, started, apiKey))
 	}
 	return decodeResponse(contents, m.providerName())
 }

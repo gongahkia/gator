@@ -1,0 +1,24 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/7] Compiling GatorMacTests NotchGeometryTests.swift
+[4/7] Emitting module GatorMacTests
+[5/7] Compiling GatorMacTests NativeInputTests.swift
+[5/7] Write Objects.LinkFileList
+[6/7] Linking GatorNativePackageTests
+Build complete! (1.40s)
+Test Suite 'Selected tests' started at 2026-11-17 10:04:20.899.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-17 10:04:20.900.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-17 10:04:20.900.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-17 10:04:20.900.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test cameraGapRequiresActualDisplayEvidence() started.
+✔ Test cameraGapRequiresActualDisplayEvidence() passed after 0.001 seconds.
+◇ Test notchPanelTracksNegativeDisplayOriginsAndStaysWithinScreen() started.
+✔ Test notchPanelTracksNegativeDisplayOriginsAndStaysWithinScreen() passed after 0.001 seconds.
+✔ Test run with 2 tests in 0 suites passed after 0.001 seconds.

@@ -1,0 +1,12 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Compiling GatorMac NotchQuickAccess.swift
+[4/6] Emitting module GatorMac
+[5/8] Compiling GatorMac AppDelegate.swift
+[6/8] Compiling GatorMac GatorApp.swift
+[6/9] Write Objects.LinkFileList
+[7/9] Linking GatorMac
+[8/9] Applying GatorMac
+Build complete! (2.13s)

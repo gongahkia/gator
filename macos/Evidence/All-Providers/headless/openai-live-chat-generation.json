@@ -1,5 +1,5 @@
 {
-  "adapter": "existing internal/model/chatcompletions.Responses.Complete; ephemeral outbound transport cap only",
+  "adapter": "existing internal/model/chatcompletions.Model.Complete; ephemeral outbound transport cap only",
   "elapsedMS": 1510.515,
   "endpoint": "https://api.openai.com/v1/chat/completions",
   "httpStatus": 200,

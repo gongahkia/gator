@@ -1,0 +1,55 @@
+AXApplication | Gator |  | 
+AXWindow |  | Gator quick access | 
+AXGroup |  |  | 
+AXButton |  | Gator, 1 task working | 
+AXStaticText |  |  | Gator
+AXButton |  | Dismiss quick access | 
+AXStaticText |  |  | 1 task working
+AXScrollArea |  |  | 
+AXButton |  | Prepare controlled fixture scope, Working | 
+AXButton |  | New chat, Idle | 
+AXStaticText |  |  | Decisions stay in exact review.
+AXButton |  | Open Chat | 
+AXWindow | Gator – Prepare controlled fixture scope |  | 
+AXGroup |  |  | 
+AXDisclosureTriangle |  | Open chats and retained tasks | 
+AXScrollArea |  |  | 
+AXOpaqueProviderGroup |  |  | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Prepare controlled fixture scope
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Fixture scope retained.
+AXDisclosureTriangle |  | Retained work result | 
+AXStaticText |  |  | You
+AXStaticText |  |  | Hold native work for notch acceptance
+AXBusyIndicator |  |  | 
+AXStaticText |  |  | Working toward your requested outcome
+AXDisclosureTriangle |  | Work activity | 
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXStaticText |  |  | Request: running
+AXStaticText |  |  | Work continues independently. You can keep talking here; Gator decides how to route your message.
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | 
+AXStaticText |  |  | Message Gator…
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXButton |  | Stop | 
+AXGroup |  |  | 
+AXMenuButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | Prepare controlled fixture scope
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator, 1 tasks working |  | 

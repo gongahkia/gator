@@ -1,0 +1,21 @@
+{
+  "cli": "Pi 1.5.2 standalone",
+  "passed": true,
+  "responseText": "Gator Pi integration received this message.",
+  "model": "gpt-5.6-terra",
+  "exitCode": 0,
+  "elapsedMS": 1778,
+  "requests": [],
+  "terminalReasons": [
+    "stop"
+  ],
+  "usage": [
+    {
+      "input": 74,
+      "output": 11
+    }
+  ],
+  "outputCap": 512,
+  "persistentConfigurationChanged": false,
+  "toolsDisabled": true
+}

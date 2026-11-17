@@ -1,0 +1,39 @@
+AXApplication | Gator |  | 
+AXWindow |  | Gator quick access | 
+AXGroup |  |  | 
+AXButton |  | Gator, Ready when you are | 
+AXStaticText |  |  | Gator
+AXButton |  | Dismiss quick access | 
+AXStaticText |  |  | Ready when you are
+AXScrollArea |  |  | 
+AXButton |  | New chat, Idle | 
+AXStaticText |  |  | Decisions stay in exact review.
+AXButton |  | Open Chat | 
+AXWindow | Gator – New chat |  | 
+AXGroup |  |  | 
+AXStaticText |  |  | What can I help with?
+AXStaticText |  |  | Ask a question, make a plan, or pick up where you left off.
+AXScrollArea |  | Conversation status and recovery | 
+AXStaticText |  |  | Connected
+AXMenuButton |  | Select Model | 
+AXScrollArea |  |  | 
+AXTextArea |  | Message Gator | An unsent draft for notch focus acceptance
+AXButton |  | Attach Files | 
+AXMenuButton | Photo | Image attachment options | 
+AXCheckBox |  | Plan first | 
+AXStaticText |  |  | ⇧ Return: new line
+AXButton |  | Send message | 
+AXToolbar |  |  | 
+AXButton |  | New Conversation | 
+AXButton |  | Inspect Current Task | 
+AXGroup |  |  | 
+AXMenuButton | More | More | 
+AXButton |  |  | 
+AXButton |  |  | 
+AXGroup |  |  | 
+AXGroup |  |  | 
+AXButton |  |  | 
+AXStaticText |  |  | Gator
+AXStaticText |  |  | New chat
+AXMenuBar |  |  | 
+AXMenuBarItem | Gator, Ready |  | 

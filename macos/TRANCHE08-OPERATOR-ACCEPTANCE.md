@@ -25,3 +25,16 @@ Failures: record the exact steps, screenshot where safe, app version and whether
 Overall operator verdict: ____________________  Remaining checks: ____________________
 
 Additional platform coverage: move the open compact/full views between Spaces and displays while a harmless task runs; dismiss/reopen and verify the selected owner, draft and keyboard focus. Expected: work continues and focus follows intentional navigation. PASS / FAIL / NOT TESTED: __________
+
+## Conditional notch supplement
+
+Use `/tmp/Gator-Native-Tranche08-Enhanced-Final.app` on a Mac that reports a camera notch. Do not replace the earlier VoiceOver/IME/preference checks with this supplement.
+
+| Step | Expected result | PASS / FAIL / notes |
+| --- | --- | --- |
+| Hover the camera area while typing in another app, then leave | Gator's work glance opens/closes without keyboard focus leaving the other app. | ___ |
+| In Gator, press ⌘⇧G, then Tab and Shift-Tab | Dismiss and chat controls receive visible keyboard focus in order; VoiceOver announces purpose and status. | ___ |
+| Press Escape with an unsent composer draft | Glance closes; original window/composer draft remains available. | ___ |
+| With a controlled pending action, choose its owning chat in the glance | Original owner and current exact review open; no approval or external effect occurs. | ___ |
+| Repeat with VoiceOver, Full Keyboard Access, Increase Contrast and Reduce Motion | Labels remain understandable, controls reachable, contrast readable and motion suppressed when requested. | ___ |
+| Move to a flat external display / rearrange displays | No invented notch on a flat display; the real notched screen's panel remains correctly placed. | ___ |

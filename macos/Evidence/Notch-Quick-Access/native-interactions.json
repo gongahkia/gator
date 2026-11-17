@@ -1,0 +1,39 @@
+{
+  "application": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app",
+  "pid": 57033,
+  "display": {
+    "name": "Built-in Retina Display",
+    "points": [
+      1470,
+      956
+    ],
+    "safeTop": 32,
+    "reportedCameraGap": 179
+  },
+  "observed": {
+    "shortcut": "Command-Shift-G",
+    "initialKeyboardFocus": "Dismiss quick access",
+    "Tab": "New chat, Idle",
+    "Shift-Tab": "Dismiss quick access",
+    "Escape": "Message Gator",
+    "draftBeforeAndAfter": "An unsent draft for notch focus acceptance",
+    "hoverFocusRemained": "Message Gator",
+    "fullWindowCloseThenNotchOpenChat": "same draft restored",
+    "goChildPIDsBeforeAndAfter": [
+      57058
+    ],
+    "collapsedPanelPoints": [
+      243,
+      38
+    ],
+    "expandedPanelPoints": [
+      420,
+      246
+    ]
+  },
+  "limits": [
+    "Physical VoiceOver and preference variants remain operator checks.",
+    "Only recorded settled observations count; compound automation batches with missed controls are excluded.",
+    "Window-only capture omitted some rendered compositor layers; final-expanded-screen-region.png is the visual reference."
+  ]
+}

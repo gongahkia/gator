@@ -1,0 +1,90 @@
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/ant-ling
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/anthropic
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/azure-openai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/azure-openai-responses
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/baseten
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/cerebras
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/cloudflare-ai-gateway
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/cloudflare-workers-ai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/deepseek
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/fireworks
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/gemini
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/groq
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/huggingface
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/kimi-coding
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/minimax
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/minimax-cn
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/mistral
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/moonshotai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/moonshotai-cn
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/nvidia
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/openai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/openai-compatible
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/opencode
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/opencode-go
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/openrouter
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan-cn
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan-individual
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/radius
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/together
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/vercel-ai-gateway
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/xai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-ams
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-cn
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-sgp
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/zai
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/zai-coding-cn
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/claude-sonnet-4-6
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/gemini-3.1-pro
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/kimi-k2.6
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/anthropic/test
+=== RUN   TestEveryDirectProviderPreservesSafeFailureIdentity/@cf/test
+--- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity (0.01s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/ant-ling (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/anthropic (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/azure-openai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/azure-openai-responses (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/baseten (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/cerebras (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/cloudflare-ai-gateway (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/cloudflare-workers-ai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/deepseek (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/fireworks (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/gemini (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/groq (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/huggingface (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/kimi-coding (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/minimax (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/minimax-cn (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/mistral (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/moonshotai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/moonshotai-cn (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/nvidia (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/openai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/openai-compatible (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/opencode (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/opencode-go (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/openrouter (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan-cn (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/qwen-token-plan-individual (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/radius (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/together (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/vercel-ai-gateway (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/xai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-ams (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-cn (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/xiaomi-token-plan-sgp (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/zai (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/zai-coding-cn (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/claude-sonnet-4-6 (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/gemini-3.1-pro (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/kimi-k2.6 (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/anthropic/test (0.00s)
+    --- PASS: TestEveryDirectProviderPreservesSafeFailureIdentity/@cf/test (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/internal/model	0.221s

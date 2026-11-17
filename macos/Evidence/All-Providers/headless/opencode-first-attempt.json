@@ -1,0 +1,16 @@
+{
+  "cli": "OpenCode 2.3.0 standalone",
+  "provider": "OpenAI Chat Completions",
+  "model": "gpt-5.6-terra",
+  "exitCode": 1,
+  "elapsedMS": 1138,
+  "passed": false,
+  "responseText": "",
+  "eventTypes": [
+    "error"
+  ],
+  "persistentConfigurationChanged": false,
+  "outputCap": 512,
+  "toolsDenied": true,
+  "failureSummary": "No successful terminal model output; raw diagnostics withheld"
+}

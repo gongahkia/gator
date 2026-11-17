@@ -1,0 +1,23 @@
+{
+  "pi": {
+    "package": "@earendil-works/pi-coding-agent",
+    "version": "1.5.2",
+    "node": "26.7.0",
+    "launch": "fnm exec --using v26.7.0 pi"
+  },
+  "opencode": {
+    "package": "@opencode/cli",
+    "version": "2.3.0",
+    "launch": "fnm exec --using v26.7.0 opencode"
+  },
+  "globalPrefix": "/Users/gongahkia/.local/share/fnm/node-versions/v26.7.0/installation",
+  "defaultNodeChanged": false,
+  "savedProviderConfigurationChanged": false,
+  "credentialsInstalled": false,
+  "reference": {
+    "url": "https://github.com/TheBoredTeam/boring.notch",
+    "commit": "b7611bbf32c627a3427408fc142486900d71a23f",
+    "license": "GPL-3.0",
+    "usage": "Interaction reference; original Gator implementation; no new dependency or source import"
+  }
+}

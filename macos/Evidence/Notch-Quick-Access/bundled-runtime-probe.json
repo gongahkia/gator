@@ -1,0 +1,10 @@
+{
+  "executable": "/tmp/Gator-Native-Tranche08-Enhanced-Final.app/Contents/Resources/gator-runtime",
+  "events": [
+    "state"
+  ],
+  "exitCode": 0,
+  "passed": true,
+  "credentialsSupplied": false,
+  "providerCalls": 0
+}

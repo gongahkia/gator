@@ -149,3 +149,27 @@ PASS is scoped to the behavior/evidence named, not a blanket claim about all pla
 6. **Signed/notarized distribution readiness — DEFERRED.** No Developer ID/notarization/release-distribution acceptance is claimed; compiler/linker ad-hoc signatures, if present, are not that acceptance.
 
 Closure work and the final assessment are complete within available tools. Acceptance remains conditional on the specifically named operator, profiling and credential prerequisites. No README change, commit, Tranche09, new runtime/coordinator/protocol, credential implementation, or backend-goal resumption was performed.
+
+## User-requested provider and notch continuation — 2026-11-17
+
+The closure above is preserved. The user subsequently requested all-provider diagnostics, installation and cheap live tests of Pi/OpenCode, plus menu-bar motion and a conditional notch interaction referencing boring.notch. This remains Tranche08. Implementation/evidence details are in [provider diagnostics](PROVIDER-DIAGNOSTICS.md) and [menu bar/notch verification](MENUBAR-NOTCH-VERIFICATION.md).
+
+The current final app is **`/tmp/Gator-Native-Tranche08-Enhanced-Final.app`**. Earlier bundles were not overwritten. It includes safe rejection diagnostics for all38 factory provider IDs plus custom/local endpoints; host-known Codex/Claude/Pi CLI failure metadata; the original alligator branding; discrete menu-bar status; and a real-notch-only, nonactivating quick-access panel using the existing owners. Keyboard entry was corrected after a native check; the final ⌘⇧G/Tab/Shift-Tab/Escape journey preserves the composer draft and one Go child. No approval or replay decision was added to the notch.
+
+The `.env` OpenAI key/model pair **does produce real output** through Chat Completions. The new bounded Responses request still returned401; its exact provider-side cause remains unresolved. Additional real output passed through standalone Pi, Gator's sandboxed Pi adapter and standalone OpenCode using disposable text-only Chat configurations. This supersedes the earlier blanket statement that successful real inference was blocked. It does not establish working Responses, Gemini or OpenCode Zen/Go gateway access. No credential or saved default was changed, and no exact USD charge was measured.
+
+Final checks: Go build PASS; all15 relevant Go packages PASS; Swift build PASS; final132 Swift tests PASS /37.262s. Additional authenticated/keyless/managed-local rejection and private CLI-trace persistence tests PASS (cmd/gator and telemetry). Host16 PASS; recovery integration9 PASS; selected TUI2 PASS +1 existing platform skip. Original failures, final reruns, live results and bundle/hash/credential inspection are retained in the two new evidence directories. Existing projection/performance results remain historical; no global rendering-speed claim or new sustained energy measurement is made.
+
+| Acceptance area | Current judgment | Exact limit |
+| --- | --- | --- |
+| Functional migration | PASS within original scope | Existing owner, admission, approval, recovery and Quit contracts remain covered. No reproducible new P0/P1 established. |
+| Menu-bar/native presentation | PARTIAL | Final notch focus/draft/close-reopen journey observed; physical assistive access and notch→pending exact-action end-to-end journey remain unverified. The latter fixture ended with a retained result rather than a pending action. |
+| Full window / streaming / exact review / multi-owner / appearance / lifecycle | PASS for original recorded contract | Earlier closure evidence plus current regressions; no claim that every representative state was recaptured on this final binary. |
+| Composer and keyboard | PARTIAL | Final ordinary notch traversal passed; physical IME and Full Keyboard Access variants still need the operator checklist. |
+| Accessibility | PARTIAL | Physical VoiceOver, physical IME and preference variants remain operator-only. AX metadata does not establish spoken behavior. |
+| Performance | PARTIAL | Earlier bounded measurements retained. Sustained Instruments energy/long-session rendering and physical display changes were not tested. |
+| Real provider integration | PARTIAL | Actual OpenAI Chat/Pi/OpenCode output PASS. Responses401 unresolved; other credentials/providers unavailable for live checks. |
+| Local development bundle | PASS | Actual final native executable and Go runtime verified, native hash matches build, no literal repo credential embedded. |
+| Signed/notarized distribution | DEFERRED | No signing/notarization claim. |
+
+Separate final verdicts: **functional migration complete within its established scope; native presentation improved with bounded observed interaction evidence; accessibility acceptance still partial; real-provider evidence now positive for the working Chat route and its two tested CLIs but incomplete across routes/providers; local development bundle ready; distribution deferred.** No Tranche09, automatic provider fallback, new runtime coordinator, README change or agent-created commit.

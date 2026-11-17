@@ -1,0 +1,12 @@
+# github.com/gongahkia/gator/internal/cliagent [github.com/gongahkia/gator/internal/cliagent.test]
+internal/cliagent/native_process.go:6:2: "fmt" imported and not used
+ok  	github.com/gongahkia/gator/internal/model	0.590s
+ok  	github.com/gongahkia/gator/internal/model/anthropic	0.969s
+ok  	github.com/gongahkia/gator/internal/model/chatcompletions	1.855s
+ok  	github.com/gongahkia/gator/internal/model/gemini	1.413s
+ok  	github.com/gongahkia/gator/internal/model/openai	2.298s
+ok  	github.com/gongahkia/gator/internal/model/providerhttp	2.704s
+ok  	github.com/gongahkia/gator/internal/model/radius	3.138s
+FAIL	github.com/gongahkia/gator/internal/cliagent [build failed]
+ok  	github.com/gongahkia/gator/internal/telemetry	3.579s
+FAIL

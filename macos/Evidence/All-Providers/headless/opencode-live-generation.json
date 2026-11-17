@@ -1,0 +1,17 @@
+{
+  "cli": "OpenCode 2.3.0 standalone",
+  "provider": "OpenAI Chat Completions",
+  "model": "gpt-5.6-terra",
+  "exitCode": 0,
+  "elapsedMS": 1893,
+  "passed": true,
+  "responseText": "Gator OpenCode integration received this message.",
+  "eventTypes": [
+    "step_start",
+    "text",
+    "step_finish"
+  ],
+  "persistentConfigurationChanged": false,
+  "outputCap": 512,
+  "toolsDenied": true
+}

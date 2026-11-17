@@ -27,6 +27,7 @@ struct NotchGeometry: Equatable {
 final class NotchQuickAccess {
     private(set) var geometry: NotchGeometry?
     private(set) var expanded = false
+    private(set) var keyboardActive = false
     private var panel: QuickAccessPanel?
     private var pending: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
@@ -52,7 +53,7 @@ final class NotchQuickAccess {
         let next = NSScreen.screens.compactMap { NotchGeometry.detect(frame: $0.frame, safeTop: $0.safeAreaInsets.top, left: $0.auxiliaryTopLeftArea, right: $0.auxiliaryTopRightArea) }.first
         let enabled = UserDefaults.standard.object(forKey: "gator.notch.enabled") as? Bool ?? true
         guard enabled, let next else {
-            pending?.cancel(); expanded = false; panel?.orderOut(nil); geometry = next; return
+            pending?.cancel(); expanded = false; keyboardActive = false; panel?.acceptsKeyboard = false; panel?.orderOut(nil); geometry = next; return
         }
         let changed = geometry != next
         geometry = next
@@ -63,6 +64,9 @@ final class NotchQuickAccess {
             window.level = .mainMenu + 1
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
             window.setAccessibilityLabel("Gator quick access")
+            observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.dismiss(restoreFocus: false) }
+            })
             window.contentView = NSHostingView(rootView: NotchQuickAccessView(presentation: self, sessions: sessions))
             panel = window
         }
@@ -79,7 +83,7 @@ final class NotchQuickAccess {
     func show() {
         guard geometry != nil, panel?.isVisible == true else { return }
         pending?.cancel(); previousWindow = NSApp.keyWindow
-        setExpanded(true); panel?.acceptsKeyboard = true
+        setExpanded(true); keyboardActive = true; panel?.acceptsKeyboard = true
         NSApp.activate(ignoringOtherApps: true); panel?.makeKeyAndOrderFront(nil)
     }
     private func setExpanded(_ value: Bool) {
@@ -88,7 +92,7 @@ final class NotchQuickAccess {
         panel?.setFrame(geometry.panelFrame(expanded: value), display: true)
     }
     func dismiss(restoreFocus: Bool = true) {
-        pending?.cancel(); panel?.acceptsKeyboard = false; setExpanded(false)
+        pending?.cancel(); keyboardActive = false; panel?.acceptsKeyboard = false; setExpanded(false)
         if restoreFocus, let previousWindow, previousWindow.isVisible { previousWindow.makeKey() }
         previousWindow = nil
     }
@@ -119,7 +123,7 @@ private struct NotchQuickAccessView: View {
     let presentation: NotchQuickAccess
     let sessions: ManagedSessionCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
+    @FocusState private var dismissFocused: Bool
     private var attention: Int { sessions.activity.filter(\.needsAttention).count }
     private var status: String {
         if attention > 0 { return "\(attention) chat\(attention == 1 ? "" : "s") to inspect" }
@@ -149,7 +153,7 @@ private struct NotchQuickAccessView: View {
                         }
                         Spacer()
                         Button { presentation.dismiss() } label: { Image(systemName: "xmark").frame(width: 24, height: 24) }
-                            .buttonStyle(.plain).help("Dismiss quick access · Escape").accessibilityLabel("Dismiss quick access")
+                            .buttonStyle(.plain).focusable().focused($dismissFocused).help("Dismiss quick access · Escape").accessibilityLabel("Dismiss quick access")
                     }
                     if sessions.activity.isEmpty {
                         Text("Your chat stays available while work runs.").font(.callout).foregroundStyle(.white.opacity(0.8)).fixedSize(horizontal: false, vertical: true)
@@ -165,7 +169,7 @@ private struct NotchQuickAccessView: View {
                                             Text(item.status).font(.caption).lineLimit(1)
                                             Image(systemName: "arrow.up.right").font(.caption)
                                         }.padding(.horizontal, 8).padding(.vertical, 6).contentShape(Rectangle())
-                                    }.buttonStyle(QuickAccessButtonStyle()).disabled(!sessions.canNavigate)
+                                    }.buttonStyle(QuickAccessButtonStyle()).focusable().disabled(!sessions.canNavigate)
                                     .help("Open the original chat and inspect its current work. No action is approved here.")
                                 }
                             }
@@ -174,7 +178,7 @@ private struct NotchQuickAccessView: View {
                     HStack {
                         Text("Decisions stay in exact review.").font(.caption).foregroundStyle(.white.opacity(0.8))
                         Spacer(minLength: 8)
-                        Button("Open Chat") { presentation.open() }.buttonStyle(.bordered).controlSize(.small)
+                        Button("Open Chat") { presentation.open() }.buttonStyle(.bordered).controlSize(.small).focusable()
                     }
                 }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 18)
                 .transition(.opacity)
@@ -185,13 +189,14 @@ private struct NotchQuickAccessView: View {
         .environment(\.colorScheme, .dark)
         .onHover { presentation.hover($0) }
         .onExitCommand { presentation.dismiss() }
+        .onChange(of: presentation.keyboardActive) { _, active in dismissFocused = active }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: presentation.expanded)
     }
 }
 
 private struct QuickAccessButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.background(.white.opacity(configuration.isPressed ? 0.2 : 0.07), in: RoundedRectangle(cornerRadius: 6))
+        QuickAccessButtonBody(label: configuration.label, pressed: configuration.isPressed)
     }
 }
 
@@ -203,7 +208,7 @@ struct GatorMenuBarLabel: View {
     private var attention: Bool { sessions.activity.contains(where: \.needsAttention) }
     private var status: String {
         if attention { return "A chat needs inspection" }
-        if sessions.workingCount > 0 { return "\(sessions.workingCount) tasks working" }
+        if sessions.workingCount > 0 { return "\(sessions.workingCount) task\(sessions.workingCount == 1 ? "" : "s") working" }
         return sessions.current.isConnected ? "Ready" : "Not connected"
     }
     var body: some View {
@@ -220,5 +225,15 @@ struct GatorMenuBarLabel: View {
             if delegate.quickAccess == nil { delegate.quickAccess = NotchQuickAccess(sessions: sessions) { openWindow(id: "conversation"); NSApp.activate(ignoringOtherApps: true) } }
             await sessions.start()
         }
+    }
+}
+
+private struct QuickAccessButtonBody<Label: View>: View {
+    let label: Label
+    let pressed: Bool
+    @State private var hovering = false
+    var body: some View {
+        label.background(.white.opacity(pressed ? 0.24 : hovering ? 0.16 : 0.07), in: RoundedRectangle(cornerRadius: 6))
+            .onHover { hovering = $0 }
     }
 }

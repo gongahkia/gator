@@ -23,6 +23,9 @@ func cliFailure(cfg Config, operation, phase string, started time.Time, cause, e
 		Transport: "cli", Phase: phase, Method: operation, Endpoint: providerhttp.SafeEndpoint(cfg.BaseURL, secret),
 		CredentialSource: "environment", Auth: "child-environment", ElapsedMS: max(0, time.Since(started).Milliseconds()), Code: "cli_failure",
 	}
+	if secret == "" {
+		d.CredentialSource, d.Auth = "none", "none"
+	}
 	switch {
 	case errors.Is(cause, context.DeadlineExceeded):
 		d.Code = "cli_timeout"

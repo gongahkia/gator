@@ -45,3 +45,12 @@ func TestCLIDiagnosticPreservesCancellationAndSanitizesEndpoint(t *testing.T) {
 		t.Fatalf("wrong cancellation diagnostic: %v", err)
 	}
 }
+
+func TestMissingCLICredentialDoesNotClaimAuthentication(t *testing.T) {
+	t.Setenv("FIXTURE_API_KEY", "")
+	err := cliFailure(Config{Kind: "pi", APIKeyEnv: "FIXTURE_API_KEY"}, "exec", "configuration", time.Now(), errors.New("missing credential"), nil)
+	d := agent.ProviderDiagnosticFrom(err)
+	if d.CredentialSource != "none" || d.Auth != "none" {
+		t.Fatalf("invented credential metadata: %+v", d)
+	}
+}

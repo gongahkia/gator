@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -48,5 +50,30 @@ func TestOTLPMetadataRedactionHierarchyAndFailure(t *testing.T) {
 	}
 	if trace.Dropped == 0 || len(trace.Spans) > 512 {
 		t.Fatal("retention unbounded")
+	}
+}
+
+func TestCLIFailureMetadataPersistsInExistingPrivateTrace(t *testing.T) {
+	trace := New("fixture-run", time.Now())
+	code := 7
+	trace.Record(agent.Event{Kind: agent.EventSubagent, At: time.Now(), Text: "PRIVATE_PROMPT", ProviderDiagnostic: &agent.ProviderDiagnostic{Provider: "pi", Transport: "cli", Method: "rpc", Phase: "native handshake", ExitCode: &code}})
+	root := t.TempDir()
+	if err := trace.Finish(root, ""); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "trace.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored Trace
+	if err := json.Unmarshal(data, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.Spans) != 2 || stored.Spans[1].ProviderDiagnostic == nil || *stored.Spans[1].ProviderDiagnostic.ExitCode != 7 || strings.Contains(string(data), "PRIVATE_PROMPT") {
+		t.Fatalf("CLI trace lost safe metadata: %s", data)
+	}
+	info, _ := os.Stat(filepath.Join(root, "trace.json"))
+	if info.Mode().Perm() != 0600 {
+		t.Fatalf("trace permissions: %v", info.Mode())
 	}
 }
