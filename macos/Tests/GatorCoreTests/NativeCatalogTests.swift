@@ -53,6 +53,14 @@ actor CatalogReplyGate {
     #expect(page.items.first?.snippet == "public retained content")
 }
 
+@Test func catalogBoundedSwiftProjectionAndSelectionMeasurements() throws {
+    let value = JSONValue.object(["request_id": .string("measured"), "action": .string("query"), "page_id": .string("measured-page"), "page": .object(["items": .array((0..<50).map { catalogItemValue("record-\($0)") })])])
+    var result = try NativeCatalogResult(value)
+    let projection = try ContinuousClock().measure { for _ in 0..<100 { result = try NativeCatalogResult(value) } }
+    let selection = ContinuousClock().measure { for _ in 0..<1_000 { #expect(result.page?.items.first { $0.id == "record-49" }?.id == "record-49") } }
+    print("GATOR_P02_SWIFT_BENCH pageSize=50 projection100=\(projection) selection1000=\(selection)")
+}
+
 @Test @MainActor func catalogTitleValidationUsesByteLimitAndRejectsControlCharacters() {
     for text in ["", " \n ", "a\nb", String(repeating: "😀", count: 65)] { #expect(NativeConversationCatalog.validateTitle(text) != nil) }
     for text in ["A title", "  Trimmed by Go  ", String(repeating: "😀", count: 64), "東京 Café"] { #expect(NativeConversationCatalog.validateTitle(text) == nil) }

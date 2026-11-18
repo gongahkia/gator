@@ -51,7 +51,7 @@ struct DialogueControl: Sendable {
 
 enum HostCommand: Sendable {
     case catalog(NativeCatalogRequest)
-    case refreshConversations
+    case refreshConversations(String)
     case focus(Bool)
     case configure(canStart: Bool, otherBusy: Bool, peers: [JSONValue])
     case bootstrap(parent: String, turn: String)
@@ -61,7 +61,7 @@ enum HostCommand: Sendable {
     var fields: [String: JSONValue] {
         switch self {
         case .catalog(let request): return ["type": .string("native_catalog"), "native_catalog": .object(request.fields)]
-        case .refreshConversations: return ["type": .string("refresh_conversations")]
+        case .refreshConversations(let id): return ["type": .string("refresh_conversations"), "conversation_id": .string(id)]
         case .focus(let foreground): return ["type": .string("focus_session"), "foreground": .bool(foreground)]
         case let .configure(canStart, otherBusy, peers): return ["type": .string("dialogue_host"), "dialogue_host": .object(["can_start": .bool(canStart), "other_busy": .bool(otherBusy), "peers": .array(peers)])]
         case let .bootstrap(parent, turn): return ["type": .string("dialogue_bootstrap"), "dialogue_parent": .string(parent), "dialogue_turn": .string(turn)]

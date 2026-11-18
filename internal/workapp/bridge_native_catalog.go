@@ -102,6 +102,12 @@ func (m Model) ApplyNativeCatalog(a NativeCatalogAction) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "query":
+		if a.RequestID == m.nativeCatalog.query.RequestID {
+			if a == m.nativeCatalog.query {
+				return m, nil
+			}
+			return fail("Catalog request identity was reused. Refresh with a new request.")
+		}
 		if m.nativeCatalog.acting {
 			return fail("Wait for the selected conversation operation to finish.")
 		}
@@ -188,7 +194,7 @@ func (m Model) ApplyNativeCatalog(a NativeCatalogAction) (tea.Model, tea.Cmd) {
 		item := nativeCatalogItem(c)
 		result.Item = &item
 		if a.Action == "inspect" {
-			m.replaceNativeCatalogItem(item)
+			item = m.replaceNativeCatalogItem(item)
 			result.PageID = m.nativeCatalog.pageID
 		}
 		m.nativeCatalog.action = a
@@ -198,7 +204,7 @@ func (m Model) ApplyNativeCatalog(a NativeCatalogAction) (tea.Model, tea.Cmd) {
 		return fail("Unsupported native catalog operation.")
 	}
 }
-func (m *Model) replaceNativeCatalogItem(item worksession.ConversationItem) {
+func (m *Model) replaceNativeCatalogItem(item worksession.ConversationItem) worksession.ConversationItem {
 	for i, prior := range m.nativeCatalog.page.Items {
 		if prior.ID == item.ID {
 			item.Snippet, item.Match = prior.Snippet, prior.Match
@@ -206,6 +212,7 @@ func (m *Model) replaceNativeCatalogItem(item worksession.ConversationItem) {
 		}
 	}
 	m.nativeCatalogIdentity()
+	return item
 }
 func (m Model) finishNativeCatalogLoad(v nativeCatalogLoaded) (tea.Model, tea.Cmd) {
 	if m.nativeCatalog == nil || m.nativeCatalog.query != v.request {
@@ -241,24 +248,35 @@ func (m Model) finishNativeCatalogChange(v nativeCatalogChanged) (tea.Model, tea
 	} else {
 		item := nativeCatalogItem(v.item)
 		result.Item = &item
-		m.replaceNativeCatalogItem(item)
+		item = m.replaceNativeCatalogItem(item)
 		result.PageID = m.nativeCatalog.pageID
 		if v.item.ID == m.conversation {
 			m.title = v.item.Title
 		}
-		m.refreshBridgeConversations()
+		m.applyNativeConversationMetadata(v.item)
 	}
 	m.nativeCatalogActionResult = result
 	return m, nil
 }
 
 // Refresh display metadata only; never focus, reload history or replay a request.
-func (m Model) RefreshBridgeConversationTitles() Model {
-	if m.config.SessionStore != nil && m.conversation != "" {
-		if c, err := m.config.SessionStore.Load(m.conversation); err == nil {
-			m.title = c.Title
+func (m Model) RefreshBridgeConversationTitles(id string) Model {
+	if m.config.SessionStore != nil {
+		if c, err := m.config.SessionStore.Load(id); err == nil {
+			m.applyNativeConversationMetadata(c)
 		}
 	}
-	m.refreshBridgeConversations()
 	return m
+}
+func (m *Model) applyNativeConversationMetadata(c worksession.Conversation) {
+	if c.ID == m.conversation {
+		m.title = c.Title
+	}
+	items := append([]worksession.Conversation(nil), m.config.Conversations...)
+	for i, item := range items {
+		if item.ID == c.ID {
+			items[i] = c
+		}
+	}
+	m.config.Conversations = items
 }

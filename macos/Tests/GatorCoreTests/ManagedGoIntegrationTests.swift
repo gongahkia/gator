@@ -80,8 +80,24 @@ import Testing
         #expect(parent.draftText == searchDraft); #expect(parent.transcript.map(\.id) == searchIDs)
         #expect(parent.pendingSubmission == nil); #expect(parent.snapshot?.running == true); #expect(child.snapshot?.running == true)
 
+        app.showCatalog()
+        try await managedEventually("catalog while two owners work") { !app.catalog.loading && app.catalog.page != nil }
+        #expect(app.current === parent); #expect(parent.snapshot?.running == true); #expect(child.snapshot?.running == true)
+        app.catalog.selection = parentID; app.catalog.beginRename(); app.catalog.renameText = "Trip planning while work continues"; app.catalog.rename()
+        try await managedEventually("current-owner rename during work") { !app.catalog.acting }
+        #expect(app.catalog.issue.isEmpty); #expect(parent.title == "Trip planning while work continues")
+        #expect(parent.snapshot?.running == true); #expect(child.snapshot?.running == true)
+        #expect(parent.draftText == searchDraft); #expect(app.ownerCount == searchOwnerCount)
+        app.catalog.dismiss()
+
+        app.showCatalog()
+        try await managedEventually("background title selection") { !app.catalog.loading && app.catalog.page != nil }
+        app.catalog.selection = childID; app.catalog.beginRename(); app.catalog.renameText = "Brief renamed as it finishes"; app.catalog.rename()
         try Data().write(to: root.appendingPathComponent("release-child"))
         try await managedEventually("retained child completion") { child.snapshot?.running == false && parent.snapshot?.value["dialogue_peers"].array.contains { $0["conversation_id"].string == childID && $0["state"].string == "completed" } == true }
+        try await managedEventually("background rename completion") { !app.catalog.acting }
+        #expect(app.catalog.issue.isEmpty); #expect(child.title == "Brief renamed as it finishes")
+        #expect(parent.title == "Trip planning while work continues"); app.catalog.dismiss()
         #expect(app.current === parent); #expect(parent.snapshot?.running == true)
         #expect(app.activity.contains { $0.id == childID && $0.needsAttention })
         try await send("What did the separate brief say?")

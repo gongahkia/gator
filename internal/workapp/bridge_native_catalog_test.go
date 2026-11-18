@@ -166,6 +166,8 @@ func TestNativeCatalogSupersessionCancelAndResultIsolation(t *testing.T) {
 	next, old := m.ApplyNativeCatalog(NativeCatalogAction{RequestID: "old-query", Action: "query", Scope: "active"})
 	m = next.(Model)
 	oldResult := old()
+	reused,duplicate:=m.ApplyNativeCatalog(NativeCatalogAction{RequestID:"old-query",Action:"query",Scope:"all"})
+	if duplicate!=nil || reused.(Model).nativeCatalogQueryResult.Error=="" { t.Fatal("query identity reused for changed scope") }
 	next, newer := m.ApplyNativeCatalog(NativeCatalogAction{RequestID: "new-query", Action: "query", Scope: "archived"})
 	m = next.(Model)
 	if contexts[0].Err() == nil {

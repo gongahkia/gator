@@ -84,6 +84,7 @@ extension GatorApplicationState {
             try await host(.catalog(request)); return try NativeCatalogResult(.object(["request_id": .string(request.id), "action": .string("cancel")]))
         }
         let key = request.action == .query ? "native_catalog_query_result" : "native_catalog_action_result"
+        guard snapshot?.value[key]["request_id"].string != request.id else { throw BridgeFailure("Use a fresh catalog request identity. Refresh and review; the previous result was not reused.") }
         let originalGeneration = generation
         try await host(.catalog(request), timeout: .seconds(12)) { $0.value[key]["request_id"].string == request.id && $0.value[key]["action"].string == request.action.rawValue }
         guard generation == originalGeneration, let snapshot else { throw BridgeFailure("The catalog owner changed. Refresh and review before trying again.") }

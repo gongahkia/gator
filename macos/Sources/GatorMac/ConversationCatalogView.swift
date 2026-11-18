@@ -28,6 +28,7 @@ struct ConversationCatalogView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @FocusState private var focus: Field?
+    @State private var statusHeight: CGFloat = 0
     private enum Field { case search, rename }
     init(sessions: ManagedSessionCoordinator) { self.sessions = sessions; self.catalog = sessions.catalog }
     var body: some View {
@@ -36,7 +37,10 @@ struct ConversationCatalogView: View {
             Divider()
             results
             Divider()
-            status.padding(.horizontal, 14).padding(.vertical, 8)
+            ScrollView {
+                status.padding(.horizontal, 14).padding(.vertical, 8)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { statusHeight = $0 }
+            }.frame(height: min(110, statusHeight))
             if let editor = catalog.editor { Divider(); renameEditor(editor).padding(14) }
             footer.padding(14)
         }

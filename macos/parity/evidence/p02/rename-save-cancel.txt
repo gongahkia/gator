@@ -1,0 +1,9 @@
+Conflict kept GUI attempted title. Explicit Refresh and Review left canonical title unchanged. Explicit Save confirmed GUI attempted title. Cancelled title edit preserved canonical title and version.
+{
+  "archived": false,
+  "head_revision_id": "",
+  "id": "work-20261118T025136-9ffbb6e952f09c8f",
+  "pinned": false,
+  "title": "GUI attempted title",
+  "version": "aaae885fd556fcc0799364abfa8dd6ec3ca33e48d8f9f8a20014fda0bb9cf80c"
+}

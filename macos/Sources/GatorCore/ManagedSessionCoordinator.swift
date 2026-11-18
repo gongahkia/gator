@@ -171,6 +171,10 @@ public final class ManagedSessionCoordinator {
         let wasCached = !id.isEmpty && owners[id] != nil
         var next: GatorApplicationState?
         do {
+            if let catalogItem, previous.conversationID == id, previous.isConnected {
+                try await verifyCatalogOwner(previous, item: catalogItem)
+                return
+            }
             if previous.isConnected { try await focus(previous, false) }
             if !id.isEmpty, let retained = owners[id], retained.connectionStatus == .disconnected {
                 try await store.selectConversation(retained.conversationID)
@@ -180,9 +184,7 @@ public final class ManagedSessionCoordinator {
             }
             let owner = try await create(id: id, new: new, source: source); next = owner
             if let catalogItem {
-                var verification = NativeCatalogRequest(.verify); verification.item = catalogItem
-                let result = try await owner.nativeCatalog(verification)
-                guard result.error?.isEmpty != false, result.item?.id == catalogItem.id, result.item?.version == catalogItem.version, result.item?.source == catalogItem.source else { throw BridgeFailure(result.error ?? "The destination conversation changed. Refresh and select it again.") }
+                try await verifyCatalogOwner(owner, item: catalogItem)
             }
             try await focus(owner, true)
             guard !stopping else { throw BridgeFailure("Gator is closing.") }
@@ -197,6 +199,11 @@ public final class ManagedSessionCoordinator {
             current = previous
             throw error
         }
+    }
+    private func verifyCatalogOwner(_ owner: GatorApplicationState, item: NativeCatalogItem) async throws {
+        var verification = NativeCatalogRequest(.verify); verification.item = item
+        let result = try await owner.nativeCatalog(verification)
+        guard result.error?.isEmpty != false, result.item?.id == item.id, result.item?.version == item.version, result.item?.source == item.source else { throw BridgeFailure(result.error ?? "The destination conversation changed. Refresh and select it again.") }
     }
     public func newConversation() async {
         let origin = current
@@ -243,12 +250,12 @@ public final class ManagedSessionCoordinator {
                 guard !stopping else { throw BridgeFailure("Gator is closing. The catalog operation was not sent.") }
                 let confirmed = try await origin.nativeCatalog(request)
                 if request.action == .open, confirmed.error?.isEmpty != false {
-                    guard catalog.isPresented, current === foreground, current.generation == foregroundGeneration, catalog.pageID == request.pageID, let item = confirmed.item, item.id == request.item?.id, item.version == request.item?.version else { throw BridgeFailure("The selected view or catalog changed. Choose Open again; original chat kept.") }
+                    guard catalog.isPresented, catalog.selection == request.item?.id, catalog.selectedItem?.version == request.item?.version, current === foreground, current.generation == foregroundGeneration, catalog.pageID == request.pageID, let item = confirmed.item, item.id == request.item?.id, item.version == request.item?.version else { throw BridgeFailure("The selected view or catalog changed. Choose Open again; original chat kept.") }
                     try await select(id: item.id, catalogItem: item)
                 }
                 if request.action == .rename, confirmed.error?.isEmpty != false, let item = confirmed.item {
                     for owner in records.values where owner !== origin && owner.isConnected {
-                        do { try await owner.host(.refreshConversations) { $0.conversationID != item.id || $0.title == item.title } }
+                        do { try await owner.host(.refreshConversations(item.id)) { $0.conversationID != item.id || $0.title == item.title } }
                         catch { issue = "The title was saved, but a cached owner could not refresh its display: " + error.localizedDescription }
                     }
                 }

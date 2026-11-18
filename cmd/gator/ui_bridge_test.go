@@ -11,7 +11,46 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/workapp"
+	"github.com/gongahkia/gator/internal/worksession"
 )
+
+func TestUIBridgeNativeCatalogAcknowledgementIsNotQueryOrRenameCompletion(t *testing.T) {
+	root := t.TempDir()
+	store, err := worksession.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := store.CreateChat(root, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	bridge := &uiBridgeModel{model: workapp.New(workapp.Config{BridgeMode: true, ManagedSessions: true, SessionStore: &store, QueryConversations: store.PageConversationsContext, OrganizeConversation: store.OrganizeConversation}), out: json.NewEncoder(&out)}
+	_, cmd := bridge.Update(uiFrame{Type: "native_catalog", Nonce: "query-nonce", NativeCatalog: &workapp.NativeCatalogAction{RequestID: "query-exact", Action: "query", Scope: "all"}})
+	if cmd == nil || bridge.model.BridgeState().NativeCatalogQueryResult != nil || !bytes.Contains(out.Bytes(), []byte(`"type":"action_applied"`)) {
+		t.Fatal("query acknowledgement conflated with result", out.String())
+	}
+	bridge.Update(cmd())
+	page := bridge.model.BridgeState().NativeCatalogQueryResult
+	if page == nil || page.RequestID != "query-exact" || page.Page.Items[0].ID != c.ID {
+		t.Fatal(page)
+	}
+	item := page.Page.Items[0]
+	out.Reset()
+	_, cmd = bridge.Update(uiFrame{Type: "native_catalog", Nonce: "rename-nonce", NativeCatalog: &workapp.NativeCatalogAction{RequestID: "rename-exact", Action: "rename", PageID: page.PageID, ID: item.ID, Version: item.Version, Title: "Confirmed title"}})
+	c, err = store.Load(c.ID)
+	if err != nil || c.Title == "Confirmed title" || bridge.model.BridgeState().NativeCatalogActionResult != nil || cmd == nil || !bytes.Contains(out.Bytes(), []byte(`"nonce":"rename-nonce"`)) {
+		t.Fatal("ack prematurely confirmed rename", out.String(), err)
+	}
+	if bridge.model.RestartBlockReason() == "" {
+		t.Fatal("restart accepted an unfinished metadata change")
+	}
+	bridge.Update(cmd())
+	result := bridge.model.BridgeState().NativeCatalogActionResult
+	if result == nil || result.RequestID != "rename-exact" || result.Error != "" || result.Item.Title != "Confirmed title" {
+		t.Fatal(result)
+	}
+}
 
 func TestUIBridgeUpdateReadinessAcknowledgesBeforeQuitting(t *testing.T) {
 	var out bytes.Buffer

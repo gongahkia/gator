@@ -25,6 +25,13 @@ func main() {
 	}
 	s, err := worksession.Open(filepath.Join(root, "state"))
 	checked(err)
+	if len(os.Args) > 2 && os.Args[2] == "fallback" {
+		path := filepath.Join(root, "state", "gator", "cache")
+		checked(os.RemoveAll(path))
+		checked(os.WriteFile(path, []byte("fixture unavailable cache"), 0600))
+		fmt.Println(`{"fallback":true}`)
+		return
+	}
 	if len(os.Args) > 3 && os.Args[2] == "rename" {
 		c, err := s.Load(os.Args[3])
 		checked(err)
@@ -36,7 +43,7 @@ func main() {
 	if len(os.Args) > 3 && os.Args[2] == "read" {
 		c, err := s.Load(os.Args[3])
 		checked(err)
-		checked(json.NewEncoder(os.Stdout).Encode(c))
+		checked(json.NewEncoder(os.Stdout).Encode(map[string]any{"id": c.ID, "title": c.Title, "archived": c.Archived, "pinned": c.Pinned, "version": worksession.ConversationDisplayVersion(c), "head_revision_id": c.HeadRevision}))
 		return
 	}
 	count, err := strconv.Atoi(os.Args[2])

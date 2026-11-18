@@ -36,6 +36,18 @@ actor CatalogOwnerOpenGate {
     app.catalog.dismiss(); #expect(await app.shutdown(confirmed: true))
 }
 
+@Test @MainActor func catalogNativeAPIRejectsReusedIdentityInsteadOfReadingThePreviousResult() async throws {
+    let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+    let transport = SessionFixture(); await transport.configureCatalog([catalogItemValue()])
+    let app = await managedFixture(root, [transport])
+    var query = NativeCatalogRequest(.query)
+    _ = try await app.current.nativeCatalog(query)
+    query.text = "changed query"
+    await #expect(throws: (any Error).self) { try await app.current.nativeCatalog(query) }
+    #expect(await transport.sent("native_catalog").count == 1)
+    #expect(await app.shutdown(confirmed: true))
+}
+
 @Test @MainActor func catalogCapacityNeverRetiresOwnersHoldingRecoveryEvidence() async throws {
     let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
     let fixtures = (0..<5).map { SessionFixture(id: "chat-\($0)") }, app = await managedFixture(root, fixtures)
