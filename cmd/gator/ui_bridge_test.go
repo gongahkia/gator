@@ -222,3 +222,28 @@ func TestUIBridgeWorkspaceAckPrecedesExactResolutionWithoutNavigation(t *testing
 		t.Fatal("resolution navigated or lost identity", result)
 	}
 }
+
+func TestUIBridgeNativeProviderAckIsNotStorageCompletionAndContainsNoSecret(t *testing.T) {
+	b := nativeProviderFixture(t)
+	review := providerReview(t, b, true, "https://example.invalid/v1")
+	var out bytes.Buffer
+	bridge := &uiBridgeModel{model: workapp.New(workapp.Config{BridgeMode: true, ManagedSessions: true, NativeProviders: b.Apply}), out: json.NewEncoder(&out)}
+	a := modelcatalog.NativeProviderAction{RequestID: "save-exact", Action: "save", Provider: "openai", ReviewID: review.ID, APIKey: nativeFixtureSecret}
+	_, cmd := bridge.Update(uiFrame{Type: "native_provider", Nonce: "nonce-save", NativeProvider: &a})
+	if cmd == nil || bridge.model.BridgeState().NativeProviderResult != nil || !bytes.Contains(out.Bytes(), []byte(`"type":"action_applied"`)) {
+		t.Fatal("ack mistaken for storage completion")
+	}
+	if bridge.model.RestartBlockReason() == "" {
+		t.Fatal("restart accepted pending storage")
+	}
+	requireNoProviderSecret(t, bridge.model.BridgeState())
+	bridge.Update(cmd())
+	result := bridge.model.BridgeState().NativeProviderResult
+	if result == nil || !result.Confirmed || result.RequestID != "save-exact" {
+		t.Fatal("missing exact completion")
+	}
+	requireNoProviderSecret(t, bridge.model.BridgeState())
+	if bytes.Contains(out.Bytes(), []byte(nativeFixtureSecret)) {
+		t.Fatal("secret leaked to bridge output")
+	}
+}

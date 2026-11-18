@@ -72,7 +72,7 @@ import Observation
                 if let review = result.review, self.isPresented, self.selection == selectedID { self.review = review }
                 if request.action == .save || request.action == .remove {
                     guard result.confirmed else { throw BridgeFailure("Provider storage was not confirmed. Refresh and review; no retry was sent.") }
-                    self.needsRefresh = false; self.notice = result.notice ?? "Go confirmed this provider change. No live request was made."
+                    self.needsRefresh = false; self.notice = request.provider + ": " + (result.notice ?? "Go confirmed this provider change. No live request was made.")
                     self.editorEpoch = UUID()
                 }
                 return true

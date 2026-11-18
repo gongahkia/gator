@@ -1,0 +1,58 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/37] Emitting module GatorMacTests
+[4/37] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[5/37] Emitting module GatorCoreTests
+[6/41] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[7/41] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[8/41] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[9/41] Compiling GatorCoreTests NativeMessageContentTests.swift
+[10/41] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[11/41] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[12/41] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[13/41] Compiling GatorCoreTests resource_bundle_accessor.swift
+[14/41] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[15/41] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[16/41] Compiling GatorCoreTests NativeCatalogTests.swift
+[17/41] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[18/41] Compiling GatorCoreTests NativePerformanceTests.swift
+[19/41] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[20/41] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[21/41] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[22/41] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[23/41] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[24/41] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[25/41] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[26/41] Compiling GatorCoreTests NativeProviderTests.swift
+[27/41] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[28/41] Compiling GatorCoreTests NativeRecoveryTests.swift
+[29/41] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[30/41] Compiling GatorCoreTests ApplicationStateTests.swift
+[31/41] Compiling GatorCoreTests BridgeProtocolTests.swift
+[32/41] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[33/41] Compiling GatorCoreTests GoIntegrationTests.swift
+[34/41] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[35/41] Compiling GatorCoreTests ManagedSessionTests.swift
+[36/41] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[37/41] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[38/41] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[39/41] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[40/43] Emitting module GatorNativePackageTests
+[41/43] Compiling GatorNativePackageTests runner.swift
+[41/43] Write Objects.LinkFileList
+[42/43] Linking GatorNativePackageTests
+Build complete! (8.77s)
+Test Suite 'Selected tests' started at 2026-11-18 15:49:38.304.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 15:49:38.305.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 15:49:38.305.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 15:49:38.305.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() started.
+✔ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() passed after 0.174 seconds.
+✔ Test run with 1 test in 0 suites passed after 0.174 seconds.

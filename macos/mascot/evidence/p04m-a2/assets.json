@@ -1,0 +1,39 @@
+{
+  "assets": [
+    {
+      "file": "B-static.png",
+      "bytes": 27738,
+      "sha256": "f0d9d1a75c116da54adfe2d2650b106d7982fe66ad426234f9e7b0afe552ec2d"
+    },
+    {
+      "file": "Gator-B.usda",
+      "bytes": 865504,
+      "sha256": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3"
+    },
+    {
+      "file": "Gator-B.usdc",
+      "bytes": 58124,
+      "sha256": "8266167f007e6e93cd4d3e9b203eeda064dfae78b19cca9ebffa75e72d8ff24d"
+    },
+    {
+      "file": "Gator-B.usdz",
+      "bytes": 58290,
+      "sha256": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca"
+    }
+  ],
+  "usdzMembers": [
+    {
+      "file": "Gator-B.usdc",
+      "bytes": 58124,
+      "compression": 0,
+      "dataOffsetAligned64": true
+    }
+  ],
+  "externalAssetReferences": [],
+  "meshes": 26,
+  "triangles": 14164,
+  "upAxis": "Y",
+  "metersPerUnit": 1,
+  "apiCompatibility": "arm64-apple-macosx15.0; strict Swift 6; SDK26.5; runtime macOS26.5.2",
+  "networkRequired": false
+}

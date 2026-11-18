@@ -15,6 +15,8 @@ actor SessionFixture: BridgeTransport {
     let silentBootstrap: Bool
     let focusDelay: Duration
     var autoAdmit = true
+    private var providerGate: CatalogOwnerOpenGate?
+    func configureProvider(gate: CatalogOwnerOpenGate?) { providerGate = gate }
     private var workspaceGate: CatalogOwnerOpenGate?
     private var workspaceResultOverride: JSONValue?
     private var workspaceFailure = ""
@@ -45,6 +47,14 @@ actor SessionFixture: BridgeTransport {
     func send(_ command: BridgeCommand, nonce: String) async throws {
         let frame = try JSONDecoder().decode(JSONValue.self, from: command.data(nonce: nonce)); frames.append(frame)
         switch command {
+        case .host(.provider(let request)):
+            await providerGate?.wait()
+            let result = try providerReply(request)
+            // Encode the non-secret fixture result through the real decoder.
+            var value: [String: JSONValue] = ["request_id": .string(result.requestID), "action": .string(result.action), "provider": .string(request.provider), "confirmed": .bool(result.confirmed), "changed": .bool(result.changed), "conflict": .bool(false)]
+            if request.action == .status { value["rows"] = .array([providerRowValue()]) }
+            if request.action == .review { value["review"] = .object(["id": .string("opaque-review"), "provider": .string(request.provider), "operation": .string("save"), "model": .string("fixture-model"), "destination": .string("127.0.0.1:9"), "endpoint_mode": .string("retain"), "credential_action": .string("replace"), "sets_defaults": .bool(true)]) }
+            patch(["native_provider_result": .object(value)])
         case .host(.workspace(let request)):
             await workspaceGate?.wait()
             guard !workspaceDisconnected else { throw BridgeFailure("Original owner disconnected before workspace resolution") }

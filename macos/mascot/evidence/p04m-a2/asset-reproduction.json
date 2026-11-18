@@ -1,0 +1,8 @@
+{
+  "byteIdentical": true,
+  "originalSha256": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3",
+  "reproducedSha256": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3",
+  "originalTriangles": 14164,
+  "reproducedTriangles": 14164,
+  "externalReferences": []
+}

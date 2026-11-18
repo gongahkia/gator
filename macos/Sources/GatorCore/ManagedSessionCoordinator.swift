@@ -79,6 +79,7 @@ public final class ManagedSessionCoordinator {
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
+        if providers.needsRefresh { return "Provider setup needs reconciliation. Quit preserves chat state, but an unconfirmed credential/configuration result must be inspected after reopening; it will not be retried automatically." }
         if providers.busy { return "A provider configuration operation awaits Go confirmation. Quit waits for its outcome; an unconfirmed change is never replayed." }
         if workspaceChoosing { return "A workspace choice is pending. Quit keeps existing conversations and drafts; no workspace transition is replayed." }
         if catalog.acting { return "A conversation catalog operation is awaiting Go confirmation. Quitting stops the owner; an unconfirmed title change must be inspected after reopening, never replayed automatically." }

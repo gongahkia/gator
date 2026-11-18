@@ -1,0 +1,111 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/25] Compiling GatorCore NativeTaskReview.swift
+[3/25] Compiling GatorCore NativeTranscriptSearch.swift
+[4/25] Compiling GatorCore NativeDraftStore.swift
+[5/25] Compiling GatorCore NativeMessageContent.swift
+[6/25] Compiling GatorCore NativePlanExecution.swift
+[7/25] Compiling GatorCore NativeProviderProtocol.swift
+[8/25] Compiling GatorCore NativeProviderSetup.swift
+[9/27] Compiling GatorCore NativeUploadStore.swift
+[10/27] Compiling GatorCore NativeWorkspaceSelection.swift
+[11/27] Compiling GatorCore NativeCatalogProtocol.swift
+[12/27] Compiling GatorCore NativeConversationCatalog.swift
+[13/27] Compiling GatorCore NativeDraftAttachments.swift
+[14/27] Compiling GatorCore NativeRecovery.swift
+[15/27] Compiling GatorCore NativeRecoveryPreparation.swift
+[16/27] Compiling GatorCore GoBridgeConnection.swift
+[17/27] Compiling GatorCore ManagedSessionCoordinator.swift
+[18/27] Compiling GatorCore ManagedSessionProtocol.swift
+[19/27] Emitting module GatorCore
+[20/27] Compiling GatorCore BridgePipeIO.swift
+[21/27] Compiling GatorCore BridgeProtocol.swift
+[22/27] Compiling GatorCore GatorApplicationState.swift
+[23/86] Compiling GatorCoreTests ApplicationStateTests.swift
+[24/86] Compiling GatorCoreTests BridgeProtocolTests.swift
+[25/86] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[26/86] Compiling GatorCoreTests GoIntegrationTests.swift
+[27/89] Emitting module GatorMac
+[28/89] Emitting module GatorCoreTests
+[29/93] Compiling GatorCoreTests NativeCatalogTests.swift
+[30/93] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[31/93] Compiling GatorCoreTests ManagedSessionTests.swift
+[32/93] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[33/93] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[34/93] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[35/93] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[36/93] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[37/93] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[38/93] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[39/93] Compiling GatorCoreTests NativeMessageContentTests.swift
+[40/93] Compiling GatorCoreTests NativePerformanceTests.swift
+[45/93] Compiling GatorMac RecoveryInspectorContent.swift
+[46/93] Compiling GatorMac RecoveryPreparationView.swift
+[47/93] Compiling GatorMac TaskInspectorView.swift
+[48/93] Compiling GatorCoreTests NativeProviderTests.swift
+[52/93] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[53/93] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[60/93] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[62/93] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[63/93] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[64/93] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[65/93] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[66/93] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[67/93] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[68/93] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[69/93] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[70/93] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[71/93] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[72/93] Compiling GatorCoreTests resource_bundle_accessor.swift
+[88/92] Linking GatorMac
+[89/92] Applying GatorMac
+[91/99] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[92/99] Compiling GatorMacTests NotchGeometryTests.swift
+[93/99] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[94/99] Compiling GatorMacTests NativeInputTests.swift
+[95/99] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[96/99] Emitting module GatorMacTests
+[97/99] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[98/101] Compiling GatorNativePackageTests runner.swift
+[99/101] Emitting module GatorNativePackageTests
+[99/100] Linking GatorNativePackageTests
+Build complete! (14.72s)
+Test Suite 'Selected tests' started at 2026-11-18 16:05:23.162.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 16:05:23.163.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 16:05:23.163.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 16:05:23.163.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 2.330 seconds.
+◇ Test providerActualGoSaveReplaceRemoveRelaunchAndSecretArtifactBoundary() started.
+✔ Test providerActualGoSaveReplaceRemoveRelaunchAndSecretArtifactBoundary() passed after 2.719 seconds.
+◇ Test providerActualGoIndependentOwnersRejectCompetingReviewedWritesAndDoNotStealChat() started.
+✔ Test providerActualGoIndependentOwnersRejectCompetingReviewedWritesAndDoNotStealChat() passed after 1.943 seconds.
+◇ Test providerProtocolCarriesSecretOnlyInExplicitSaveAndNeverChat() started.
+✔ Test providerProtocolCarriesSecretOnlyInExplicitSaveAndNeverChat() passed after 0.001 seconds.
+◇ Test providerReviewSaveRemoveCancelAndFailureRequireFreshExplicitIntent() started.
+✔ Test providerReviewSaveRemoveCancelAndFailureRequireFreshExplicitIntent() passed after 0.007 seconds.
+◇ Test providerStaleCompletionDoesNotInstallReviewOrClaimSave() started.
+✔ Test providerStaleCompletionDoesNotInstallReviewOrClaimSave() passed after 0.019 seconds.
+◇ Test providerAcknowledgementWithoutConfirmedStorageIsNotSuccessAndQuitWaitsOperation() started.
+✔ Test providerAcknowledgementWithoutConfirmedStorageIsNotSuccessAndQuitWaitsOperation() passed after 0.013 seconds.
+◇ Test providerManagedOwnerPinNavigationPendingApprovalAndQuitBoundary() started.
+✔ Test providerManagedOwnerPinNavigationPendingApprovalAndQuitBoundary() passed after 0.146 seconds.
+◇ Test providerCompletionAfterSelectionChangeUpdatesStatusWithoutChangingSelection() started.
+✔ Test providerCompletionAfterSelectionChangeUpdatesStatusWithoutChangingSelection() passed after 0.013 seconds.
+◇ Test providerDisconnectedOriginRequiresReconciliationAndFreshExplicitHostSelection() started.
+✔ Test providerDisconnectedOriginRequiresReconciliationAndFreshExplicitHostSelection() passed after 0.104 seconds.
+◇ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() started.
+✔ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() passed after 1.905 seconds.
+◇ Test providerSecretEditorUsesNativeSecureMaskAndClearsOnDismantle() started.
+✔ Test providerSecretEditorUsesNativeSecureMaskAndClearsOnDismantle() passed after 0.066 seconds.
+◇ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() started.
+✔ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() passed after 0.152 seconds.
+◇ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() started.
+✔ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() passed after 0.004 seconds.
+✔ Test run with 14 tests in 0 suites passed after 9.430 seconds.

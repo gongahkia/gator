@@ -6,6 +6,7 @@ import SwiftUI
 struct NativeProviderSecretEntry: NSViewRepresentable {
     @Binding var text: String
     var enabled = true
+    var onCancel: @MainActor () -> Void = {}
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeNSView(context: Context) -> NSSecureTextField {
         let field = NSSecureTextField()
@@ -27,6 +28,13 @@ struct NativeProviderSecretEntry: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: NativeProviderSecretEntry
         init(_ parent: NativeProviderSecretEntry) { self.parent = parent }
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard commandSelector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+            (control as? NSSecureTextField)?.stringValue = ""
+            parent.text = ""
+            parent.onCancel()
+            return true
+        }
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSSecureTextField else { return }
             parent.text = field.stringValue

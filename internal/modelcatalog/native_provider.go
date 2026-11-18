@@ -26,6 +26,7 @@ type NativeProviderInput struct {
 	Options      map[string]string `json:"options,omitempty"`
 }
 type NativeProviderRow struct {
+	IsDefault   bool              `json:"is_default"`
 	ID          string            `json:"id"`
 	Model       string            `json:"model"`
 	Stored      bool              `json:"stored"`

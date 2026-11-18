@@ -1,0 +1,9 @@
+{
+  "credential_unchanged_after_cancel": true,
+  "selected_conversation_preserved": true,
+  "draft_preserved": true,
+  "secret_outside_canonical_store": [],
+  "application_exit": "confirmed by native controller",
+  "secure_editor_escape": "passed on preceding P04 UI revision; final headless regression passed",
+  "delivery_bundle_launch_status_cancel_and_quit": "passed; final repeated CG keyboard sequence refused on external focus change"
+}

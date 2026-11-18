@@ -1,0 +1,23 @@
+{
+  "initial_head": "12ee4a43b6677f4d01a4ab6882951a35d09ac678",
+  "final_head": "12ee4a43b6677f4d01a4ab6882951a35d09ac678",
+  "production_and_existing_test_hashes_unchanged": true,
+  "preserved_files": 1500,
+  "changed_protected_files": [],
+  "tools": {
+    "Swift": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0",
+    "macOS": "26.5.2",
+    "GPU": "Apple M3, 10 GPU cores (system_profiler)",
+    "Blender": "not found on PATH or in /Applications",
+    "Reality Composer Pro": "present inside Xcode.app/Contents/Applications; not launched",
+    "ImageMagick": "installed; inspection only",
+    "FFmpeg": "installed; preview encoding only",
+    "USD tools": "system usdcat, usdzip, usdchecker"
+  },
+  "limitations": {
+    "usdzip -c text-layer attempt": "terminated with exit 138; not used by final pipeline",
+    "usdchecker": "exit 0 / Success for each final USDZ, with Apple plugin duplicate Connectable-behavior diagnostics; retained in per-model logs",
+    "native_preview": "compiled, not launched",
+    "macOS15physical": "not tested; macOS15 deployment target compiled and APIs checked on SDK26.5"
+  }
+}

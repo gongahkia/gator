@@ -1,0 +1,7 @@
+{
+  "private_store_matches_fixture": true,
+  "auth_permissions": "0o600",
+  "confirmed_provider": "openai",
+  "confirmed_model": "p04-desktop-fixture",
+  "endpoint": "http://127.0.0.1:9/v1"
+}

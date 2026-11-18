@@ -3,9 +3,10 @@ import Foundation
 public struct NativeProviderRow: Decodable, Sendable, Equatable, Identifiable {
     public let id, model, kind, issue, destination, apiVersion: String
     public let stored, ambient, expired, configured, ready: Bool
+    public let isDefault: Bool?
     public let fields: [String]
     public let options: [String: String]?
-    enum CodingKeys: String, CodingKey { case id, model, kind, issue, destination, stored, ambient, expired, configured, ready, fields, options; case apiVersion = "api_version" }
+    enum CodingKeys: String, CodingKey { case id, model, kind, issue, destination, stored, ambient, expired, configured, ready, fields, options; case apiVersion = "api_version"; case isDefault = "is_default" }
 }
 public struct NativeProviderReview: Decodable, Sendable, Equatable {
     public let id, provider, operation, model, destination, endpointMode, credentialAction: String

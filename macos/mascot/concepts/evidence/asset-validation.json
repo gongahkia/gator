@@ -1,0 +1,11 @@
+{
+  "bright_eye_pixels_blink" : 93,
+  "bright_eye_pixels_neutral" : 1782,
+  "distinct_animation_frames" : 80,
+  "frame_count" : 80,
+  "native_small_sizes" : "18 images have exact pixel dimensions and clear alpha corners",
+  "reduced_motion_equals_neutral_frame" : true,
+  "sample_antialiased_alpha_pixels" : 439,
+  "sample_opaque_pixels" : 26796,
+  "sample_transparent_pixels" : 38301
+}

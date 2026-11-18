@@ -127,6 +127,21 @@ import Testing
         #expect(parent.draftText == parentDraft); #expect(child.draftText == childDraft)
         await app.openConversation(childID)
         #expect(child.messages.contains { $0.text.contains("jade heron") }); #expect(child.draftText == "Child draft")
+        // MD03 changes future defaults while the original real Go Work keeps
+        // its captured fixture model. No request uses the newly stored key.
+        let inspected = app.current, inspectedDraft = inspected.draftText
+        app.showProviders()
+        try await managedEventually("provider status during captured Work") { !app.providers.busy && !app.providers.rows.isEmpty }
+        app.providers.selection = "openai"
+        var providerForm = try #require(app.providers.forms["openai"])
+        providerForm.model = "inert-future-model"; providerForm.endpointMode = "override"; providerForm.endpoint = "http://127.0.0.1:9/v1"
+        app.providers.forms["openai"] = providerForm
+        #expect(await app.providers.prepare(replacing: true))
+        #expect(await app.providers.save(apiKey: "P04_MANAGED_INERT_KEY_5d91"))
+        #expect(app.providers.issue.isEmpty); #expect(app.current === inspected)
+        #expect(inspected.draftText == inspectedDraft); #expect(parent.snapshot?.running == true)
+        #expect(app.ownerCount == 4); #expect(parent.snapshot?.value["source"].string == workSource)
+        app.providers.dismiss()
         try Data().write(to: root.appendingPathComponent("release-main"))
         try await managedEventually("main completion in background") { parent.snapshot?.running == false }
         #expect(app.current === child)

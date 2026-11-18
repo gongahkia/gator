@@ -33,6 +33,7 @@ struct ProviderSetupView: View {
                     ForEach(setup.rows) { row in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(verbatim: row.id).fontWeight(.medium)
+                            if row.isDefault == true { Text("Future default").font(.caption).foregroundStyle(.secondary) }
                             Text(row.ready ? "Locally ready" : row.configured ? "Configured · needs attention" : "Not configured")
                                 .font(.caption).foregroundStyle(.secondary)
                         }.padding(.vertical, 4).tag(row.id)
@@ -42,7 +43,7 @@ struct ProviderSetupView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         if let row = setup.selected {
-                            ProviderCredentialEditor(setup: setup, row: row).id(row.id + setup.editorEpoch.uuidString)
+                            ProviderCredentialEditor(setup: setup, row: row, cancel: close).id(row.id + setup.editorEpoch.uuidString)
                         } else {
                             Text(setup.busy ? "Reading provider status…" : "Select a built-in provider to configure it.").foregroundStyle(.secondary)
                         }
@@ -60,7 +61,7 @@ struct ProviderSetupView: View {
             HStack {
                 Text("Credentials stay in Gator’s private Go credential store.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Return to Chat") { close() }
+                Button("Return to Chat") { close() }.keyboardShortcut(setup.review == nil ? KeyboardShortcut.cancelAction : nil)
             }.padding(14)
         }
         .background(NativeWindowConfiguration(compact: false, registersConversation: false).frame(width: 0, height: 0))
@@ -76,7 +77,9 @@ struct ProviderSetupView: View {
 private struct ProviderCredentialEditor: View {
     @Bindable var setup: NativeProviderSetup
     let row: NativeProviderRow
+    let cancel: @MainActor () -> Void
     @State private var secret = ""
+    @State private var entryIssue = ""
     private var editing: Bool { !setup.busy && setup.review == nil && !setup.needsRefresh }
     private var form: Binding<NativeProviderForm> {
         Binding(get: { setup.forms[row.id] ?? NativeProviderForm() }, set: { setup.forms[row.id] = $0 })
@@ -89,8 +92,10 @@ private struct ProviderCredentialEditor: View {
                 Text(row.ambient ? "Ambient credential source available" : "No ambient credential source detected").font(.callout).foregroundStyle(.secondary)
                 if row.expired { NativeStatusMessage(text: "The stored credential is expired.", severity: .warning) }
                 if !row.issue.isEmpty { NativeStatusMessage(text: row.issue, severity: .warning) }
+                Text("\(row.isDefault == true ? "Current default model" : "Suggested model for setup"): \(row.model.isEmpty ? "not selected" : row.model)").font(.callout).textSelection(.enabled)
                 Text("Current processing destination: \(row.destination.isEmpty ? "not available" : row.destination)").font(.callout).textSelection(.enabled)
             }
+            if !entryIssue.isEmpty { NativeStatusMessage(text: entryIssue, severity: .error) }
             if let review = setup.review, review.provider == row.id {
                 reviewContent(review)
             } else {
@@ -112,25 +117,37 @@ private struct ProviderCredentialEditor: View {
                         } else if field == "gateway_protocol" {
                             Picker("Gateway protocol", selection: option(field)) {
                                 Text("Choose protocol").tag("")
-                                Text("OpenAI").tag("openai"); Text("Anthropic").tag("anthropic")
+                                Text("OpenAI Responses").tag("openai-responses")
+                                Text("Anthropic Messages").tag("anthropic-messages")
+                                Text("Workers AI Chat Completions").tag("workers-ai-chat-completions")
                             }
                         } else {
                             TextField(fieldLabel(field), text: option(field)).textFieldStyle(.roundedBorder)
                         }
                     }
                     Text("API key").font(.headline)
-                    NativeProviderSecretEntry(text: $secret, enabled: editing).frame(height: 24)
+                    NativeProviderSecretEntry(text: $secret, enabled: editing, onCancel: cancel).frame(height: 24)
                     Text("Empty keeps the existing credential. Saving also selects this provider/model as the future default. No request is sent to the provider.").font(.caption).foregroundStyle(.secondary)
                 }.disabled(!editing)
                 HStack {
                     Button("Cancel") { secret = ""; setup.cancelReview() }.disabled(setup.busy)
                     Spacer()
                     if row.stored { Button("Remove Credential…") { secret = ""; Task { _ = await setup.prepare(replacing: false, removal: true) } }.disabled(!setup.canReview) }
-                    Button("Review Changes…") { Task { _ = await setup.prepare(replacing: !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) } }
+                    Button("Review Changes…") { reviewChanges() }
                         .disabled(!setup.canReview).accessibilityIdentifier("gator.providers.review")
                 }
             }
         }.onDisappear { secret = "" }
+    }
+    private func reviewChanges() {
+        entryIssue = ""
+        let entered = secret.trimmingCharacters(in: .whitespacesAndNewlines), fields = form.wrappedValue
+        if !entered.isEmpty && ([fields.model, fields.endpoint, fields.apiVersion] + Array(fields.options.values)).contains(where: { $0.contains(entered) }) {
+            secret = ""; entryIssue = "API keys belong only in the secure key field. Remove credential material from configuration fields, then review again."
+            return
+        }
+        let replacing = !entered.isEmpty
+        Task { _ = await setup.prepare(replacing: replacing) }
     }
     private func option(_ field: String) -> Binding<String> {
         Binding(get: { form.wrappedValue.options[field] ?? "" }, set: { value in var updated = form.wrappedValue; updated.options[field] = value; form.wrappedValue = updated })
@@ -152,7 +169,7 @@ private struct ProviderCredentialEditor: View {
                 Text("Only this Gator-stored credential will be removed. Models and endpoints stay configured. Environment or vendor credentials may still authenticate requests.").font(.callout)
             }
             HStack {
-                Button("Cancel Review") { secret = ""; setup.cancelReview() }.disabled(setup.busy)
+                Button("Cancel Review") { secret = ""; setup.cancelReview() }.keyboardShortcut(.cancelAction).disabled(setup.busy)
                 Spacer()
                 Button(review.operation == "remove" ? "Remove Gator Credential" : "Save Reviewed Changes") {
                     let entered = secret; secret = ""

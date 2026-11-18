@@ -1,0 +1,29 @@
+Another instance of SwiftPM (PID: 67792) is already running using '/tmp/gator-native-build', waiting until that process has finished execution...[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[2/6] Write swift-version--58304C5D6DBC2206.txt
+[4/9] Compiling GatorMac ProviderSetupView.swift
+[5/9] Emitting module GatorMac
+[6/9] Compiling GatorMac NativeProviderSecretEntry.swift
+[6/11] Write Objects.LinkFileList
+[7/11] Linking GatorMac
+[8/11] Applying GatorMac
+[10/13] Emitting module GatorMacTests
+[11/13] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[11/13] Write Objects.LinkFileList
+[12/13] Linking GatorNativePackageTests
+Build complete! (4.67s)
+Test Suite 'Selected tests' started at 2026-11-18 15:57:03.493.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 15:57:03.494.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 15:57:03.494.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 15:57:03.494.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() started.
+✔ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() passed after 0.333 seconds.
+◇ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() started.
+✔ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() passed after 0.008 seconds.
+✔ Test run with 2 tests in 0 suites passed after 0.342 seconds.

@@ -1,0 +1,7 @@
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/validation/RendererLab.swift:154:9: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+152 |         let final = metrics(), elapsed = Date().timeIntervalSince(start)
+153 |         let warmFrames = renderers.flatMap(\.transitionMilliseconds).sorted()
+154 |         results.append(["phase": name, "seconds": elapsed, "cpuPercentOneCore": (final.cpu - initial.cpu) / elapsed * 100,
+    |         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+155 |                         "rssMiBSamples": samples.map { Double($0) / 1_048_576 }, "rssFinalMiB": Double(final.rss) / 1_048_576,
+156 |                         "renders": frameCount + renderers.reduce(0) { $0 + $1.renders } - initialFrames,

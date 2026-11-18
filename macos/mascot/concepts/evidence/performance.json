@@ -1,0 +1,23 @@
+{
+  "battery" : "not measured",
+  "GPU_time" : "not measured",
+  "host" : "Apple M3 10-core GPU \/ macOS 26.5.2 \/ Swift 6.3.3",
+  "offline_hold_wall" : "4.00847775 seconds",
+  "offline_no_render_hold_cpu_seconds" : 0.0004119999999999957,
+  "RealityView_idle" : "not measured",
+  "renderer" : "SCNRenderer \/ Metal \/ 4x MSAA",
+  "results" : [
+    {
+      "frames" : 120,
+      "pixels" : 96,
+      "process_cpu_seconds" : 0.027158000000000002,
+      "wall_seconds" : 0.098877666000000003
+    },
+    {
+      "frames" : 120,
+      "pixels" : 256,
+      "process_cpu_seconds" : 0.051159999999999997,
+      "wall_seconds" : 0.13410233299999999
+    }
+  ]
+}

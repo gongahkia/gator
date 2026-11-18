@@ -1,0 +1,20 @@
+{
+  "candidate": "/tmp/Gator-Native-Parity-P04.app",
+  "bundle": "dev.gator.native.p04.disposable",
+  "hashes": {
+    "Contents/MacOS/GatorMac": "4bb3a33575b3b983936913ddfaa8f16dc781c0d9e613f3e39730a55c69a1391e",
+    "Contents/Resources/gator-runtime": "0d6e86cc1b073bf96d6d70a4604d7cfe0913205aa452338ba4d09a40a7b14dcb"
+  },
+  "prior_gui_hashes": {
+    "Contents/MacOS/GatorMac": "8ee7e7ceb2aeb81d1f3374b61f5abdec742462592de09f3a9955a3f916435d5b",
+    "Contents/Resources/gator-runtime": "b1fad6b594faaaae623c5d2378f5952a56281ff4bf802954514e08f051fd305d"
+  },
+  "pre_secure_editor_hashes": {
+    "Contents/MacOS/GatorMac": "bf3e2a85e80b76d818b01212fad5f0cda629b768e075b229c7b7c7e7ec81147d",
+    "Contents/Resources/gator-runtime": "b1fad6b594faaaae623c5d2378f5952a56281ff4bf802954514e08f051fd305d"
+  },
+  "pre_keyboard_hashes": {
+    "Contents/MacOS/GatorMac": "bf3e2a85e80b76d818b01212fad5f0cda629b768e075b229c7b7c7e7ec81147d",
+    "Contents/Resources/gator-runtime": "b1fad6b594faaaae623c5d2378f5952a56281ff4bf802954514e08f051fd305d"
+  }
+}

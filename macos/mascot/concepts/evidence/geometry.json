@@ -1,0 +1,19 @@
+{
+  "A" : {
+    "meshes" : 23,
+    "triangles" : 12168,
+    "vertices" : 7135
+  },
+  "B" : {
+    "meshes" : 26,
+    "triangles" : 14164,
+    "vertices" : 8609
+  },
+  "C" : {
+    "meshes" : 22,
+    "triangles" : 11904,
+    "vertices" : 6966
+  },
+  "offline_preview_seconds" : "0.163624042 seconds",
+  "preview_frames" : 80
+}

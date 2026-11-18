@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -89,12 +90,47 @@ func safeProviderText(value string, c *auth.Credential) string {
 	}
 	return value
 }
+
+// Redact known Gator and ambient provider credentials even if a malformed
+// configuration placed another provider's secret in a public field.
+func providerRedactor(store auth.Store) (func(string) string, error) {
+	names, err := store.Providers()
+	if err != nil {
+		return nil, err
+	}
+	var secrets []string
+	for _, name := range names {
+		c, found, err := store.Read(name)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			secrets = append(secrets, providerSecretValues(&c)...)
+		}
+	}
+	for _, name := range model.Names() {
+		p, _ := model.ParseProvider(name)
+		secrets = append(secrets, os.Getenv(model.APIKeyEnvironment(p)))
+	}
+	return func(value string) string {
+		for _, secret := range secrets {
+			if secret != "" && strings.Contains(value, secret) {
+				return "[redacted]"
+			}
+		}
+		return safeProviderText(value, nil)
+	}, nil
+}
 func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error) {
 	settings, err := b.settings.Load()
 	if err != nil {
 		return nil, err
 	}
 	store, err := auth.New(b.stateDir)
+	if err != nil {
+		return nil, err
+	}
+	redact, err := providerRedactor(store)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +144,6 @@ func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error)
 		if err != nil {
 			return nil, err
 		}
-		var c *auth.Credential
-		if found {
-			c = &credential
-		}
 		selected := settings
 		selected.Defaults.Provider = id
 		selected.Defaults.Model = model.DefaultModel(p)
@@ -122,11 +154,12 @@ func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error)
 		if err != nil {
 			return nil, err
 		}
-		row := modelcatalog.NativeProviderRow{ID: id, Model: safeProviderText(status.Model, c), Stored: found, Ambient: len(remainingCredentialSources(p)) > 0, Fields: modelcatalog.NativeCloudFields(p), APIVersion: "v1", Options: map[string]string{}, Destination: safeProviderText(status.Processing.Destination, c)}
+		row := modelcatalog.NativeProviderRow{ID: id, Model: redact(status.Model), Stored: found, Ambient: len(remainingCredentialSources(p)) > 0, Fields: modelcatalog.NativeCloudFields(p), APIVersion: "v1", Options: map[string]string{}, Destination: redact(status.Processing.Destination)}
 		if found {
 			row.Kind = credentialKindLabel(credential)
 			row.Expired = credential.Expired(time.Now())
 		}
+		row.IsDefault = settings.Defaults.Provider == id
 		row.Configured = found || row.Ambient || settings.Defaults.Provider == id || settings.ProviderEndpoint(id) != "" || len(settings.OptionsForProvider(id)) > 0
 		row.Ready = status.Issue == "" && status.Provider != "" && row.Configured
 		if status.Issue != "" {
@@ -135,7 +168,7 @@ func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error)
 		for _, name := range row.Fields {
 			if name == "api_version" {
 				if u, err := url.Parse(settings.ProviderEndpoint(id)); err == nil && u.Query().Get("api-version") != "" {
-					row.APIVersion = safeProviderText(u.Query().Get("api-version"), c)
+					row.APIVersion = redact(u.Query().Get("api-version"))
 				}
 				continue
 			}
@@ -143,7 +176,7 @@ func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error)
 			if name == "gateway" && !safeProviderURL(value, false) {
 				value = ""
 			}
-			row.Options[name] = safeProviderText(value, c)
+			row.Options[name] = redact(value)
 		}
 		rows = append(rows, row)
 	}
@@ -188,6 +221,10 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 		if err != nil {
 			return fail("Private credentials could not be opened.")
 		}
+		redact, err := providerRedactor(credentials)
+		if err != nil {
+			return fail("Private credential metadata could not be read.")
+		}
 		current, found, err := credentials.Read(a.Provider)
 		if err != nil {
 			return fail("Private credentials could not be read.")
@@ -212,6 +249,11 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 				return fail("Configuration fields are required.")
 			}
 			input := a.Input
+			for _, value := range append([]string{input.Model, input.Endpoint, input.APIVersion}, providerOptionValues(input.Options)...) {
+				if redact(value) != value {
+					return fail("Configuration fields cannot contain known credential material.")
+				}
+			}
 			endpoint := settings.ProviderEndpoint(a.Provider)
 			switch input.EndpointMode {
 			case "retain":
@@ -240,7 +282,7 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 			}
 			// A retained credential must not be projected through another input field.
 			for _, value := range append([]string{setup.Model, setup.BaseURL}, providerOptionValues(setup.Options)...) {
-				if safeProviderText(value, review.credential) != value {
+				if redact(value) != value {
 					return fail("Configuration fields cannot contain stored credential material.")
 				}
 			}
@@ -248,7 +290,11 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 			review.public.Options = cloneTUIProviderOptions(setup.Options)
 			if azure {
 				u, _ := url.Parse(setup.BaseURL)
-				review.public.Options["api_version"] = u.Query().Get("api-version")
+				version := u.Query().Get("api-version")
+				if redact(version) != version {
+					return fail("Configuration fields cannot contain known credential material.")
+				}
+				review.public.Options["api_version"] = version
 			}
 			review.public.Model = setup.Model
 			review.public.EndpointMode = input.EndpointMode
@@ -283,7 +329,7 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 		if len(a.APIKey) > 16*1024 || strings.ContainsAny(a.APIKey, "\x00\r\n") {
 			return fail("The API key format is invalid. Re-enter it; nothing was saved.")
 		}
-		if a.APIKey != "" {
+		if strings.TrimSpace(a.APIKey) != "" {
 			for _, value := range append([]string{review.setup.Model, review.setup.BaseURL}, providerOptionValues(review.setup.Options)...) {
 				if strings.Contains(value, strings.TrimSpace(a.APIKey)) {
 					return fail("Credential material cannot be saved in configuration fields.")
