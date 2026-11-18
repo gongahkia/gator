@@ -155,8 +155,11 @@ func (b *nativeProviderBackend) rows() ([]modelcatalog.NativeProviderRow, error)
 func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) modelcatalog.NativeProviderResult {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	r := modelcatalog.NativeProviderResult{RequestID: a.RequestID, Action: a.Action, Provider: a.Provider}
+	r := modelcatalog.NativeProviderResult{RequestID: a.RequestID, Action: a.Action, Provider: ""}
 	fail := func(message string) modelcatalog.NativeProviderResult { r.Error = message; return r }
+	if a.Action != "save" && a.APIKey != "" {
+		return fail("Secret input is accepted only by an explicit reviewed Save.")
+	}
 	if a.Action == "status" {
 		rows, err := b.rows()
 		if err != nil {
@@ -174,6 +177,7 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 	if !ok {
 		return fail("This provider has no supported built-in API-key setup. Vendor CLI/OAuth, custom definitions and local runtime management are not available here.")
 	}
+	r.Provider = a.Provider
 	if a.Action == "review" || a.Action == "review_remove" {
 		b.review = nil
 		settings, err := b.settings.Load()
@@ -241,7 +245,11 @@ func (b *nativeProviderBackend) Apply(a modelcatalog.NativeProviderAction) model
 				}
 			}
 			review.setup = setup
-			review.public.Options = setup.Options
+			review.public.Options = cloneTUIProviderOptions(setup.Options)
+			if azure {
+				u, _ := url.Parse(setup.BaseURL)
+				review.public.Options["api_version"] = u.Query().Get("api-version")
+			}
 			review.public.Model = setup.Model
 			review.public.EndpointMode = input.EndpointMode
 			review.public.Destination = workModelProcessing(a.Provider, setup.BaseURL).Destination

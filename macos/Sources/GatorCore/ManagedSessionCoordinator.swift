@@ -20,6 +20,9 @@ public final class ManagedSessionCoordinator {
     public private(set) var started = false
     public private(set) var stopping = false
     public let catalog = NativeConversationCatalog()
+    public let providers = NativeProviderSetup()
+    @ObservationIgnored private var providerOrigin: GatorApplicationState?
+    @ObservationIgnored private var providerGeneration: UUID?
     public private(set) var workspaceChoosing = false
     public private(set) var workspaceStatus = ""
     public private(set) var workspaceIssue = ""
@@ -76,6 +79,7 @@ public final class ManagedSessionCoordinator {
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
+        if providers.busy { return "A provider configuration operation awaits Go confirmation. Quit waits for its outcome; an unconfirmed change is never replayed." }
         if workspaceChoosing { return "A workspace choice is pending. Quit keeps existing conversations and drafts; no workspace transition is replayed." }
         if catalog.acting { return "A conversation catalog operation is awaiting Go confirmation. Quitting stops the owner; an unconfirmed title change must be inspected after reopening, never replayed automatically." }
         if switching || !uncertain.isEmpty { return "A chat transition or task-control outcome is unconfirmed. Quit stops all Go owners and preserves retained work; nothing is replayed on restart." }
@@ -154,6 +158,7 @@ public final class ManagedSessionCoordinator {
         return nil
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
+        if owner === providerOrigin && providers.retainsHost { return false }
         if owner === workspaceOrigin && workspaceChoosing { return false }
         if owner === catalogOrigin && catalog.retainsHost { return false }
         guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, owner.attachmentImport == nil, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
@@ -294,6 +299,25 @@ public final class ManagedSessionCoordinator {
             await settled()
         }
     }
+    public func showProviders() {
+        guard started, !stopping else { return }
+        if !providers.busy, !providers.isPresented || providerOrigin?.isConnected != true || providerGeneration != providerOrigin?.generation {
+            providerOrigin = current; providerGeneration = current.generation
+        }
+        let origin = providerOrigin, generation = providerGeneration
+        providers.present { [weak self, weak origin] request in
+            guard let self, let origin, origin.isConnected, origin.generation == generation else { throw BridgeFailure("Provider setup owner changed. Reconnect explicitly, reopen and refresh.") }
+            let result = try await origin.nativeProvider(request)
+            if result.confirmed && result.changed {
+                for owner in self.records.values where owner !== origin && owner.isConnected && !owner.closing {
+                    do { try await owner.host(.refreshPreferences) }
+                    catch { self.issue = "Provider settings were saved, but a cached chat could not refresh its future configuration. Reconnect it explicitly when ready." }
+                }
+            }
+            return result
+        }
+    }
+
     public func showCatalog() {
         guard started, !stopping else { return }
         if catalog.isPresented, catalogOrigin?.isConnected == true, catalogGeneration == catalogOrigin?.generation { catalog.focusSearch(); return }
@@ -626,6 +650,7 @@ public final class ManagedSessionCoordinator {
         for owner in records.values { owner.beginClosing() }
         catalog.cancelSearch()
         await catalog.finishActions()
+        await providers.finishOperation()
         var success = false
         defer {
             if !success {

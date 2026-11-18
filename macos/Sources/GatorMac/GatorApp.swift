@@ -44,6 +44,7 @@ struct GatorApp: App {
                 Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
             }
             CommandMenu("Conversation") {
+                ModelsAndProvidersButton(sessions: application)
                 ChooseWorkspaceButton(sessions: application)
                 AllConversationsButton(sessions: application).keyboardShortcut("o", modifiers: [.command, .shift])
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
@@ -62,6 +63,12 @@ struct GatorApp: App {
                     .keyboardShortcut("n").disabled(!application.canNavigate)
             }
         }
+
+        Window("Models and Providers", id: "providers") {
+            ProviderSetupView(sessions: application).frame(minWidth: 560, minHeight: 500)
+        }
+        .defaultSize(width: 820, height: 720)
+        .defaultLaunchBehavior(.suppressed)
 
         Window("All Conversations", id: "catalog") {
             ConversationCatalogView(sessions: application).frame(minWidth: 540, minHeight: 480)

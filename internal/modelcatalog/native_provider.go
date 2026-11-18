@@ -90,7 +90,7 @@ func NormalizeNativeCloudSetup(setup CloudModelSetup, version string) (CloudMode
 	for name := range setup.Options {
 		found := false
 		for _, field := range allowed {
-			if name == field {
+			if name == field && field != "api_version" {
 				found = true
 			}
 		}

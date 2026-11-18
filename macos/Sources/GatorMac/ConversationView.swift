@@ -81,6 +81,7 @@ struct ConversationView: View {
             if !compact {
                 ToolbarItem(placement: .navigation) { RecentConversationsMenu() }
                 ToolbarItem { ChooseWorkspaceButton(sessions: sessions).labelStyle(.iconOnly) }
+                ToolbarItem { ModelsAndProvidersButton(sessions: sessions).labelStyle(.iconOnly) }
                 ToolbarItemGroup(placement: .primaryAction) { headerActions }
             }
         }
@@ -155,6 +156,7 @@ struct ConversationView: View {
                 if application.snapshot?.value["recent_conversations"].array.isEmpty != false { Text("No recent conversations") }
             }
             AllConversationsButton(sessions: sessions)
+            ModelsAndProvidersButton(sessions: sessions)
             ChooseWorkspaceButton(sessions: sessions)
             Divider()
             Menu("Configured Models") { modelChoices }

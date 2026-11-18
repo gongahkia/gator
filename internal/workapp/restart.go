@@ -3,6 +3,9 @@ package workapp
 // RestartBlockReason is checked inside the application message loop, after
 // earlier submitted actions. A stale host snapshot cannot authorize shutdown.
 func (m Model) RestartBlockReason() string {
+	if m.nativeProviderPending != "" {
+		return "Wait for provider configuration confirmation before restarting."
+	}
 	if m.nativeCatalog != nil && m.nativeCatalog.acting {
 		return "Wait for the conversation title change before restarting."
 	}
