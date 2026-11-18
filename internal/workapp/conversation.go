@@ -92,6 +92,7 @@ func (m *Model) beginChat(source string) bool {
 // and history navigation, ensuring each path has identical transcript and
 // artifact-card semantics.
 func (m *Model) restoreConversation(conversationID, announcement string) {
+	m.conversationLoadIssue = ""
 	m.input = ""
 	m.clearPromptHistory()
 	m.queue = nil
@@ -107,6 +108,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	if m.config.LoadConversation != nil {
 		state, err := m.config.LoadConversation(conversationID)
 		if err != nil {
+			m.conversationLoadIssue = err.Error()
 			m.status = "Restore conversation: " + err.Error()
 			return
 		}
@@ -116,6 +118,7 @@ func (m *Model) restoreConversation(conversationID, announcement string) {
 	if m.config.LoadConversationOptions != nil {
 		options, err := m.config.LoadConversationOptions(conversationID)
 		if err != nil {
+			m.conversationLoadIssue = err.Error()
 			m.status = "Load conversation settings: " + err.Error()
 			return
 		}

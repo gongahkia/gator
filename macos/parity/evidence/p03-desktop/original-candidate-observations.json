@@ -1,0 +1,20 @@
+{
+  "root": "/tmp/gator-native-test-p03-acceptance-hewe1mpn",
+  "bundle": "dev.gator.native.p03.acceptance",
+  "original": "work-20261118T060750-01519f44ccceba61",
+  "aID": "work-20261118T061508-dd2ad5e43041d017",
+  "a": "/tmp/gator-native-test-p03-acceptance-hewe1mpn/Workspace A",
+  "b": "/tmp/gator-native-test-p03-acceptance-hewe1mpn/A deliberately long parent folder for readable truncated workspace paths with spaces and caf\u00e9 \u65e5\u672c/Workspace B",
+  "observedIssue": "The workspace transition does not match the original source. Choose again.",
+  "bMetadata": [
+    {
+      "version": 2,
+      "id": "work-20261118T061630-bc2c7d79d012238b",
+      "title": "New chat",
+      "source_path": "/private/tmp/gator-native-test-p03-acceptance-hewe1mpn/A deliberately long parent folder for readable truncated workspace paths with spaces and cafe\u0301 \u65e5\u672c/Workspace B",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T06:16:30.013236Z",
+      "updated_at": "2026-11-18T06:16:30.013236Z"
+    }
+  ]
+}

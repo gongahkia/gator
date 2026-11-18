@@ -1,0 +1,86 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[1/7] Write swift-version--58304C5D6DBC2206.txt
+[3/24] Compiling GatorCore NativeMessageContent.swift
+[4/24] Compiling GatorCore NativePlanExecution.swift
+[5/24] Compiling GatorCore NativeTaskReview.swift
+[6/24] Compiling GatorCore NativeTranscriptSearch.swift
+[7/26] Compiling GatorCore NativeUploadStore.swift
+[8/26] Compiling GatorCore NativeWorkspaceSelection.swift
+[9/26] Compiling GatorCore NativeRecovery.swift
+[10/26] Compiling GatorCore NativeRecoveryPreparation.swift
+[11/26] Compiling GatorCore NativeDraftAttachments.swift
+[12/26] Compiling GatorCore NativeDraftStore.swift
+[13/26] Compiling GatorCore GoBridgeConnection.swift
+[14/26] Compiling GatorCore ManagedSessionCoordinator.swift
+[15/26] Compiling GatorCore ManagedSessionProtocol.swift
+[16/26] Compiling GatorCore NativeCatalogProtocol.swift
+[17/26] Compiling GatorCore NativeConversationCatalog.swift
+[18/26] Emitting module GatorCore
+[19/26] Compiling GatorCore BridgePipeIO.swift
+[20/26] Compiling GatorCore BridgeProtocol.swift
+[21/26] Compiling GatorCore GatorApplicationState.swift
+[22/81] Compiling GatorCoreTests NativeCatalogTests.swift
+[23/81] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[24/81] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[25/84] Emitting module GatorMac
+[26/84] Compiling GatorCoreTests ApplicationStateTests.swift
+[27/84] Compiling GatorCoreTests BridgeProtocolTests.swift
+[28/84] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[29/84] Compiling GatorCoreTests GoIntegrationTests.swift
+[30/84] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[31/84] Compiling GatorCoreTests ManagedSessionTests.swift
+[32/84] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[33/84] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[34/84] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[35/84] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[36/84] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[37/84] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[38/84] Compiling GatorMac RecoveryInspectorContent.swift
+[39/84] Compiling GatorMac RecoveryPreparationView.swift
+[40/84] Compiling GatorMac TaskInspectorView.swift
+[45/84] Emitting module GatorCoreTests
+[46/88] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[47/88] Compiling GatorCoreTests NativeMessageContentTests.swift
+[48/88] Compiling GatorCoreTests NativePerformanceTests.swift
+[49/88] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[53/88] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[54/88] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[55/88] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[56/88] Compiling GatorCoreTests NativeRecoveryTests.swift
+[57/88] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[66/88] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[70/88] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[71/88] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[72/88] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[73/88] Compiling GatorCoreTests resource_bundle_accessor.swift
+[83/87] Linking GatorMac
+[84/87] Applying GatorMac
+[86/93] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[87/93] Emitting module GatorMacTests
+[88/93] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[89/93] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[90/93] Compiling GatorMacTests NotchGeometryTests.swift
+[91/93] Compiling GatorMacTests NativeInputTests.swift
+[92/95] Emitting module GatorNativePackageTests
+[93/95] Compiling GatorNativePackageTests runner.swift
+[93/95] Write Objects.LinkFileList
+[94/95] Linking GatorNativePackageTests
+Build complete! (18.39s)
+Test Suite 'Selected tests' started at 2026-11-18 14:19:12.370.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 14:19:12.371.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 14:19:12.371.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 14:19:12.371.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() started.
+✘ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() recorded an issue at NativeWorkspaceIntegrationTests.swift:174:5: Expectation failed: (app.workspaceIssue → "The workspace transition does not match the original source. Choose again. Open a retained conversation from Recent or All Conversations to review the outcome before choosing again. No transition is replayed.").isEmpty → false
+✘ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() recorded an issue at NativeWorkspaceIntegrationTests.swift:175:5: Expectation failed: (app.current → GatorCore.GatorApplicationState) !== (original → GatorCore.GatorApplicationState)
+✘ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() recorded an issue at NativeWorkspaceIntegrationTests.swift:176:5: Expectation failed: (app.workspaceSource → "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-native-test-B3761D31-B57F-4985-8853-A8A7845B55CC/workspace") == (folder → "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-native-test-B3761D31-B57F-4985-8853-A8A7845B55CC/Folder café 日本")
+✘ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() recorded an issue at NativeWorkspaceTests.swift:6:21: Expectation failed: (app → GatorCore.ManagedSessionCoordinator).beginWorkspaceChoice() → nil
+✘ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() failed after 2.773 seconds with 4 issues.
+✘ Test run with 1 test in 0 suites failed after 2.773 seconds with 4 issues.

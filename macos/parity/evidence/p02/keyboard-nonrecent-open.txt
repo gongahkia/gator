@@ -1,0 +1,12 @@
+press AXMenuItem::All Conversations… -> press AXMenuItem::All Conversations…: 0
+focused -> AXOutline Retained conversation results gator.catalog.window
+inspect Open -> focused=Optional(0) enabled=Optional(1) position=(804.0, 629.0) size=(57.0, 24.0) value=
+focused-window -> catalog
+set gator.composer.text Older independent GUI draft -> 0
+PASS: Command-F, Tab to result list, Down Arrow and Return opened the exact older result outside recents
+Go PIDs before=61432; after=61432
+77086
+press AXMenuItem::All Conversations… -> press AXMenuItem::All Conversations…: 0
+select-row gator.catalog.row.work-20261118T025136-9ffbb6e952f09c8f -> 0
+press Open -> press Open: 0
+PASS: repeated open reused the same two Go owners

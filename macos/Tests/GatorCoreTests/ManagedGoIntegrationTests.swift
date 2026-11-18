@@ -111,6 +111,20 @@ import Testing
         try await managedEventually("host stop accepted by original child") { parent.snapshot?.value["dialogue"].array.contains { $0["text"].string == "Stop research target" && $0["state"].string == "stopped" } == true }
         #expect(parent.snapshot?.running == true)
         #expect(app.ownerCount == 3)
+        // AS05 opens an idle owner without changing the still-running original
+        // task's captured source, approvals, dialogue or draft.
+        let workSource = parent.snapshot?.value["source"].string, childSource = child.snapshot?.value["source"].string
+        let project = root.appendingPathComponent("Workspace café during background work")
+        try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let parentDraft = parent.draftText, childDraft = child.draftText
+        try await chooseWorkspace(app, project.path)
+        #expect(app.workspaceIssue.isEmpty); #expect(app.ownerCount == 4)
+        #expect(app.workspaceSource == (try workspaceFixtureCanonical(project.path)))
+        #expect(app.current.snapshot?.running == false); #expect(app.current.snapshot?.hasApproval == false)
+        #expect(app.current.draftText.isEmpty); #expect(app.current.draftUploads.isEmpty); #expect(app.current.pendingSubmission == nil)
+        #expect(parent.snapshot?.running == true); #expect(parent.snapshot?.value["source"].string == workSource)
+        #expect(child.snapshot?.value["source"].string == childSource)
+        #expect(parent.draftText == parentDraft); #expect(child.draftText == childDraft)
         await app.openConversation(childID)
         #expect(child.messages.contains { $0.text.contains("jade heron") }); #expect(child.draftText == "Child draft")
         try Data().write(to: root.appendingPathComponent("release-main"))

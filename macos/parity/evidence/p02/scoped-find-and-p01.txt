@@ -1,0 +1,16 @@
+set gator.composer.text Unsent main draft across global search -> 0
+set Find in loaded transcript 0309-13 -> 0
+press AXMenuItem::All Conversations… -> press AXMenuItem::All Conversations…: 0
+inspect Search all retained conversations -> focused=Optional(1) enabled=Optional(1) position=(372.5, 201.0) size=(424.5, 24.0) value=Retained topic 0005
+inspect Find in loaded transcript -> focused=Optional(0) enabled=Optional(1) position=(362.5, 185.0) size=(593.5, 24.0) value=0309-13
+close-catalog -> 0
+inspect Find in loaded transcript -> focused=Optional(0) enabled=Optional(1) position=(362.5, 185.0) size=(593.5, 24.0) value=0309-13
+inspect gator.composer.text -> focused=Optional(0) enabled=nil position=(349.0, 721.0) size=(772.0, 76.0) value=Unsent main draft across global search
+heads -> Jump to Latest at (667.5, 623.0) size (135.5, 24.0)
+Retained note 0309-11 at (373.0, -232.12469482421875) size (163.0, 19.12469482421875)
+Retained note 0309-12 at (373.0, 27.87529754638672) size (165.0, 19.12470245361328)
+Retained note 0309-13 at (373.0, 287.8752899169922) size (165.5, 19.124710083007812)
+Retained note 0309-14 at (373.0, 547.8753051757812) size (165.5, 19.12469482421875)
+Retained note 0309-15 at (373.0, 807.8753051757812) size (165.5, 19.12469482421875)
+Retained note 0309-16 at (373.0, 1067.8753051757812) size (165.5, 19.12469482421875)
+PASS: scoped Command-F; closing catalog retained transcript Find, exact reading target and unsent draft

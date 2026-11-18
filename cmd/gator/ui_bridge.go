@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	NativeWorkspace        *workapp.NativeWorkspaceAction     `json:"native_workspace,omitempty"`
 	ConversationMetadataID string                             `json:"conversation_id,omitempty"`
 	NativeCatalog          *workapp.NativeCatalogAction       `json:"native_catalog,omitempty"`
 	RequestRecovery        *workapp.RequestRecoveryAction     `json:"request_recovery,omitempty"`
@@ -71,6 +72,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "native_workspace":
+			if frame.NativeWorkspace == nil {
+				return m, nil
+			}
+			next, command = m.model.ResolveNativeWorkspace(*frame.NativeWorkspace)
 		case "native_catalog":
 			if frame.NativeCatalog == nil {
 				return m, nil

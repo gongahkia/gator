@@ -1,0 +1,55 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+[2/20] Compiling GatorCore NativeConversationCatalog.swift
+[3/20] Compiling GatorCore NativeDraftAttachments.swift
+[4/22] Compiling GatorCore NativePlanExecution.swift
+[5/22] Compiling GatorCore NativeRecovery.swift
+[6/22] Compiling GatorCore NativeRecoveryPreparation.swift
+[7/22] Compiling GatorCore NativeTaskReview.swift
+[8/22] Compiling GatorCore NativeDraftStore.swift
+[9/22] Compiling GatorCore NativeMessageContent.swift
+[10/22] Compiling GatorCore NativeTranscriptSearch.swift
+[11/22] Compiling GatorCore NativeUploadStore.swift
+[12/22] Compiling GatorCore GoBridgeConnection.swift
+[13/22] Compiling GatorCore ManagedSessionCoordinator.swift
+[14/22] Emitting module GatorCore
+[15/22] Compiling GatorCore ManagedSessionProtocol.swift
+[16/22] Compiling GatorCore NativeCatalogProtocol.swift
+[17/22] Compiling GatorCore BridgePipeIO.swift
+[18/22] Compiling GatorCore BridgeProtocol.swift
+[19/22] Compiling GatorCore GatorApplicationState.swift
+[20/47] Compiling GatorMac NativeErrorDisclosure.swift
+[21/47] Compiling GatorMac NativeMessageBody.swift
+[22/47] Compiling GatorMac NativeReadingPositions.swift
+[23/50] Compiling GatorMac NativeComposer.swift
+[24/50] Compiling GatorMac NativeComposerPresentation.swift
+[25/50] Compiling GatorMac NativeDropInput.swift
+[26/50] Emitting module GatorMac
+[27/50] Compiling GatorMac NativeStatusMessage.swift
+[28/50] Compiling GatorMac NativeTranscriptFind.swift
+[29/50] Compiling GatorMac NativeWindowConfiguration.swift
+[30/50] Compiling GatorMac AppDelegate.swift
+[31/50] Compiling GatorMac ApprovalReviewView.swift
+[32/50] Compiling GatorMac AttachmentSelectionView.swift
+[33/50] Compiling GatorMac ComposerView.swift
+[34/50] Compiling GatorMac GatorApp.swift
+[35/50] Compiling GatorMac MenuBarVisibilityToggle.swift
+[36/50] Compiling GatorMac NativeAccessibilityStatus.swift
+[37/50] Compiling GatorMac NativeAttachmentActions.swift
+[38/50] Compiling GatorMac RecoveryInspectorContent.swift
+[39/50] Compiling GatorMac RecoveryPreparationView.swift
+[40/50] Compiling GatorMac TaskInspectorView.swift
+[41/50] Compiling GatorMac NotchQuickAccess.swift
+[42/50] Compiling GatorMac PlanReviewContent.swift
+[43/50] Compiling GatorMac RecentConversationsMenu.swift
+[44/50] Compiling GatorMac ConversationCatalogView.swift
+[45/50] Compiling GatorMac ConversationView.swift
+[46/50] Compiling GatorMac ExactDecisionButton.swift
+[47/50] Compiling GatorMac ExactReviewContent.swift
+[47/49] Linking GatorMac
+[48/49] Applying GatorMac
+Build complete! (9.91s)
+/tmp/gator-native-app.2NseXs/Gator.app/Contents/Info.plist: OK
+Built /tmp/Gator-Native-Parity-P02.app
+Launch: open '/tmp/Gator-Native-Parity-P02.app'

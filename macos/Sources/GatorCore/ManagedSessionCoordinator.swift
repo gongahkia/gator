@@ -20,6 +20,18 @@ public final class ManagedSessionCoordinator {
     public private(set) var started = false
     public private(set) var stopping = false
     public let catalog = NativeConversationCatalog()
+    public private(set) var workspaceChoosing = false
+    public private(set) var workspaceStatus = ""
+    public private(set) var workspaceIssue = ""
+    public private(set) var workspaceNeedsReview = false
+    @ObservationIgnored private var workspaceStartAttempted = false
+    @ObservationIgnored private var workspaceResolving = false
+    @ObservationIgnored private var workspaceChoice: UUID?
+    @ObservationIgnored private var workspaceOrigin: GatorApplicationState?
+    @ObservationIgnored private var workspaceGeneration: UUID?
+    public var workspaceSource: String { current.snapshot?.value["source"].string ?? "" }
+    public var canChooseWorkspace: Bool { canNavigate && current.isConnected && !workspaceChoosing && !workspaceNeedsReview }
+
     @ObservationIgnored private var catalogOrigin: GatorApplicationState?
     @ObservationIgnored private var catalogGeneration: UUID?
     private var inspections: [String: NativeTaskInspection] = [:]
@@ -64,6 +76,7 @@ public final class ManagedSessionCoordinator {
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
+        if workspaceChoosing { return "A workspace choice is pending. Quit keeps existing conversations and drafts; no workspace transition is replayed." }
         if catalog.acting { return "A conversation catalog operation is awaiting Go confirmation. Quitting stops the owner; an unconfirmed title change must be inspected after reopening, never replayed automatically." }
         if switching || !uncertain.isEmpty { return "A chat transition or task-control outcome is unconfirmed. Quit stops all Go owners and preserves retained work; nothing is replayed on restart." }
         let held = records.values.filter { $0.quitGuard != nil }
@@ -141,12 +154,13 @@ public final class ManagedSessionCoordinator {
         return nil
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
+        if owner === workspaceOrigin && workspaceChoosing { return false }
         if owner === catalogOrigin && catalog.retainsHost { return false }
         guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, owner.attachmentImport == nil, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
     }
-    private func create(id: String = "", new: Bool = false, source: String = "") async throws -> GatorApplicationState {
+    private func create(id: String = "", new: Bool = false, source: String = "", workspaceSelection: Bool = false) async throws -> GatorApplicationState {
         if !id.isEmpty, let existing = owners[id] {
             guard existing.isConnected else { throw BridgeFailure("The original task owner is disconnected. Open it and reconnect explicitly; no second owner was started.") }
             return existing
@@ -160,19 +174,21 @@ public final class ManagedSessionCoordinator {
         var config = configuration; config.conversationID = id; config.bootMode = new ? "new" : ""; config.startSource = source
         let owner = GatorApplicationState(configuration: config, store: store, responseTimeout: admissionTimeout, uploads: uploads, factory: factory), key = UUID()
         records[key] = owner; order.append(key); expected[key] = id; observe(owner)
+        if workspaceSelection { workspaceStartAttempted = true }
         await owner.start()
         do { try await owner.awaitReady(); try validateIdentity(owner) }
         catch { _ = await owner.shutdown(confirmed: true); records.removeValue(forKey: key); order.removeAll { $0 == key }; expected.removeValue(forKey: key); seenSessions.removeValue(forKey: key); seenDispatches.removeValue(forKey: key); hostSignatures.removeValue(forKey: key); throw error }
         scheduleHostProjection(); return owner
     }
-    private func select(id: String = "", new: Bool = false, source: String = "", catalogItem: NativeCatalogItem? = nil) async throws {
-        switching = true; issue = ""; defer { switching = false }
+    private func select(id: String = "", new: Bool = false, source: String = "", catalogItem: NativeCatalogItem? = nil, expectedSource: String? = nil) async throws {
+        switching = true; issue = ""; workspaceStatus = ""; defer { switching = false }
         let previous = current
         let wasCached = !id.isEmpty && owners[id] != nil
         var next: GatorApplicationState?
         do {
             if let catalogItem, previous.conversationID == id, previous.isConnected {
                 try await verifyCatalogOwner(previous, item: catalogItem)
+                workspaceNeedsReview = false
                 return
             }
             if previous.isConnected { try await focus(previous, false) }
@@ -182,7 +198,11 @@ public final class ManagedSessionCoordinator {
                 issue = "This owner disconnected. Reconnect explicitly to inspect its durable state; nothing is replayed."
                 return
             }
-            let owner = try await create(id: id, new: new, source: source); next = owner
+            let owner = try await create(id: id, new: new, source: source, workspaceSelection: expectedSource != nil); next = owner
+            if let expectedSource {
+                let confirmed = try await owner.resolveWorkspace(NativeWorkspaceRequest(path: expectedSource))
+                guard confirmed.source == expectedSource, !confirmed.new, owner.snapshot?.value["source"].string == expectedSource, owner.conversationID != previous.conversationID, owner.snapshot?.unsafeToNavigate == false, owner.pendingSubmission == nil, owner.recovery?.unresolved != true, owner.receiptOperation?.unresolved != true else { throw BridgeFailure("The new owner did not confirm the chosen workspace and an idle conversation. Original conversation kept; inspect retained chats before retrying.") }
+            }
             if let catalogItem {
                 try await verifyCatalogOwner(owner, item: catalogItem)
             }
@@ -190,9 +210,10 @@ public final class ManagedSessionCoordinator {
             guard !stopping else { throw BridgeFailure("Gator is closing.") }
             try await store.selectConversation(owner.conversationID)
             current = owner; attention.removeValue(forKey: owner.conversationID)
+            if expectedSource == nil { workspaceNeedsReview = false; workspaceIssue = "" }
         } catch {
             if let next, next !== previous, next.isConnected { try? await focus(next, false) }
-            if catalogItem != nil, !wasCached, let next, disposable(next), let key = key(for: next), await next.shutdown() {
+            if (catalogItem != nil || expectedSource != nil), !wasCached, let next, disposable(next), let key = key(for: next), await next.shutdown() {
                 records.removeValue(forKey: key); order.removeAll { $0 == key }; hostSignatures.removeValue(forKey: key); seenSessions.removeValue(forKey: key); seenDispatches.removeValue(forKey: key); expected.removeValue(forKey: key)
             }
             if previous.isConnected { try? await focus(previous, true) }
@@ -205,6 +226,50 @@ public final class ManagedSessionCoordinator {
         let result = try await owner.nativeCatalog(verification)
         guard result.error?.isEmpty != false, result.item?.id == item.id, result.item?.version == item.version, result.item?.source == item.source else { throw BridgeFailure(result.error ?? "The destination conversation changed. Refresh and select it again.") }
     }
+    /// Reserves one picker/validation transaction across all native surfaces.
+    public func beginWorkspaceChoice() -> UUID? {
+        guard canChooseWorkspace else { return nil }
+        let token = UUID()
+        workspaceChoice = token; workspaceOrigin = current; workspaceGeneration = current.generation
+        workspaceChoosing = true; workspaceIssue = ""; workspaceStatus = ""; workspaceStartAttempted = false
+        return token
+    }
+    public func finishWorkspaceChoice(_ token: UUID, path: String?) async {
+        guard !workspaceResolving, workspaceChoice == token, let origin = workspaceOrigin, let generation = workspaceGeneration else { return }
+        workspaceResolving = true
+        defer {
+            workspaceResolving = false; workspaceChoosing = false; workspaceChoice = nil; workspaceOrigin = nil; workspaceGeneration = nil
+        }
+        guard let path else { workspaceStatus = ""; return }
+        workspaceStatus = "Validating workspace…"
+        do {
+            guard !stopping, origin === current, origin.generation == generation else { throw BridgeFailure("The selected conversation changed. Choose the workspace again.") }
+            let result = try await origin.resolveWorkspace(NativeWorkspaceRequest(path: path))
+            guard !stopping, origin === current, origin.generation == generation else { throw BridgeFailure("The selected conversation changed during validation. Original workspace kept; choose again.") }
+            guard let source = result.source else { throw BridgeFailure("No workspace was confirmed.") }
+            if !result.new {
+                guard source == workspaceSource else { throw BridgeFailure("Workspace identity changed. Choose again.") }
+                workspaceStatus = "Already using this workspace · conversation kept"
+                return
+            }
+            workspaceStatus = "Opening a new conversation…"
+            var failure: (any Error)?
+            await enqueue { [self] in
+                do {
+                    guard origin === current, origin.generation == generation else { throw BridgeFailure("The selected conversation changed before opening. Choose again.") }
+                    try await select(new: true, source: source, expectedSource: source)
+                } catch { failure = error }
+            }.value
+            if let failure { throw failure }
+            guard !stopping, current !== origin, workspaceSource == source else { throw BridgeFailure("Workspace transition was not confirmed. Inspect retained conversations before retrying; nothing was replayed.") }
+            workspaceStatus = "New conversation · workspace stays read-only during Work"
+        } catch {
+            workspaceStatus = ""; workspaceNeedsReview = workspaceStartAttempted
+            workspaceIssue = error.localizedDescription
+            if workspaceNeedsReview { workspaceIssue += " Open a retained conversation from Recent or All Conversations to review the outcome before choosing again. No transition is replayed." }
+        }
+    }
+
     public func newConversation() async {
         let origin = current
         await enqueue { [self] in

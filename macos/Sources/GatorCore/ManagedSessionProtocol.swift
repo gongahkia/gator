@@ -50,6 +50,7 @@ struct DialogueControl: Sendable {
 }
 
 enum HostCommand: Sendable {
+    case workspace(NativeWorkspaceRequest)
     case catalog(NativeCatalogRequest)
     case refreshConversations(String)
     case focus(Bool)
@@ -60,6 +61,7 @@ enum HostCommand: Sendable {
     case refreshPreferences
     var fields: [String: JSONValue] {
         switch self {
+        case .workspace(let request): return ["type": .string("native_workspace"), "native_workspace": .object(request.fields)]
         case .catalog(let request): return ["type": .string("native_catalog"), "native_catalog": .object(request.fields)]
         case .refreshConversations(let id): return ["type": .string("refresh_conversations"), "conversation_id": .string(id)]
         case .focus(let foreground): return ["type": .string("focus_session"), "foreground": .bool(foreground)]

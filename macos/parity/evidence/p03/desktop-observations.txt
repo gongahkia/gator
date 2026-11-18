@@ -1,0 +1,14 @@
+Disposable profile: /tmp/gator-native-test-p03-60anfx0w
+Bundle: dev.gator.native.p03-disposable
+Initial valid launch PID 8354. Native picker opened; cancellation retained original conversation/source/draft.
+Observed full-window outer size: 820 x 740.
+Keyboard/reveal and successful selection NOT VERIFIED because foreground repeatedly moved to another application; no keystrokes were sent after the frontmost guard failed.
+A first hand-built fixture omitted the required draft revision; fixed only the disposable fixture and relaunched. No production persistence code changed.
+Final native observations after cancellation:
+ AXWindow | Gator – Retained topic 0005 |  |  | conversation
+   AXStaticText |  |  | Current workspace: /tmp/gator-native-test-p03-60anfx0w/workspace | gator.window
+   AXStaticText |  |  | Read-only in Work | gator.window
+    AXTextArea |  | Message Gator | Unsent original workspace draft | gator.composer.text
+   AXButton |  | Choose Workspace… |  | folder
+    AXMenuItem | Choose Workspace… |  |  | menuAction:
+Normal Quit returned exit 0; all fixture apps were stopped.

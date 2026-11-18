@@ -1,0 +1,87 @@
+{
+  "phase": "accepted-after-a",
+  "selected": "work-20261118T062839-f28f8059deef77fe",
+  "source": "/private/tmp/gator-native-test-p03-acceptance-6f8he7dl/Workspace A",
+  "drafts": {
+    "conversation:work-20261118T062719-3602b39d79f02ac6": {
+      "text": "Original acceptance draft stays here",
+      "updated": 816676040.7464509,
+      "revision": "C6CDD267-1ECB-491E-BFF5-B8EEE6CD513D"
+    }
+  },
+  "children": [
+    "23377",
+    "24623"
+  ],
+  "records": {
+    "work-20261118T062719-3602b39d79f02ac6": {
+      "version": 2,
+      "id": "work-20261118T062719-3602b39d79f02ac6",
+      "title": "Retained topic 0005",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:05:00Z",
+      "updated_at": "2026-11-18T00:05:00Z"
+    },
+    "work-20261118T062719-4e769c2242eee485": {
+      "version": 2,
+      "id": "work-20261118T062719-4e769c2242eee485",
+      "title": "Retained topic 0001",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:01:00Z",
+      "updated_at": "2026-11-18T00:01:00Z"
+    },
+    "work-20261118T062719-8fe8bad9e9f70ae3": {
+      "version": 2,
+      "id": "work-20261118T062719-8fe8bad9e9f70ae3",
+      "title": "Retained topic 0002",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:02:00Z",
+      "updated_at": "2026-11-18T00:02:00Z"
+    },
+    "work-20261118T062719-56e09c857686fc00": {
+      "version": 2,
+      "id": "work-20261118T062719-56e09c857686fc00",
+      "title": "Retained topic 0004",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:04:00Z",
+      "updated_at": "2026-11-18T00:04:00Z"
+    },
+    "work-20261118T062839-f28f8059deef77fe": {
+      "version": 2,
+      "id": "work-20261118T062839-f28f8059deef77fe",
+      "title": "New chat",
+      "source_path": "/private/tmp/gator-native-test-p03-acceptance-6f8he7dl/Workspace A",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T06:28:39.88495Z",
+      "updated_at": "2026-11-18T06:28:39.88495Z"
+    },
+    "work-20261118T062719-90ea94e2c569edfa": {
+      "version": 2,
+      "id": "work-20261118T062719-90ea94e2c569edfa",
+      "title": "Retained topic 0000",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "snap-fixture",
+      "head_revision_id": "rev-catalog-fixture",
+      "created_at": "2026-11-18T00:00:00Z",
+      "updated_at": "2026-11-18T00:00:00Z"
+    },
+    "work-20261118T062719-c9e29b53c7a3664c": {
+      "version": 2,
+      "id": "work-20261118T062719-c9e29b53c7a3664c",
+      "title": "Retained topic 0003",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:03:00Z",
+      "updated_at": "2026-11-18T00:03:00Z"
+    }
+  },
+  "selectedFiles": [
+    ".metadata.lock",
+    "conversation.json",
+    ".execution.lock"
+  ]
+}

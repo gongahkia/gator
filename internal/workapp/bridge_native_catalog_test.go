@@ -156,6 +156,22 @@ func TestNativeCatalogRenameCASReviewAndDuplicateSuppression(t *testing.T) {
 	}
 }
 
+func TestNativeCatalogDestinationVerificationRefreshesACachedCanonicalTitle(t *testing.T) {
+	m, s, _ := nativeCatalogFixture(t, 1)
+	c, err := s.Load(m.conversation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err = s.OrganizeConversation(worksession.ConversationChange{ID: c.ID, Version: worksession.ConversationDisplayVersion(c), Action: "rename", Title: "Changed by another client"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = nativeCatalogAction(t, m, NativeCatalogAction{RequestID: "verify-renamed-cache", Action: "verify", ID: c.ID, Version: worksession.ConversationDisplayVersion(c)})
+	if m.nativeCatalogActionResult.Error != "" || m.title != c.Title || !m.running {
+		t.Fatal("canonical selection retained a stale title", m.title, m.nativeCatalogActionResult)
+	}
+}
+
 func TestNativeCatalogSupersessionCancelAndResultIsolation(t *testing.T) {
 	m, _, _ := nativeCatalogFixture(t, 1)
 	var contexts []context.Context
@@ -166,8 +182,10 @@ func TestNativeCatalogSupersessionCancelAndResultIsolation(t *testing.T) {
 	next, old := m.ApplyNativeCatalog(NativeCatalogAction{RequestID: "old-query", Action: "query", Scope: "active"})
 	m = next.(Model)
 	oldResult := old()
-	reused,duplicate:=m.ApplyNativeCatalog(NativeCatalogAction{RequestID:"old-query",Action:"query",Scope:"all"})
-	if duplicate!=nil || reused.(Model).nativeCatalogQueryResult.Error=="" { t.Fatal("query identity reused for changed scope") }
+	reused, duplicate := m.ApplyNativeCatalog(NativeCatalogAction{RequestID: "old-query", Action: "query", Scope: "all"})
+	if duplicate != nil || reused.(Model).nativeCatalogQueryResult.Error == "" {
+		t.Fatal("query identity reused for changed scope")
+	}
 	next, newer := m.ApplyNativeCatalog(NativeCatalogAction{RequestID: "new-query", Action: "query", Scope: "archived"})
 	m = next.(Model)
 	if contexts[0].Err() == nil {
@@ -239,5 +257,14 @@ func TestNativeCatalogMissingChangedAndFallbackRecordsRemainExplicit(t *testing.
 	m = nativeCatalogAction(t, m, NativeCatalogAction{RequestID: "wrong-owner", Action: "verify", ID: item.ID, Version: item.Version})
 	if m.nativeCatalogActionResult.Error == "" {
 		t.Fatal("destination identity was not bound")
+	}
+	c, err := s.Load(m.conversation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.conversationLoadIssue = "unavailable retained lineage"
+	m = nativeCatalogAction(t, m, NativeCatalogAction{RequestID: "unavailable-owner", Action: "verify", ID: c.ID, Version: worksession.ConversationDisplayVersion(c)})
+	if !strings.Contains(m.nativeCatalogActionResult.Error, "could not be loaded") {
+		t.Fatal("unavailable destination was accepted")
 	}
 }

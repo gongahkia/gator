@@ -1,0 +1,5 @@
+--- FAIL: TestNativeWorkspaceRejectsDirectoryWithoutTraversalPermission (0.00s)
+    bridge_workspace_test.go:144: directory without traversal permission was accepted
+FAIL
+FAIL	github.com/gongahkia/gator/internal/workapp	0.689s
+FAIL

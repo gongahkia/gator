@@ -1,0 +1,54 @@
+CONTROL ('wait', 'conversation', 'gator.composer.text')
+ready=true
+CONTROL ('move', 'conversation', '325', '125')
+move=0
+CONTROL ('focus', 'conversation')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=24285 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=conversation focused=AXWindow::conversation
+{"phase": "accepted-before", "selected": "work-20261118T062719-3602b39d79f02ac6", "source": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace", "children": ["23377"]}
+CONTROL ('press', 'menu', 'Conversation')
+press=0
+CONTROL ('press', 'menu', 'Choose Workspace…')
+press=0
+CONTROL ('wait', 'open-panel', 'OKButton')
+ready=true
+CONTROL ('select-file', 'open-panel', 'AXTextField::Workspace A')
+parent=AXGroup list=AXList
+selected=0
+CONTROL ('inspect', 'open-panel', 'where popup')
+role=AXPopUpButton title=Where: desc= id=where popup focused=Optional(0) enabled=Optional(1) pos=(682.0, 197.0) size=(232.0, 26.0) value=Workspace A
+CONTROL ('press', 'open-panel', 'OKButton')
+press=0
+CONTROL ('wait-gone', 'open-panel')
+gone=true
+CONTROL ('wait', 'conversation', 'New conversation · workspace stays read-only during Work')
+ready=true
+{"phase": "accepted-after-a", "selected": "work-20261118T062839-f28f8059deef77fe", "source": "/private/tmp/gator-native-test-p03-acceptance-6f8he7dl/Workspace A", "children": ["23377", "24623"]}
+CONTROL ('inspect', 'conversation', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(1) enabled=nil pos=(349.0, 721.0) size=(772.0, 76.0) value=
+CONTROL ('set', 'conversation', 'gator.composer.text', 'A desktop draft remains with A')
+set=0
+CONTROL ('press', 'conversation', 'Choose Workspace…')
+press=0
+CONTROL ('wait', 'open-panel', 'OKButton')
+ready=true
+CONTROL ('select-file', 'open-panel', 'AXTextField::A deliberately long parent folder for readable truncated workspace paths with spaces and café 日本')
+parent=AXGroup list=AXList
+selected=0
+CONTROL ('wait', 'open-panel', 'AXTextField::Workspace B')
+ready=true
+CONTROL ('select-file', 'open-panel', 'AXTextField::Workspace B')
+parent=AXGroup list=AXList
+selected=0
+CONTROL ('inspect', 'open-panel', 'where popup')
+role=AXPopUpButton title=Where: desc= id=where popup focused=Optional(0) enabled=Optional(1) pos=(681.5, 197.0) size=(232.0, 26.0) value=Workspace B
+CONTROL ('press', 'open-panel', 'OKButton')
+press=0
+CONTROL ('wait-gone', 'open-panel')
+gone=true
+CONTROL ('wait', 'conversation', 'New conversation · workspace stays read-only during Work')
+ready=true
+{"phase": "accepted-after-b", "selected": "work-20261118T062911-51b434c430918784", "source": "/private/tmp/gator-native-test-p03-acceptance-6f8he7dl/A deliberately long parent folder for readable truncated workspace paths with spaces and cafe\u0301 \u65e5\u672c/Workspace B", "children": ["23377", "24623", "25119"]}
+CONTROL ('set', 'conversation', 'gator.composer.text', 'B desktop draft remains with B')
+set=0
+PASS actual native A/B selection, canonical persisted sources, distinct selected identities, existing owner PIDs retained, exact independent drafts, no request/snapshot admission

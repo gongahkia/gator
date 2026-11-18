@@ -401,7 +401,10 @@ type Model struct {
 	planResult                *TaskPlanResult
 	requestRecoveryResult     *RequestRecoveryResult
 	catalog                   *conversationCatalog
+	nativeWorkspacePending    string
+	nativeWorkspaceResult     *NativeWorkspaceResult
 	nativeCatalog             *nativeCatalogState
+	conversationLoadIssue     string
 	nativeCatalogQueryResult  *NativeCatalogResult
 	nativeCatalogActionResult *NativeCatalogResult
 	catalogSequence           uint64

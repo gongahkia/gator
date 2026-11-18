@@ -82,6 +82,13 @@ struct CatalogIntegrationFixture {
         app.catalog.rename(); try await managedEventually("explicit fresh save") { !app.catalog.acting }
         #expect(app.current.title == "Native attempted after conflict"); #expect(app.catalog.issue.isEmpty)
 
+        try fixture.change(olderID, title: "Externally renamed cached owner")
+        app.catalog.query = "Externally renamed cached owner"; app.catalog.search()
+        try await managedEventually("fresh cached metadata") { !app.catalog.loading && app.catalog.items.count == 1 }
+        app.catalog.selection = olderID; app.catalog.openSelected()
+        try await managedEventually("cached title on exact open") { !app.catalog.acting }
+        #expect(app.current.title == "Externally renamed cached owner"); #expect(app.ownerCount == 2)
+
         app.catalog.scope = .archived; app.catalog.query = "Retained topic 0007"; app.catalog.search()
         try await managedEventually("archived result") { !app.catalog.loading && app.catalog.items.count == 1 }
         #expect(app.catalog.items[0].archived)
@@ -93,6 +100,15 @@ struct CatalogIntegrationFixture {
         app.catalog.dismiss(); await app.openConversation(originalID)
         #expect(app.current === original); #expect(app.current.draftText == "Unsent foreground draft survives the catalog")
         #expect(app.owners[olderID]?.draftText == "Independent older draft")
+        app.showCatalog(); app.catalog.scope = .all; app.catalog.query = "jade decision"; app.catalog.search()
+        try await managedEventually("unavailable history selection") { !app.catalog.loading && app.catalog.items.count == 1 }
+        let beforeUnavailable = app.ownerCount
+        let revision = fixture.root.appendingPathComponent("state/gator/conversations/\(fixture.ids[0])/revisions/rev-catalog-fixture.json")
+        try Data("{".utf8).write(to: revision)
+        app.catalog.selection = fixture.ids[0]; app.catalog.openSelected()
+        try await managedEventually("unavailable target rejected") { !app.catalog.acting }
+        #expect(app.current === original); #expect(app.ownerCount == beforeUnavailable)
+        #expect(app.catalog.issue.contains("could not be loaded")); app.catalog.dismiss()
         #expect(await app.shutdown(confirmed: true))
     } catch { _ = await app.shutdown(confirmed: true); throw error }
 }

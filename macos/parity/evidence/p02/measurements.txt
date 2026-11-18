@@ -1,0 +1,5 @@
+GATOR_P02_RENAME requestToConfirmedCachedOwnerTitle=0.045240875 seconds
+GATOR_P02_GO_BENCH records=12 titleRequestToResult=0.038349625 seconds workContentRequestToResult=0.015392125 seconds pageItems=12 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=310 titleRequestToResult=1.101966375 seconds workContentRequestToResult=0.028386125 seconds pageItems=50 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=1500 titleRequestToResult=5.163545166 seconds workContentRequestToResult=5.261325124999999 seconds pageItems=50 titleFallback=true contentFallback=true incomplete=false
+GATOR_P02_SWIFT_BENCH pageSize=50 projection100=0.052095 seconds selection1000=0.006690833 seconds

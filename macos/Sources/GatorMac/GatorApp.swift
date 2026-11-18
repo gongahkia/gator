@@ -44,6 +44,7 @@ struct GatorApp: App {
                 Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
             }
             CommandMenu("Conversation") {
+                ChooseWorkspaceButton(sessions: application)
                 AllConversationsButton(sessions: application).keyboardShortcut("o", modifiers: [.command, .shift])
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 MenuBarVisibilityToggle()

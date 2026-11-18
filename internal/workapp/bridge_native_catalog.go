@@ -131,6 +131,9 @@ func (m Model) ApplyNativeCatalog(a NativeCatalogAction) (tea.Model, tea.Cmd) {
 		if a.ID != m.conversation || a.Version == "" {
 			return fail("The destination owner does not match the catalog selection.")
 		}
+		if m.conversationLoadIssue != "" {
+			return fail("This conversation's retained history or settings could not be loaded: " + m.conversationLoadIssue)
+		}
 		c, err := m.config.SessionStore.Load(a.ID)
 		if err != nil {
 			return fail("This conversation is unavailable: " + err.Error())
@@ -138,6 +141,7 @@ func (m Model) ApplyNativeCatalog(a NativeCatalogAction) (tea.Model, tea.Cmd) {
 		if worksession.ConversationDisplayVersion(c) != a.Version {
 			return fail("This conversation changed. Refresh and choose it again.")
 		}
+		m.applyNativeConversationMetadata(c)
 		item := nativeCatalogItem(c)
 		result.Item = &item
 		m.nativeCatalogActionResult = result

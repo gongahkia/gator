@@ -15,6 +15,11 @@ actor SessionFixture: BridgeTransport {
     let silentBootstrap: Bool
     let focusDelay: Duration
     var autoAdmit = true
+    private var workspaceGate: CatalogOwnerOpenGate?
+    private var workspaceResultOverride: JSONValue?
+    private var workspaceFailure = ""
+    private var workspaceDisconnected = false
+    func configureWorkspace(gate: CatalogOwnerOpenGate? = nil, failure: String = "", result: JSONValue? = nil) { workspaceGate = gate; workspaceFailure = failure; workspaceResultOverride = result }
     private var catalogItems: [JSONValue] = []
     private var catalogOpenGate: CatalogOwnerOpenGate?
     private var catalogQueryGate: CatalogOwnerOpenGate?
@@ -29,16 +34,22 @@ actor SessionFixture: BridgeTransport {
         launch = configuration
         if failStart { throw BridgeFailure("Fixture startup failed") }
         if !configuration.conversationID.isEmpty { state["conversation_id"] = .string(configuration.conversationID); state["title"] = .string(configuration.conversationID) }
+        if !configuration.startSource.isEmpty { state["source"] = .string(configuration.startSource) }
         publish()
     }
     private func publish() { output.yield(.state(BridgeSnapshot(.object(state)))) }
     func patch(_ values: [String: JSONValue]) { state.merge(values) { _, new in new }; publish() }
     func sent(_ type: String) -> [JSONValue] { frames.filter { $0["type"].string == type } }
     func setAutoAdmit(_ enabled: Bool) { autoAdmit = enabled }
-    func disconnect() { output.yield(.disconnected("Fixture lost only this owner")) }
+    func disconnect() { workspaceDisconnected = true; output.yield(.disconnected("Fixture lost only this owner")) }
     func send(_ command: BridgeCommand, nonce: String) async throws {
         let frame = try JSONDecoder().decode(JSONValue.self, from: command.data(nonce: nonce)); frames.append(frame)
         switch command {
+        case .host(.workspace(let request)):
+            await workspaceGate?.wait()
+            guard !workspaceDisconnected else { throw BridgeFailure("Original owner disconnected before workspace resolution") }
+            let result = workspaceResultOverride ?? .object(["request_id": .string(request.id), "conversation_id": state["conversation_id"] ?? .string(""), "source": .string(request.path), "new": .bool(request.path != state["source"]?.string), "error": .string(workspaceFailure)])
+            patch(["native_workspace_result": result])
         case .host(.catalog(let request)):
             if request.action == .cancel { break }
             if request.action == .open { await catalogOpenGate?.wait() }

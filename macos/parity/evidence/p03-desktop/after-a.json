@@ -1,0 +1,29 @@
+{
+  "phase": "after-a",
+  "selected": "work-20261118T061508-dd2ad5e43041d017",
+  "drafts": {
+    "conversation:work-20261118T060750-01519f44ccceba61": {
+      "updated": 816674871.104425,
+      "text": "Original acceptance draft stays here",
+      "revision": "32E35ECF-54A9-479B-B034-37B8BA368D23"
+    },
+    "conversation:work-20261118T061508-dd2ad5e43041d017": {
+      "updated": 816675326.000993,
+      "text": "Workspace A draft stays with A",
+      "revision": "74DCC816-70CB-4541-8FF4-B2E6AC25A19E"
+    }
+  },
+  "metadata": {
+    "version": 2,
+    "id": "work-20261118T061508-dd2ad5e43041d017",
+    "title": "New chat",
+    "source_path": "/private/tmp/gator-native-test-p03-acceptance-hewe1mpn/Workspace A",
+    "snapshot_id": "",
+    "created_at": "2026-11-18T06:15:08.199344Z",
+    "updated_at": "2026-11-18T06:15:08.199344Z"
+  },
+  "children": [
+    "11403",
+    "15937"
+  ]
+}

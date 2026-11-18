@@ -18,6 +18,8 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case nativeWorkspaceResolved:
+		return m.finishNativeWorkspace(value.Result)
 	case nativeCatalogLoaded:
 		return m.finishNativeCatalogLoad(value)
 	case nativeCatalogChanged:

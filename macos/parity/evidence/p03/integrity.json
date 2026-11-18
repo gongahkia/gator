@@ -1,0 +1,192 @@
+{
+  "startingHEAD": "07675f2c5dac1fc336446116a0cecc5cf38efb94",
+  "observedHEAD": "07675f2c5dac1fc336446116a0cecc5cf38efb94",
+  "protected": {
+    "macos/Sources/GatorCore/NativeDraftStore.swift": {
+      "sha256": "3aec34b85e60a3a18c08437b0d243df695b448f499b73647a025912df799fab6",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/GatorApplicationState.swift": {
+      "sha256": "88ab986e253566f2e8c2c5dd2518b2610aea57f46987518936a0aeac75fb3ee9",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/GoBridgeConnection.swift": {
+      "sha256": "17ada0b512e8e2120dc818c87079fc4245353275932fd7280f57e299421c9c6e",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/NativeUploadStore.swift": {
+      "sha256": "94dc5406ef0a1d1a579efcbf3c60d9d862aeca487947be4c91096810382ef8d3",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/BridgePipeIO.swift": {
+      "sha256": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/NativeTranscriptSearch.swift": {
+      "sha256": "e94c042a07e5c70a7086843cf5e4e7fb919b804a697a27327fecd511bdc5c336",
+      "unchanged": true
+    },
+    "macos/Sources/GatorMac/NativeTranscriptFind.swift": {
+      "sha256": "1c77267007aabf1018f4d1a604b74660553d866d49531f0d4acd4976328630c3",
+      "unchanged": true
+    },
+    "macos/Sources/GatorMac/NativeReadingPositions.swift": {
+      "sha256": "af252f0fbb83f9d169b7c2f536211fc6fd825fda60e8437984f56fd4429716bc",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Info.plist": {
+      "sha256": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/MacOS/GatorMac": {
+      "sha256": "0e11c318acd08a1bd7888dcf82072a7f720e7ea0d31f169539ba8e11b0c39b90",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/GatorHead.png": {
+      "sha256": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/gator-runtime": {
+      "sha256": "4fbb61def7980ab43a825e8b0e9100c612223ec4e1848b24e89444f530d2682e",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/AppIcon.icns": {
+      "sha256": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/GatorMenuBar.png": {
+      "sha256": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Info.plist": {
+      "sha256": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/MacOS/GatorMac": {
+      "sha256": "e34fe1f76380ae47e0f34e0e258d4bf4c91d7d6bd69aaa529329a00a66fcaba1",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/GatorHead.png": {
+      "sha256": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/gator-runtime": {
+      "sha256": "cabd48a83ff2c55624b2e0b6b772aa95ec34c2fb42d709989e7dacb5517e5b39",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/AppIcon.icns": {
+      "sha256": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+      "unchanged": true
+    },
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/GatorMenuBar.png": {
+      "sha256": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+      "unchanged": true
+    }
+  },
+  "priorSafety": {
+    "macos/Sources/GatorCore/NativeDraftStore.swift": {
+      "sha256": "3aec34b85e60a3a18c08437b0d243df695b448f499b73647a025912df799fab6",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorCore/GatorApplicationState.swift": {
+      "sha256": "88ab986e253566f2e8c2c5dd2518b2610aea57f46987518936a0aeac75fb3ee9",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorCore/GoBridgeConnection.swift": {
+      "sha256": "17ada0b512e8e2120dc818c87079fc4245353275932fd7280f57e299421c9c6e",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorCore/BridgePipeIO.swift": {
+      "sha256": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
+      "unchangedFromP02": true
+    },
+    "macos/Tests/GatorCoreTests/NativeArchiveSafetyTests.swift": {
+      "sha256": "5febae12a5d4afc6ad218dad056a97276201e7f52139d7f519845f3110462bba",
+      "unchangedFromP02": true
+    },
+    "macos/Tests/GatorCoreTests/NativeClosingSafetyTests.swift": {
+      "sha256": "ef210eb2e2f597164d2264a0b84f9233947c0076d8a217dd7c621e0e99d4c4a4",
+      "unchangedFromP02": true
+    },
+    "macos/Tests/GatorCoreTests/BridgeShutdownSafetyTests.swift": {
+      "sha256": "e955688ce49ec0a4ffb90abf3f9dcca5396e78c0b0b141a8f6124f600932707c",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorCore/NativeUploadStore.swift": {
+      "sha256": "94dc5406ef0a1d1a579efcbf3c60d9d862aeca487947be4c91096810382ef8d3",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorMac/AppDelegate.swift": {
+      "sha256": "29df7c92278f1c27c4738e1b8a1fd444fd54caf9f65d1cfbd279a4c9060049cb",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorMac/NativeReadingPositions.swift": {
+      "sha256": "af252f0fbb83f9d169b7c2f536211fc6fd825fda60e8437984f56fd4429716bc",
+      "unchangedFromP02": true
+    },
+    "internal/worksession/catalog.go": {
+      "sha256": "d8bdf4342e3003c1473b490cf1f2d63128dabbc3495c28c24f0dc9862006cce8",
+      "unchangedFromP02": true
+    },
+    "internal/worksession/catalog_sqlite.go": {
+      "sha256": "402d4b77fe86f958e8cadcdfbbe0081760b9b5991e91dcd74421f75637b95c4c",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorCore/NativeTranscriptSearch.swift": {
+      "sha256": "e94c042a07e5c70a7086843cf5e4e7fb919b804a697a27327fecd511bdc5c336",
+      "unchangedFromP02": true
+    },
+    "macos/Sources/GatorMac/NativeTranscriptFind.swift": {
+      "sha256": "1c77267007aabf1018f4d1a604b74660553d866d49531f0d4acd4976328630c3",
+      "unchangedFromP02": true
+    },
+    "macos/Tests/GatorCoreTests/NativeTranscriptSearchTests.swift": {
+      "sha256": "af102c658e516560baef328c8b5142e8bdb4046c112c7360277805a3d2533b47",
+      "unchangedFromP02": true
+    },
+    "macos/Tests/GatorMacTests/NativeTranscriptFindTests.swift": {
+      "sha256": "a9293e7cafc335dc22971440245dd1743223010114bb04858a965de32e700e2d",
+      "unchangedFromP02": true
+    }
+  },
+  "apps": {
+    "MacOS/GatorMac": {
+      "candidate": "fe1938459fa1c7e09cb73b243289702113dbf399eaa152af982fadbcb437014f",
+      "desktop": "fe1938459fa1c7e09cb73b243289702113dbf399eaa152af982fadbcb437014f"
+    },
+    "Resources/gator-runtime": {
+      "candidate": "8f09d57b1e28f4195fb72993b9445e27ff2e313b373a7f0876518c4f7e584977",
+      "desktop": "8f09d57b1e28f4195fb72993b9445e27ff2e313b373a7f0876518c4f7e584977"
+    }
+  },
+  "screenshots": {
+    "picker-light.png": {
+      "sha256": "3ebf88c095722580a847a990451a9910b151a41e6fca259379a36f568d7ab031",
+      "size": [
+        2178,
+        1032
+      ]
+    }
+  },
+  "sourceHashes": {
+    "cmd/gator/ui_bridge.go": "fc1cbdefef42589e157896503cee71da1ada7c5b19a3f7ed01092258dd817db7",
+    "cmd/gator/ui_bridge_test.go": "4b58c47cd73c17194ec78da8f6b9e0fc73475ef75a5525482a6d9c73b368d389",
+    "internal/workapp/app.go": "83081bc71d841ff17abca60ad079b78153365b660827f4b10112b4c47a6b1706",
+    "internal/workapp/bridge.go": "b1bf91fa530de65ce2cd790d5ca104fba67e570bac15f0ebe7b46006864e7a41",
+    "internal/workapp/update.go": "fec6ee6d1f75858ce453d447dd9b76331e62005da3c4cab2c79b6ad3b36be756",
+    "internal/workapp/bridge_workspace.go": "f8086080424baca355c85b90f5c2323d38f7c33fdd2e1c7858605a1848fbc3df",
+    "internal/workapp/bridge_workspace_test.go": "d2eb01ee5c915290c24dd145f6e32351914b3682fb3d90390da7e7d3e12973ac",
+    "macos/Sources/GatorCore/ManagedSessionCoordinator.swift": "4b313dd99c6c60bae18c52095ad12d3806ec1c1a7e28b3ded6ebeb62e7ae17c4",
+    "macos/Sources/GatorCore/ManagedSessionProtocol.swift": "d5b94f1efcf794e6d35f922a2534e6b4ed37b3cdae32ad2ec16333f1d95fdddc",
+    "macos/Sources/GatorCore/NativeWorkspaceSelection.swift": "bfac491bd3f897c06ab35cb57968774d4d4184381dc2e0f78fed11957fd30e1f",
+    "macos/Sources/GatorMac/ConversationView.swift": "bf211d50fccfe4954b398fce3d97e4223d7043f2c718a951d5b25fc436486996",
+    "macos/Sources/GatorMac/GatorApp.swift": "0457c1d1cb01ff1a86c809243b4e0d44c37c84c0c6f9bd0d2172a4462e6d7324",
+    "macos/Sources/GatorMac/NativeWorkspacePicker.swift": "9799a38fff329cbf6e4ac62643196bcfb53bd34f9bedc67f4bd3a423d8d5244b",
+    "macos/Tests/GatorCoreTests/ManagedSessionTests.swift": "27accdd32405191a746639401ab14349a4130da52f3534039e4b5331f3fb462d",
+    "macos/Tests/GatorCoreTests/ManagedGoIntegrationTests.swift": "f01d280926ee6978defc6f62b370ece02688c46bd587ce7bf94bfcf15cbbe3e0",
+    "macos/Tests/GatorCoreTests/NativeWorkspaceTests.swift": "2f72aa5b63054c9a5f86b2a09d95a2c2268c422eafe4377cf496cccd77281d45",
+    "macos/Tests/GatorCoreTests/NativeWorkspaceIntegrationTests.swift": "a9f28f38395faa728f383addf7a38e05d56819ef519d9b47a32415680be04c9f",
+    "macos/Tests/GatorMacTests/NativeWorkspacePickerTests.swift": "72a4ea00637c12a18988654d498af34dcdcc1f3448264e4ba8cb2aa3b530c8ce"
+  },
+  "closingBarrier": "unchanged synchronous all-owner boundary before await"
+}

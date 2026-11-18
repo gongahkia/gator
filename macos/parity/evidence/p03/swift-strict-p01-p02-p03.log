@@ -1,0 +1,178 @@
+[0/1] Planning build
+Building for debugging...
+[0/8] Write sources
+[2/8] Write swift-version--58304C5D6DBC2206.txt
+[4/25] Compiling GatorCore NativeRecovery.swift
+[5/25] Compiling GatorCore NativeRecoveryPreparation.swift
+[6/27] Compiling GatorCore NativeUploadStore.swift
+[7/27] Compiling GatorCore NativeWorkspaceSelection.swift
+[8/27] Compiling GatorCore NativeTaskReview.swift
+[9/27] Compiling GatorCore NativeTranscriptSearch.swift
+[10/27] Compiling GatorCore NativeDraftAttachments.swift
+[11/27] Compiling GatorCore NativeDraftStore.swift
+[12/27] Compiling GatorCore NativeCatalogProtocol.swift
+[13/27] Compiling GatorCore NativeConversationCatalog.swift
+[14/27] Compiling GatorCore NativeMessageContent.swift
+[15/27] Compiling GatorCore NativePlanExecution.swift
+[16/27] Compiling GatorCore BridgePipeIO.swift
+[17/27] Compiling GatorCore BridgeProtocol.swift
+[18/27] Compiling GatorCore GatorApplicationState.swift
+[19/27] Compiling GatorCore GoBridgeConnection.swift
+[20/27] Compiling GatorCore ManagedSessionCoordinator.swift
+[21/27] Compiling GatorCore ManagedSessionProtocol.swift
+[22/27] Emitting module GatorCore
+[23/82] Compiling GatorMac NativeComposer.swift
+[24/82] Compiling GatorMac NativeComposerPresentation.swift
+[25/82] Compiling GatorMac NativeDropInput.swift
+[26/82] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[27/85] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[28/85] Compiling GatorCoreTests ManagedSessionTests.swift
+[29/85] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[30/85] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[31/85] Emitting module GatorMac
+[32/85] Compiling GatorCoreTests GoIntegrationTests.swift
+[33/85] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[34/85] Compiling GatorCoreTests NativeMessageContentTests.swift
+[35/85] Compiling GatorMac RecoveryInspectorContent.swift
+[36/85] Compiling GatorMac RecoveryPreparationView.swift
+[37/85] Compiling GatorMac TaskInspectorView.swift
+[38/85] Compiling GatorCoreTests NativeCatalogTests.swift
+[39/85] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[40/85] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[41/85] Compiling GatorMac AppDelegate.swift
+[44/85] Compiling GatorMac NativeMessageBody.swift
+[45/85] Compiling GatorMac NativeReadingPositions.swift
+[46/89] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[47/89] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[48/89] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[49/89] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[50/89] Compiling GatorMac NativeStatusMessage.swift
+[62/89] Compiling GatorMac ApprovalReviewView.swift
+[63/89] Compiling GatorMac AttachmentSelectionView.swift
+[64/89] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[66/89] Emitting module GatorCoreTests
+[77/89] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[78/89] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[79/89] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[80/89] Compiling GatorCoreTests resource_bundle_accessor.swift
+[84/89] Write Objects.LinkFileList
+[85/89] Linking GatorMac
+[86/89] Applying GatorMac
+[88/95] Compiling GatorMacTests NotchGeometryTests.swift
+[89/95] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[90/95] Emitting module GatorMacTests
+[91/95] Compiling GatorMacTests NativeInputTests.swift
+[92/95] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[93/95] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[94/97] Compiling GatorNativePackageTests runner.swift
+[95/97] Emitting module GatorNativePackageTests
+[95/97] Write Objects.LinkFileList
+[96/97] Linking GatorNativePackageTests
+Build complete! (14.48s)
+Test Suite 'Selected tests' started at 2026-11-18 13:47:52.351.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 13:47:52.352.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 13:47:52.352.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 13:47:52.352.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 2.269 seconds.
+◇ Test catalogActualGoPagesScopesOlderSelectionRenameConflictAndOwnerDrafts() started.
+GATOR_P02_RENAME requestToConfirmedCachedOwnerTitle=0.046717458 seconds
+✔ Test catalogActualGoPagesScopesOlderSelectionRenameConflictAndOwnerDrafts() passed after 12.742 seconds.
+◇ Test catalogActualGoSmallHundredsAndLargeBoundedMeasurementsAndFallback() started.
+GATOR_P02_GO_BENCH records=12 titleRequestToResult=0.03686925 seconds workContentRequestToResult=0.015452875 seconds pageItems=12 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=310 titleRequestToResult=1.058030417 seconds workContentRequestToResult=0.026169042 seconds pageItems=50 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=1500 titleRequestToResult=5.149189792 seconds workContentRequestToResult=5.2351958750000005 seconds pageItems=50 titleFallback=true contentFallback=true incomplete=false
+✔ Test catalogActualGoSmallHundredsAndLargeBoundedMeasurementsAndFallback() passed after 52.045 seconds.
+◇ Test catalogManagedNonRecentOpenReusesOwnersPreservesDraftsAndNeverReconnectsDisconnectedOwner() started.
+✔ Test catalogManagedNonRecentOpenReusesOwnersPreservesDraftsAndNeverReconnectsDisconnectedOwner() passed after 0.351 seconds.
+◇ Test catalogNativeAPIRejectsReusedIdentityInsteadOfReadingThePreviousResult() started.
+✔ Test catalogNativeAPIRejectsReusedIdentityInsteadOfReadingThePreviousResult() passed after 0.037 seconds.
+◇ Test catalogCapacityNeverRetiresOwnersHoldingRecoveryEvidence() started.
+✔ Test catalogCapacityNeverRetiresOwnersHoldingRecoveryEvidence() passed after 0.397 seconds.
+◇ Test catalogClosedDuringOpenValidationCannotStealForeground() started.
+✔ Test catalogClosedDuringOpenValidationCannotStealForeground() passed after 0.218 seconds.
+◇ Test catalogQueryCompletesAcrossForegroundSwitchWithoutChangingDraftFocusOrOwners() started.
+✔ Test catalogQueryCompletesAcrossForegroundSwitchWithoutChangingDraftFocusOrOwners() passed after 0.257 seconds.
+◇ Test catalogDestinationVerificationRejectsChangedRecordAndReleasesOnlyTheNewIdleCandidate() started.
+✔ Test catalogDestinationVerificationRejectsChangedRecordAndReleasesOnlyTheNewIdleCandidate() passed after 0.268 seconds.
+◇ Test catalogProtocolEncodesOnlyTypedQueriesScopesAndExactVersionedActions() started.
+✔ Test catalogProtocolEncodesOnlyTypedQueriesScopesAndExactVersionedActions() passed after 0.001 seconds.
+◇ Test catalogDecodingPreservesEmptyPagesCoverageAndRejectsDuplicateRows() started.
+✔ Test catalogDecodingPreservesEmptyPagesCoverageAndRejectsDuplicateRows() passed after 0.001 seconds.
+◇ Test catalogBoundedSwiftProjectionAndSelectionMeasurements() started.
+GATOR_P02_SWIFT_BENCH pageSize=50 projection100=0.047887625 seconds selection1000=0.006608208 seconds
+✔ Test catalogBoundedSwiftProjectionAndSelectionMeasurements() passed after 0.055 seconds.
+◇ Test catalogTitleValidationUsesByteLimitAndRejectsControlCharacters() started.
+✔ Test catalogTitleValidationUsesByteLimitAndRejectsControlCharacters() passed after 0.001 seconds.
+◇ Test catalogSupersededQueryScopeAndClosedSearchCannotPublishStaleResults() started.
+✔ Test catalogSupersededQueryScopeAndClosedSearchCannotPublishStaleResults() passed after 0.006 seconds.
+◇ Test catalogPageAnchorsResetWithQueryAndSelectionDoesNotFollowRowIndexes() started.
+✔ Test catalogPageAnchorsResetWithQueryAndSelectionDoesNotFollowRowIndexes() passed after 0.025 seconds.
+◇ Test catalogRenameConflictKeepsAttemptAndRequiresReviewThenExplicitFreshSave() started.
+✔ Test catalogRenameConflictKeepsAttemptAndRequiresReviewThenExplicitFreshSave() passed after 0.024 seconds.
+◇ Test catalogUnconfirmedRenameNeverRetriesAndQueryRefreshRequiresFreshReview() started.
+✔ Test catalogUnconfirmedRenameNeverRetriesAndQueryRefreshRequiresFreshReview() passed after 0.018 seconds.
+◇ Test catalogOpenResultIsExplicitAndDoesNotReplacePresentationOnLateClose() started.
+✔ Test catalogOpenResultIsExplicitAndDoesNotReplacePresentationOnLateClose() passed after 0.012 seconds.
+◇ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() started.
+✔ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() passed after 0.001 seconds.
+◇ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() started.
+✔ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() passed after 0.001 seconds.
+◇ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() started.
+✔ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() passed after 0.001 seconds.
+◇ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() started.
+✔ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() passed after 0.001 seconds.
+◇ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() started.
+✔ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() passed after 0.001 seconds.
+◇ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() started.
+✔ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() passed after 0.126 seconds.
+◇ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() started.
+✔ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() passed after 0.001 seconds.
+◇ Test transcriptSearchBenchmarks() started.
+GATOR_P01_BENCH messages=50 build=0.000183375 seconds query20=0.006400291 seconds absent20=0.004148416 seconds resolve1000=0.000580166 seconds liveResolve100=0.000938667 seconds
+GATOR_P01_BENCH messages=500 build=0.002711625 seconds query20=0.076919375 seconds absent20=0.051297125 seconds resolve1000=0.000605834 seconds liveResolve100=0.007154958 seconds
+GATOR_P01_BENCH messages=2000 build=0.00694525 seconds query20=0.279685833 seconds absent20=0.175931458 seconds resolve1000=0.000679125 seconds liveResolve100=0.025405375 seconds
+✔ Test transcriptSearchBenchmarks() passed after 0.645 seconds.
+◇ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() started.
+GATOR_P03_HANDOFF requestToConfirmedOwner=0.083432375 seconds
+✔ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() passed after 6.252 seconds.
+◇ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() started.
+✔ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() passed after 1.568 seconds.
+◇ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() started.
+✔ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() passed after 1.600 seconds.
+◇ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() started.
+✔ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() passed after 2.020 seconds.
+◇ Test workspaceRequestEncodesPathAsDataAndResultIdentity() started.
+✔ Test workspaceRequestEncodesPathAsDataAndResultIdentity() passed after 0.001 seconds.
+◇ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() started.
+✔ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() passed after 0.049 seconds.
+◇ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() started.
+✔ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() passed after 0.154 seconds.
+◇ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() started.
+✔ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() passed after 0.053 seconds.
+◇ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() started.
+✔ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() passed after 0.022 seconds.
+◇ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() started.
+✔ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() passed after 0.184 seconds.
+◇ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() started.
+✔ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() passed after 0.172 seconds.
+◇ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() started.
+✔ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() passed after 0.039 seconds.
+◇ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() started.
+✔ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() passed after 0.059 seconds.
+◇ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() started.
+✔ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() passed after 0.092 seconds.
+◇ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() started.
+✔ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() passed after 0.001 seconds.
+◇ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() started.
+✔ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() passed after 0.001 seconds.
+◇ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() started.
+✔ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() passed after 0.001 seconds.
+◇ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() started.
+✔ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() passed after 0.393 seconds.
+✔ Test run with 44 tests in 0 suites passed after 82.172 seconds.

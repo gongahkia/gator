@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/workapp"
 	"github.com/gongahkia/gator/internal/worksession"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func TestUIBridgeNativeCatalogAcknowledgementIsNotQueryOrRenameCompletion(t *testing.T) {
@@ -204,5 +205,20 @@ func TestUIBridgeHandsEditorToFrontendAndRestoresDraft(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("UI bridge did not exit")
+	}
+}
+
+func TestUIBridgeWorkspaceAckPrecedesExactResolutionWithoutNavigation(t *testing.T) {
+	root := t.TempDir()
+	var out bytes.Buffer
+	bridge := &uiBridgeModel{model: workapp.New(workapp.Config{BridgeMode: true, ManagedSessions: true, CurrentFolder: root, ResolveSource: func(path string) (string, error) { r, e := workspace.Open(path); return r.Path(), e }}), out: json.NewEncoder(&out)}
+	_, cmd := bridge.Update(uiFrame{Type: "native_workspace", Nonce: "transport-only", NativeWorkspace: &workapp.NativeWorkspaceAction{RequestID: "exact-workspace", Path: root}})
+	if cmd == nil || bridge.model.BridgeState().NativeWorkspaceResult != nil || !bytes.Contains(out.Bytes(), []byte(`"nonce":"transport-only"`)) {
+		t.Fatal("ack treated as resolution", out.String())
+	}
+	bridge.Update(cmd())
+	result := bridge.model.BridgeState().NativeWorkspaceResult
+	if result == nil || result.RequestID != "exact-workspace" || result.Error != "" || bridge.model.BridgeState().SessionRequest != nil {
+		t.Fatal("resolution navigated or lost identity", result)
 	}
 }

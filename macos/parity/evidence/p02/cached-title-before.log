@@ -1,0 +1,5 @@
+--- FAIL: TestNativeCatalogDestinationVerificationRefreshesACachedCanonicalTitle (0.03s)
+    bridge_native_catalog_test.go:171: canonical selection retained a stale title Topic 0000 &{verify-renamed-cache verify  <nil> 0x2b5baf952280  false}
+FAIL
+FAIL	github.com/gongahkia/gator/internal/workapp	0.758s
+FAIL

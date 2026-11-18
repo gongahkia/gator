@@ -1,0 +1,114 @@
+{
+  "phase": "accepted-before",
+  "selected": "work-20261118T062719-3602b39d79f02ac6",
+  "source": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+  "drafts": {
+    "conversation:work-20261118T062719-3602b39d79f02ac6": {
+      "revision": "C6CDD267-1ECB-491E-BFF5-B8EEE6CD513D",
+      "updated": 816676040.7464509,
+      "text": "Original acceptance draft stays here"
+    }
+  },
+  "children": [
+    "23377"
+  ],
+  "records": {
+    "work-20261118T062719-3602b39d79f02ac6": {
+      "version": 2,
+      "id": "work-20261118T062719-3602b39d79f02ac6",
+      "title": "Retained topic 0005",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:05:00Z",
+      "updated_at": "2026-11-18T00:05:00Z"
+    },
+    "work-20261118T062719-4e769c2242eee485": {
+      "version": 2,
+      "id": "work-20261118T062719-4e769c2242eee485",
+      "title": "Retained topic 0001",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:01:00Z",
+      "updated_at": "2026-11-18T00:01:00Z"
+    },
+    "work-20261118T062719-8fe8bad9e9f70ae3": {
+      "version": 2,
+      "id": "work-20261118T062719-8fe8bad9e9f70ae3",
+      "title": "Retained topic 0002",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:02:00Z",
+      "updated_at": "2026-11-18T00:02:00Z"
+    },
+    "work-20261118T062719-56e09c857686fc00": {
+      "version": 2,
+      "id": "work-20261118T062719-56e09c857686fc00",
+      "title": "Retained topic 0004",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:04:00Z",
+      "updated_at": "2026-11-18T00:04:00Z"
+    },
+    "work-20261118T062719-90ea94e2c569edfa": {
+      "version": 2,
+      "id": "work-20261118T062719-90ea94e2c569edfa",
+      "title": "Retained topic 0000",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "snap-fixture",
+      "head_revision_id": "rev-catalog-fixture",
+      "created_at": "2026-11-18T00:00:00Z",
+      "updated_at": "2026-11-18T00:00:00Z"
+    },
+    "work-20261118T062719-c9e29b53c7a3664c": {
+      "version": 2,
+      "id": "work-20261118T062719-c9e29b53c7a3664c",
+      "title": "Retained topic 0003",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:03:00Z",
+      "updated_at": "2026-11-18T00:03:00Z"
+    }
+  },
+  "selectedFiles": [
+    ".metadata.lock",
+    "conversation.json",
+    "display.json",
+    ".execution.lock",
+    "dialogue/.lock",
+    "dialogue/00000000000000000025-1a4bab830d922442b7a4c8ffa098407d00166f17eba209fe681d2c3350f478f4.json",
+    "dialogue/00000000000000000021-0c1669f72b8ccd872b703c53a20b9e4a3adac0edcb6d340ee177d6d14afd4cc4.json",
+    "dialogue/00000000000000000014-06e187d8e15cd87e239632eed13b7755941df6a6c9be26a89c9b93ed977ad000.json",
+    "dialogue/00000000000000000035-56f6a9b5a192c881aed10e064698b6b15f4cafba720f6af5a4d31d86c34396c1.json",
+    "dialogue/00000000000000000023-81f11cfa4bc0fcdd7c2a6b25667ef92970bbacd5a12cdf065814764eb79b70bd.json",
+    "dialogue/00000000000000000011-c4e4ddf20e054238f32b2b354b5f70a6d5c03e72e5eb6a46359b6603c2ab9465.json",
+    "dialogue/00000000000000000026-4216742f1783d1a689b99fbc03d35edf70cdf5c8a109987b9e061107c67ae6d3.json",
+    "dialogue/00000000000000000032-dd2a01a9b365870c03f1f245af409599dbde0772bd607ab78c383efd85f59293.json",
+    "dialogue/00000000000000000013-d5dffad03ebc919cd95f42b943ae50d1c0ab0dd96d1f8fe1b5f57bda261821fb.json",
+    "dialogue/00000000000000000016-16f25c21f83f4a601f43f0c3f45e3760da9827cc1f8244eb126c94ecb3a37286.json",
+    "dialogue/00000000000000000029-c42b543e7cf94411e2fbf1188609d8d2c6b902bdc4954b3938f12c3528f000c6.json",
+    "dialogue/00000000000000000019-d245c6f9b7c725a8e08d460dc6af406bf420a49a22a4876f2aaaaef60bcff69d.json",
+    "dialogue/00000000000000000034-69c57147f9097e6da984115d4316c838889b82ab79f50e4c731217563c062c47.json",
+    "dialogue/00000000000000000002-5c9cfc7875a7a0db5c18a7fc56a6ee3282ab299c170b94e38f2c3d96a32129de.json",
+    "dialogue/00000000000000000008-95f92aa5f4906032ba7ddeceadfea1b872c3068ac702b2c462194c32809487d7.json",
+    "dialogue/00000000000000000030-a98b6358946e52e75a01bfdc128ee50f8b2208e18320198eff48c3108c11685b.json",
+    "dialogue/00000000000000000024-70164a603f0e47a5e2e7e621b276127928e3161854f0a99ea6fbc69b48e06ccf.json",
+    "dialogue/00000000000000000012-c6b113cae22014d3c1d3f7cafd2da37672eff21edf77b7c4889c2b57565e35be.json",
+    "dialogue/00000000000000000007-264b0b1b61471b463b0979a52cf3be71a357c8a820aa5cb7b5517e046bdf4863.json",
+    "dialogue/00000000000000000003-27e78a904e51c4ea8f691448d81f37dc3fb1377e2aaf4a8479130910587c144b.json",
+    "dialogue/00000000000000000015-eaed30c87e5913ecfc3177129cf8db8ef1340cff20feb4658832391b40ea0f4b.json",
+    "dialogue/00000000000000000022-b6fecb4a851d213e32ea8f053278984217fd8409d952757b0cfc7d91081c5372.json",
+    "dialogue/00000000000000000020-082a1e27dd2c417b87867d6b56b35b4461f2a24901ef54fb9dc2a39b47194567.json",
+    "dialogue/00000000000000000018-a588e7fbe28d31ccb58d5b779655a6874124b9607d138a9f269597427a7705ba.json",
+    "dialogue/00000000000000000001-9c56be340c53ef759c67e5e54ab0f4cada1b766e1f1e1b08d618de6a88a11690.json",
+    "dialogue/00000000000000000031-822655f011d39cec304da2a2615a0c47a03bdc0c5781d6675a709e12315cb273.json",
+    "dialogue/00000000000000000027-9e1162f1276773e75f296863cb93d564677edbbebb49e97f5920d4cd674e74a6.json",
+    "dialogue/00000000000000000006-e02083cd719e3703c4cea490bad9d97a91969fc000b621721d6ae96102edd79f.json",
+    "dialogue/00000000000000000028-693ef3ce4d27596013d0b2a853d66d45815de620b905acdb97c1b1171042731d.json",
+    "dialogue/00000000000000000017-27564022e780535c418982a20e98b1ad6c54d8861f7243ce223317dac251567f.json",
+    "dialogue/00000000000000000004-ea6ed3795052edf2aca0d5e1e9b25c09848ab4ec984767938e836a77551d2734.json",
+    "dialogue/00000000000000000009-1bc9974bf336782a4d5afc7b79868cddce4821d22da0272f91cf8cf5238c426f.json",
+    "dialogue/00000000000000000033-fb70e415470f39509c80cc9cd17ea624026c0e3ce20a16c21918874e1190cdfa.json",
+    "dialogue/00000000000000000005-a40f104720c753a0266503a10d4698ae9d7ebaff929d96bd392b6d1397d5bc6c.json",
+    "dialogue/00000000000000000010-2bac3a3b2d55af94652564c2c81bf0d93e78c4be76781d6949a3d36e742b7062.json"
+  ]
+}

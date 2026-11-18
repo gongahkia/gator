@@ -37,6 +37,7 @@ struct ConversationView: View {
     private var conversationContent: some View {
         VStack(spacing: 0) {
             if compact { header.padding(.horizontal, 14).padding(.vertical, 10); Divider() }
+            NativeWorkspaceContext(sessions: sessions, compact: compact)
             if !compact && find.isPresented { NativeTranscriptFindBar(find: find, close: closeFind); Divider() }
             if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
             if compact, let inspection = sessions.inspection {
@@ -79,6 +80,7 @@ struct ConversationView: View {
         .toolbar {
             if !compact {
                 ToolbarItem(placement: .navigation) { RecentConversationsMenu() }
+                ToolbarItem { ChooseWorkspaceButton(sessions: sessions).labelStyle(.iconOnly) }
                 ToolbarItemGroup(placement: .primaryAction) { headerActions }
             }
         }
@@ -153,6 +155,7 @@ struct ConversationView: View {
                 if application.snapshot?.value["recent_conversations"].array.isEmpty != false { Text("No recent conversations") }
             }
             AllConversationsButton(sessions: sessions)
+            ChooseWorkspaceButton(sessions: sessions)
             Divider()
             Menu("Configured Models") { modelChoices }
             Menu("Effort") {

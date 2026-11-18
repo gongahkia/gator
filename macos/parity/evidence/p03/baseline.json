@@ -1,0 +1,26 @@
+{
+  "head": "07675f2c5dac1fc336446116a0cecc5cf38efb94",
+  "status": " M internal/workapp/app.go\n M internal/workapp/bridge_native_catalog.go\n M internal/workapp/bridge_native_catalog_test.go\n M internal/workapp/conversation.go\n M macos/Tests/GatorCoreTests/NativeCatalogIntegrationTests.swift\n?? macos/parity/P02-CONVERSATION-CATALOG.md\n?? macos/parity/evidence/p02/archived-light.png\n?? macos/parity/evidence/p02/cached-title-before.log\n?? macos/parity/evidence/p02/catalog-dark.png\n?? macos/parity/evidence/p02/desktop-control.swift\n?? macos/parity/evidence/p02/desktop-fixture.py\n?? macos/parity/evidence/p02/desktop-session.py\n?? macos/parity/evidence/p02/final-candidate-launch.txt\n?? macos/parity/evidence/p02/go-regression.log\n?? macos/parity/evidence/p02/host-regression.log\n?? macos/parity/evidence/p02/integrity.json\n?? macos/parity/evidence/p02/keyboard-nonrecent-open.txt\n?? macos/parity/evidence/p02/measurements.txt\n?? macos/parity/evidence/p02/package.log\n?? macos/parity/evidence/p02/return-original-and-archived.txt\n?? macos/parity/evidence/p02/scoped-find-and-p01.txt\n?? macos/parity/evidence/p02/strict-packaged-tests.log\n?? macos/parity/evidence/p02/swift-build.log\n?? macos/parity/evidence/p02/swift-full-tests.log\n",
+  "hashes": {
+    "macos/Sources/GatorCore/NativeDraftStore.swift": "3aec34b85e60a3a18c08437b0d243df695b448f499b73647a025912df799fab6",
+    "macos/Sources/GatorCore/GatorApplicationState.swift": "88ab986e253566f2e8c2c5dd2518b2610aea57f46987518936a0aeac75fb3ee9",
+    "macos/Sources/GatorCore/GoBridgeConnection.swift": "17ada0b512e8e2120dc818c87079fc4245353275932fd7280f57e299421c9c6e",
+    "macos/Sources/GatorCore/NativeUploadStore.swift": "94dc5406ef0a1d1a579efcbf3c60d9d862aeca487947be4c91096810382ef8d3",
+    "macos/Sources/GatorCore/BridgePipeIO.swift": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
+    "macos/Sources/GatorCore/NativeTranscriptSearch.swift": "e94c042a07e5c70a7086843cf5e4e7fb919b804a697a27327fecd511bdc5c336",
+    "macos/Sources/GatorMac/NativeTranscriptFind.swift": "1c77267007aabf1018f4d1a604b74660553d866d49531f0d4acd4976328630c3",
+    "macos/Sources/GatorMac/NativeReadingPositions.swift": "af252f0fbb83f9d169b7c2f536211fc6fd825fda60e8437984f56fd4429716bc",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/MacOS/GatorMac": "0e11c318acd08a1bd7888dcf82072a7f720e7ea0d31f169539ba8e11b0c39b90",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/gator-runtime": "4fbb61def7980ab43a825e8b0e9100c612223ec4e1848b24e89444f530d2682e",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "/tmp/Gator-Native-Parity-P01.app/Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/MacOS/GatorMac": "e34fe1f76380ae47e0f34e0e258d4bf4c91d7d6bd69aaa529329a00a66fcaba1",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/gator-runtime": "cabd48a83ff2c55624b2e0b6b772aa95ec34c2fb42d709989e7dacb5517e5b39",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "/tmp/Gator-Native-Parity-P02.app/Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c"
+  }
+}

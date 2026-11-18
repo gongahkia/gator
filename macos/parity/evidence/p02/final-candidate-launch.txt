@@ -1,0 +1,2 @@
+Final candidate executables copied byte-for-byte into isolated domain copy. Dark startup restored unsent original draft; Command-Shift-O opened All Conversations; indexed title query returned exact older ID.
+focused=Optional(1) enabled=Optional(1) position=(-117.0, -818.0) size=(685.0, 24.0) value=GUI attempted title

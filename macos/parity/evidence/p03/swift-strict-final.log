@@ -1,0 +1,111 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/23] Compiling GatorCore NativeDraftAttachments.swift
+[3/23] Compiling GatorCore NativeDraftStore.swift
+[4/25] Compiling GatorCore NativeMessageContent.swift
+[5/25] Compiling GatorCore NativePlanExecution.swift
+[6/25] Compiling GatorCore NativeRecovery.swift
+[7/25] Compiling GatorCore NativeRecoveryPreparation.swift
+[8/25] Compiling GatorCore NativeTaskReview.swift
+[9/25] Compiling GatorCore NativeTranscriptSearch.swift
+[10/25] Compiling GatorCore NativeUploadStore.swift
+[11/25] Compiling GatorCore NativeWorkspaceSelection.swift
+[12/25] Compiling GatorCore NativeCatalogProtocol.swift
+[13/25] Compiling GatorCore NativeConversationCatalog.swift
+[14/25] Compiling GatorCore GoBridgeConnection.swift
+[15/25] Compiling GatorCore ManagedSessionCoordinator.swift
+[16/25] Compiling GatorCore ManagedSessionProtocol.swift
+[17/25] Emitting module GatorCore
+[18/25] Compiling GatorCore BridgePipeIO.swift
+[19/25] Compiling GatorCore BridgeProtocol.swift
+[20/25] Compiling GatorCore GatorApplicationState.swift
+[21/80] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[22/80] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[23/80] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[24/80] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[25/83] Emitting module GatorMac
+[26/83] Compiling GatorCoreTests ManagedSessionTests.swift
+[27/83] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[28/83] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[29/83] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[30/83] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[31/83] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[32/83] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[33/83] Compiling GatorCoreTests ApplicationStateTests.swift
+[34/83] Compiling GatorCoreTests BridgeProtocolTests.swift
+[35/83] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[36/83] Compiling GatorCoreTests GoIntegrationTests.swift
+[37/83] Compiling GatorMac RecoveryInspectorContent.swift
+[38/83] Compiling GatorMac RecoveryPreparationView.swift
+[39/83] Compiling GatorMac TaskInspectorView.swift
+[44/87] Compiling GatorCoreTests NativeCatalogTests.swift
+[45/87] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[46/87] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[47/87] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[48/87] Emitting module GatorCoreTests
+[49/87] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[50/87] Compiling GatorCoreTests NativeMessageContentTests.swift
+[51/87] Compiling GatorCoreTests NativePerformanceTests.swift
+[52/87] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[53/87] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[54/87] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[69/87] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[70/87] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[71/87] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[72/87] Compiling GatorCoreTests resource_bundle_accessor.swift
+[82/86] Linking GatorMac
+[83/86] Applying GatorMac
+[85/92] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[86/92] Compiling GatorMacTests NotchGeometryTests.swift
+[87/92] Emitting module GatorMacTests
+[88/92] Compiling GatorMacTests NativeInputTests.swift
+[89/92] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[90/92] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[91/94] Compiling GatorNativePackageTests runner.swift
+[92/94] Emitting module GatorNativePackageTests
+[92/93] Linking GatorNativePackageTests
+Build complete! (17.40s)
+Test Suite 'Selected tests' started at 2026-11-18 13:56:02.784.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 13:56:02.785.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 13:56:02.785.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 13:56:02.785.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 2.301 seconds.
+◇ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() started.
+GATOR_P03_HANDOFF requestToConfirmedOwner=0.085005791 seconds
+✔ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() passed after 3.186 seconds.
+◇ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() started.
+✔ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() passed after 1.700 seconds.
+◇ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() started.
+✔ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() passed after 1.756 seconds.
+◇ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() started.
+✔ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() passed after 2.112 seconds.
+◇ Test workspaceRequestEncodesPathAsDataAndResultIdentity() started.
+✔ Test workspaceRequestEncodesPathAsDataAndResultIdentity() passed after 0.001 seconds.
+◇ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() started.
+✔ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() passed after 0.060 seconds.
+◇ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() started.
+✔ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() passed after 0.210 seconds.
+◇ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() started.
+✔ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() passed after 0.101 seconds.
+◇ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() started.
+✔ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() passed after 0.040 seconds.
+◇ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() started.
+✔ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() passed after 0.226 seconds.
+◇ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() started.
+✔ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() passed after 0.261 seconds.
+◇ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() started.
+✔ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() passed after 0.032 seconds.
+◇ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() started.
+✔ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() passed after 0.064 seconds.
+◇ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() started.
+✔ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() passed after 0.127 seconds.
+◇ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() started.
+✔ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() passed after 0.370 seconds.
+✔ Test run with 16 tests in 0 suites passed after 12.554 seconds.

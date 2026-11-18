@@ -1,0 +1,20 @@
+('type', 'GoToWindow', 'PathTextField', '/tmp/gator-native-test-p03-acceptance-6f8he7dl/A deliberately long parent folder for readable truncated workspace paths with spaces and café 日本/Workspace B')
+typed_to=PathTextField observed_value=true
+('confirm-key', 'GoToWindow')
+return_dismissed=true
+controller=25317 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=open-panel focused=AXList::
+('wait', 'open-panel', 'OKButton')
+ready=true
+('focus', 'open-panel')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=25341 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=open-panel focused=AXList::
+('confirm-key', 'open-panel')
+return_dismissed=true
+controller=25342 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=conversation focused=AXTextArea:Message Gator:gator.composer.text
+('wait', 'conversation', 'Already using this workspace · conversation kept')
+ready=true
+('state',)
+controller=25344 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=conversation focused=AXTextArea:Message Gator:gator.composer.text
+('inspect', 'conversation', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(1) enabled=nil pos=(349.0, 721.0) size=(772.0, 76.0) value=B desktop draft remains with B
+PASS keyboard GoTo entry/Return, native Return confirmation, same owner/PIDs/draft, Already using feedback
