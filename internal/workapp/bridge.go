@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	appconfig "github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/uisnapshot"
 	"github.com/gongahkia/gator/internal/workactivity"
 	"github.com/gongahkia/gator/internal/workhome"
@@ -20,35 +21,36 @@ import (
 // BridgeState is a display-only projection for the desktop.
 // The Go model remains the sole owner of commands, runs, approvals and history.
 type BridgeState struct {
-	NativeWorkspaceResult     *NativeWorkspaceResult  `json:"native_workspace_result,omitempty"`
-	NativeCatalogQueryResult  *NativeCatalogResult    `json:"native_catalog_query_result,omitempty"`
-	NativeCatalogActionResult *NativeCatalogResult    `json:"native_catalog_action_result,omitempty"`
-	PreferencesRevision       uint64                  `json:"preferences_revision"`
-	Dialogue                  []DialogueMessage       `json:"dialogue,omitempty"`
-	DialogueMore              bool                    `json:"dialogue_more,omitempty"`
-	DialogueIssue             string                  `json:"dialogue_issue,omitempty"`
-	DialogueBusy              bool                    `json:"dialogue_busy,omitempty"`
-	DialogueActive            bool                    `json:"dialogue_active,omitempty"`
-	DialogueDispatch          *DialogueDispatch       `json:"dialogue_dispatch,omitempty"`
-	DialogueBootstrapResult   *DialogueDispatchResult `json:"dialogue_bootstrap_result,omitempty"`
-	DialogueControlResult     *DialogueControlResult  `json:"dialogue_control_result,omitempty"`
-	DialogueTask              *DialogueTaskState      `json:"dialogue_task,omitempty"`
-	DialoguePeers             []DialoguePeer          `json:"dialogue_peers,omitempty"`
-	CheckResult               *BridgeCheckResult      `json:"check_result,omitempty"`
-	GoalResult                *BridgeGoalResult       `json:"goal_result,omitempty"`
-	GoalBusy                  bool                    `json:"goal_busy,omitempty"`
-	SupervisorRunning         bool                    `json:"supervisor_running"`
-	TaskPlans                 []TaskPlanSummary       `json:"task_plans,omitempty"`
-	RequestRecoveries         []RequestRecoveryView   `json:"request_recoveries,omitempty"`
-	RequestRecoveryResult     *RequestRecoveryResult  `json:"request_recovery_result,omitempty"`
-	TaskPlanResult            *TaskPlanResult         `json:"task_plan_result,omitempty"`
-	Branch                    *BranchLink             `json:"branch,omitempty"`
-	BranchResult              *BranchResult           `json:"branch_result,omitempty"`
-	PendingOperation          string                  `json:"pending_operation,omitempty"`
-	CatalogBusy               bool                    `json:"catalog_busy,omitempty"`
-	ActionRecoveries          []RecoveredAction       `json:"action_recoveries,omitempty"`
-	ActionRecoveryIssue       string                  `json:"action_recovery_issue,omitempty"`
-	ActionRecoveryTruncated   bool                    `json:"action_recovery_truncated,omitempty"`
+	NativeProviderResult      *modelcatalog.NativeProviderResult `json:"native_provider_result,omitempty"`
+	NativeWorkspaceResult     *NativeWorkspaceResult             `json:"native_workspace_result,omitempty"`
+	NativeCatalogQueryResult  *NativeCatalogResult               `json:"native_catalog_query_result,omitempty"`
+	NativeCatalogActionResult *NativeCatalogResult               `json:"native_catalog_action_result,omitempty"`
+	PreferencesRevision       uint64                             `json:"preferences_revision"`
+	Dialogue                  []DialogueMessage                  `json:"dialogue,omitempty"`
+	DialogueMore              bool                               `json:"dialogue_more,omitempty"`
+	DialogueIssue             string                             `json:"dialogue_issue,omitempty"`
+	DialogueBusy              bool                               `json:"dialogue_busy,omitempty"`
+	DialogueActive            bool                               `json:"dialogue_active,omitempty"`
+	DialogueDispatch          *DialogueDispatch                  `json:"dialogue_dispatch,omitempty"`
+	DialogueBootstrapResult   *DialogueDispatchResult            `json:"dialogue_bootstrap_result,omitempty"`
+	DialogueControlResult     *DialogueControlResult             `json:"dialogue_control_result,omitempty"`
+	DialogueTask              *DialogueTaskState                 `json:"dialogue_task,omitempty"`
+	DialoguePeers             []DialoguePeer                     `json:"dialogue_peers,omitempty"`
+	CheckResult               *BridgeCheckResult                 `json:"check_result,omitempty"`
+	GoalResult                *BridgeGoalResult                  `json:"goal_result,omitempty"`
+	GoalBusy                  bool                               `json:"goal_busy,omitempty"`
+	SupervisorRunning         bool                               `json:"supervisor_running"`
+	TaskPlans                 []TaskPlanSummary                  `json:"task_plans,omitempty"`
+	RequestRecoveries         []RequestRecoveryView              `json:"request_recoveries,omitempty"`
+	RequestRecoveryResult     *RequestRecoveryResult             `json:"request_recovery_result,omitempty"`
+	TaskPlanResult            *TaskPlanResult                    `json:"task_plan_result,omitempty"`
+	Branch                    *BranchLink                        `json:"branch,omitempty"`
+	BranchResult              *BranchResult                      `json:"branch_result,omitempty"`
+	PendingOperation          string                             `json:"pending_operation,omitempty"`
+	CatalogBusy               bool                               `json:"catalog_busy,omitempty"`
+	ActionRecoveries          []RecoveredAction                  `json:"action_recoveries,omitempty"`
+	ActionRecoveryIssue       string                             `json:"action_recovery_issue,omitempty"`
+	ActionRecoveryTruncated   bool                               `json:"action_recovery_truncated,omitempty"`
 
 	ReceiptBusy           bool                       `json:"receipt_busy,omitempty"`
 	ReceiptResult         *ReceiptResult             `json:"receipt_result,omitempty"`
@@ -222,6 +224,7 @@ func (m Model) BridgeState() BridgeState {
 	desktop := m.desktop
 	desktop.Shortcuts = m.desktop.ResolvedShortcuts()
 	state := BridgeState{
+		NativeProviderResult:     m.nativeProviderResult,
 		NativeWorkspaceResult:    m.nativeWorkspaceResult,
 		NativeCatalogQueryResult: m.nativeCatalogQueryResult, NativeCatalogActionResult: m.nativeCatalogActionResult,
 		PreferencesRevision: m.preferencesRevision,

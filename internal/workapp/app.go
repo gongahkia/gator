@@ -4,6 +4,7 @@ package workapp
 
 import (
 	"context"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -185,6 +186,7 @@ type ModelStatus struct {
 type GoalState struct{ Title, SourcePath, ConversationID string }
 
 type Config struct {
+	NativeProviders          func(modelcatalog.NativeProviderAction) modelcatalog.NativeProviderResult
 	ReviewRequestAccess      func(worksession.Request, []string) (RequestAccessReview, error)
 	CaptureConversationInput func(ConversationInput) (ConversationInput, error)
 	RouteConversation        func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error)
@@ -401,6 +403,8 @@ type Model struct {
 	planResult                *TaskPlanResult
 	requestRecoveryResult     *RequestRecoveryResult
 	catalog                   *conversationCatalog
+	nativeProviderPending     string
+	nativeProviderResult      *modelcatalog.NativeProviderResult
 	nativeWorkspacePending    string
 	nativeWorkspaceResult     *NativeWorkspaceResult
 	nativeCatalog             *nativeCatalogState

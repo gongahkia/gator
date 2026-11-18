@@ -23,7 +23,12 @@ type cloudSettingsUpdater interface {
 // saveTUICloudModelConfiguration keeps the UI's secret entry boundary small:
 // the TUI only holds the typed value until this callback stores it in auth.json.
 // Endpoint overrides remain non-secret settings shared by TUI and CLI runs.
-func saveTUICloudModelConfiguration(settingsStore cloudSettingsUpdater, stateDir string) func(modelcatalog.CloudModelSetup) error {
+type cloudCredentialReview struct {
+	provider string
+	expected *auth.Credential
+}
+
+func saveTUICloudModelConfiguration(settingsStore cloudSettingsUpdater, stateDir string, reviewed ...cloudCredentialReview) func(modelcatalog.CloudModelSetup) error {
 	return func(setup modelcatalog.CloudModelSetup) error {
 		provider, err := model.ParseProvider(setup.Provider)
 		if err != nil {
@@ -38,7 +43,7 @@ func saveTUICloudModelConfiguration(settingsStore cloudSettingsUpdater, stateDir
 		}
 		var credentials auth.Store
 		var previous *auth.Credential
-		if storeCredential {
+		if storeCredential || len(reviewed) > 0 {
 			credentials, err = auth.New(stateDir)
 			if err != nil {
 				return fmt.Errorf("open cloud credential store; model settings were not changed: %w", err)
@@ -48,6 +53,9 @@ func saveTUICloudModelConfiguration(settingsStore cloudSettingsUpdater, stateDir
 				return err
 			}
 			defer release()
+			if credentialProvider == "" {
+				credentialProvider = string(provider)
+			}
 			prior, found, readErr := credentials.Read(credentialProvider)
 			if readErr != nil {
 				return fmt.Errorf("read cloud credential; model settings were not changed: %w", readErr)
@@ -55,20 +63,35 @@ func saveTUICloudModelConfiguration(settingsStore cloudSettingsUpdater, stateDir
 			if found {
 				previous = &prior
 			}
-			if err := credentials.ReplaceReviewed(credentialProvider, previous, &credential); err != nil {
-				return fmt.Errorf("save cloud credential; model settings were not changed: %w", err)
+			if len(reviewed) > 0 {
+				review := reviewed[0]
+				if review.provider != string(provider) || (review.expected == nil && found) || (review.expected != nil && (!found || !reflect.DeepEqual(*review.expected, prior))) {
+					return auth.ErrCredentialChanged
+				}
+			}
+			if storeCredential {
+				if err := credentials.ReplaceReviewed(credentialProvider, previous, &credential); err != nil {
+					return fmt.Errorf("save cloud credential; model settings were not changed: %w", err)
+				}
 			}
 		}
 		err = settingsStore.Update(func(settings *config.Settings) error {
 			// Do not publish settings for a credential replaced while waiting
 			// for another chat's settings transaction.
-			if storeCredential {
+			if storeCredential || len(reviewed) > 0 {
 				current, found, err := credentials.Read(credentialProvider)
 				if err != nil {
 					return err
 				}
-				if !found || !reflect.DeepEqual(current, credential) {
-					return auth.ErrCredentialChanged
+				if storeCredential {
+					if !found || !reflect.DeepEqual(current, credential) {
+						return auth.ErrCredentialChanged
+					}
+				} else {
+					expected := reviewed[0].expected
+					if (expected == nil && found) || (expected != nil && (!found || !reflect.DeepEqual(current, *expected))) {
+						return auth.ErrCredentialChanged
+					}
 				}
 			}
 

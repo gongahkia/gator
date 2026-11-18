@@ -176,6 +176,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 		return err
 	}
 	localModels := newLocalModelManager(settingsStore)
+	nativeProviders := &nativeProviderBackend{settings: settingsStore, stateDir: stateDir}
 	defer localModels.Close()
 	connections := &connectionControls{stateDir: stateDir}
 	application := workapp.New(workapp.Config{
@@ -220,6 +221,7 @@ func workInteractiveConversationForGoal(startConversationID, goalID string) erro
 			current, err := settingsStore.Load()
 			return current.Desktop, err
 		},
+		NativeProviders:     nativeProviders.Apply,
 		Models:              workModelPanel(settingsStore, stateDir, localModels),
 		ComposerModels:      func() ([]workapp.ComposerModel, error) { return workComposerModels(settingsStore, stateDir) },
 		SelectComposerModel: workModelDefaults{settings: settingsStore}.SetDefaults,

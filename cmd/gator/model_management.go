@@ -297,3 +297,25 @@ func describeCredentialRemoval(result modelcatalog.CredentialRemovalResult) stri
 	}
 	return text
 }
+
+// removeReviewedCredential uses the existing auth authority without deleting a
+// credential that changed after the native confirmation was prepared.
+func (backend *tuiModelManagementBackend) removeReviewedCredential(providerName string, expected *auth.Credential) (modelcatalog.CredentialRemovalResult, error) {
+	provider, err := model.ParseProvider(providerName)
+	if err != nil || !model.SupportsAPIKeyLogin(provider) {
+		return modelcatalog.CredentialRemovalResult{}, fmt.Errorf("unsupported credential provider")
+	}
+	credentials, err := auth.New(backend.stateDir)
+	if err != nil {
+		return modelcatalog.CredentialRemovalResult{}, err
+	}
+	release, err := lockCloudCredentialSetup(credentials)
+	if err != nil {
+		return modelcatalog.CredentialRemovalResult{}, err
+	}
+	defer release()
+	if err = credentials.ReplaceReviewed(string(provider), expected, nil); err != nil {
+		return modelcatalog.CredentialRemovalResult{}, err
+	}
+	return modelcatalog.CredentialRemovalResult{Provider: string(provider), StoreKey: string(provider), Removed: expected != nil, RemainingSources: remainingCredentialSources(provider)}, nil
+}

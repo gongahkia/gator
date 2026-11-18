@@ -12,10 +12,12 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/workapp"
 )
 
 type uiFrame struct {
+	NativeProvider         *modelcatalog.NativeProviderAction `json:"native_provider,omitempty"`
 	NativeWorkspace        *workapp.NativeWorkspaceAction     `json:"native_workspace,omitempty"`
 	ConversationMetadataID string                             `json:"conversation_id,omitempty"`
 	NativeCatalog          *workapp.NativeCatalogAction       `json:"native_catalog,omitempty"`
@@ -72,6 +74,11 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "native_provider":
+			if frame.NativeProvider == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyNativeProvider(*frame.NativeProvider)
 		case "native_workspace":
 			if frame.NativeWorkspace == nil {
 				return m, nil

@@ -24,6 +24,10 @@ func currentWorkModelStatus(settingsStore config.Store, stateDir string) (workap
 	if err != nil {
 		return workapp.ModelStatus{}, err
 	}
+	return workModelStatusForSettings(settings, stateDir)
+}
+
+func workModelStatusForSettings(settings config.Settings, stateDir string) (workapp.ModelStatus, error) {
 	status := workapp.ModelStatus{
 		Provider: strings.TrimSpace(settings.Defaults.Provider),
 		Model:    strings.TrimSpace(settings.Defaults.Model),
