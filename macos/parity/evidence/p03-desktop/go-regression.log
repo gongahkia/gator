@@ -1,0 +1,4 @@
+ok  	github.com/gongahkia/gator/cmd/gator	33.540s
+ok  	github.com/gongahkia/gator/internal/workapp	8.999s
+ok  	github.com/gongahkia/gator/internal/worksession	(cached)
+ok  	github.com/gongahkia/gator/internal/workspace	(cached)

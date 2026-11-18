@@ -1,72 +1,72 @@
 {
   "phase": "accepted-before",
-  "selected": "work-20261118T062719-3602b39d79f02ac6",
-  "source": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+  "selected": "work-20261118T064411-ce15bfc5c15ef886",
+  "source": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
   "drafts": {
-    "conversation:work-20261118T062719-3602b39d79f02ac6": {
-      "revision": "C6CDD267-1ECB-491E-BFF5-B8EEE6CD513D",
-      "updated": 816676040.7464509,
-      "text": "Original acceptance draft stays here"
+    "conversation:work-20261118T064411-ce15bfc5c15ef886": {
+      "updated": 816677052.111733,
+      "text": "Original acceptance draft stays here",
+      "revision": "F1E0FA56-6417-4838-9A87-EEFB0C6954A7"
     }
   },
   "children": [
-    "23377"
+    "31584"
   ],
   "records": {
-    "work-20261118T062719-3602b39d79f02ac6": {
+    "work-20261118T064411-ba5feacaf1441313": {
       "version": 2,
-      "id": "work-20261118T062719-3602b39d79f02ac6",
-      "title": "Retained topic 0005",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
-      "snapshot_id": "",
-      "created_at": "2026-11-18T00:05:00Z",
-      "updated_at": "2026-11-18T00:05:00Z"
-    },
-    "work-20261118T062719-4e769c2242eee485": {
-      "version": 2,
-      "id": "work-20261118T062719-4e769c2242eee485",
-      "title": "Retained topic 0001",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
-      "snapshot_id": "",
-      "created_at": "2026-11-18T00:01:00Z",
-      "updated_at": "2026-11-18T00:01:00Z"
-    },
-    "work-20261118T062719-8fe8bad9e9f70ae3": {
-      "version": 2,
-      "id": "work-20261118T062719-8fe8bad9e9f70ae3",
-      "title": "Retained topic 0002",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
-      "snapshot_id": "",
-      "created_at": "2026-11-18T00:02:00Z",
-      "updated_at": "2026-11-18T00:02:00Z"
-    },
-    "work-20261118T062719-56e09c857686fc00": {
-      "version": 2,
-      "id": "work-20261118T062719-56e09c857686fc00",
-      "title": "Retained topic 0004",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
-      "snapshot_id": "",
-      "created_at": "2026-11-18T00:04:00Z",
-      "updated_at": "2026-11-18T00:04:00Z"
-    },
-    "work-20261118T062719-90ea94e2c569edfa": {
-      "version": 2,
-      "id": "work-20261118T062719-90ea94e2c569edfa",
+      "id": "work-20261118T064411-ba5feacaf1441313",
       "title": "Retained topic 0000",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
       "snapshot_id": "snap-fixture",
       "head_revision_id": "rev-catalog-fixture",
       "created_at": "2026-11-18T00:00:00Z",
       "updated_at": "2026-11-18T00:00:00Z"
     },
-    "work-20261118T062719-c9e29b53c7a3664c": {
+    "work-20261118T064411-f5eb47586f0bf9d7": {
       "version": 2,
-      "id": "work-20261118T062719-c9e29b53c7a3664c",
+      "id": "work-20261118T064411-f5eb47586f0bf9d7",
+      "title": "Retained topic 0002",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:02:00Z",
+      "updated_at": "2026-11-18T00:02:00Z"
+    },
+    "work-20261118T064411-bcad114dfd6ce98e": {
+      "version": 2,
+      "id": "work-20261118T064411-bcad114dfd6ce98e",
       "title": "Retained topic 0003",
-      "source_path": "/tmp/gator-native-test-p03-acceptance-6f8he7dl/workspace",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
       "snapshot_id": "",
       "created_at": "2026-11-18T00:03:00Z",
       "updated_at": "2026-11-18T00:03:00Z"
+    },
+    "work-20261118T064411-ce15bfc5c15ef886": {
+      "version": 2,
+      "id": "work-20261118T064411-ce15bfc5c15ef886",
+      "title": "Retained topic 0005",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:05:00Z",
+      "updated_at": "2026-11-18T00:05:00Z"
+    },
+    "work-20261118T064411-9943ef342f213799": {
+      "version": 2,
+      "id": "work-20261118T064411-9943ef342f213799",
+      "title": "Retained topic 0001",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:01:00Z",
+      "updated_at": "2026-11-18T00:01:00Z"
+    },
+    "work-20261118T064411-7dfc2550da2b5793": {
+      "version": 2,
+      "id": "work-20261118T064411-7dfc2550da2b5793",
+      "title": "Retained topic 0004",
+      "source_path": "/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace",
+      "snapshot_id": "",
+      "created_at": "2026-11-18T00:04:00Z",
+      "updated_at": "2026-11-18T00:04:00Z"
     }
   },
   "selectedFiles": [

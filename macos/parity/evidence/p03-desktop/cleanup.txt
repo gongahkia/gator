@@ -1,0 +1,2 @@
+Final controlled client PID 31583 exited through normal Quit with all three direct Go owners gone.
+Earlier interfered client PID 23375 had closed all direct Go owners but remained alive after Quit with a task inspector. After two native Quit attempts, only that verified disposable client PID received SIGTERM for cleanup. This uncontrolled observation was not treated as a new confirmed lifecycle defect.

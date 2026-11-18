@@ -23,6 +23,7 @@ func find(_ e: AXUIElement, _ name: String, _ depth: Int = 0) -> AXUIElement? {
 }
 func window(_ id: String) -> AXUIElement? {
     let windows=elements(app,"AXWindows")
+    if id=="compact" {return windows.first {str($0,"AXIdentifier").isEmpty && str($0,"AXTitle").isEmpty && abs(size($0).width-440)<2}}
     if let w=windows.first(where:{str($0,"AXIdentifier")==id || str($0,"AXTitle")==id}) {return w}
     for w in windows {if let sheet=find(w,id),str(sheet,"AXRole")=="AXSheet" {return sheet}}
     return nil
@@ -43,7 +44,7 @@ func state() {
 }
 func requireFocus(_ win: String, _ name: String? = nil) {
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier==pid,
-          let fw=element(app,"AXFocusedWindow"),matches(fw,win) else { state(); print("refuse_input_wrong_window");exit(3) }
+          let fw=element(app,"AXFocusedWindow"), (win=="compact" ? str(fw,"AXIdentifier").isEmpty && abs(size(fw).width-440)<2 : matches(fw,win)) else { state(); print("refuse_input_wrong_window");exit(3) }
     if let name { guard let focused=element(app,"AXFocusedUIElement"),matches(focused,name) else { state(); print("refuse_input_wrong_element");exit(3) } }
 }
 func key(_ code: UInt16, flags: CGEventFlags = []) {
@@ -73,6 +74,22 @@ case "wait-gone":
 case "wait":
     let ready=until { scope(args[3]).flatMap{find($0,args[4])} != nil };print("ready=\(ready)");if !ready{exit(2)}
 case "tree": guard let s=scope(args[3]) else{exit(2)};dump(s)
+case "compact-cancel":
+    guard let w=window("compact"),let more=find(w,"More") else{print("missing_compact");exit(2)}
+    _=AXUIElementPerformAction(more,"AXPress" as CFString)
+    guard until({window("compact").flatMap{find($0,"AXMenuItem::Choose Workspace…")} != nil}),let item=window("compact").flatMap({find($0,"AXMenuItem::Choose Workspace…")}) else{print("no_compact_menu");exit(3)}
+    let chosen=AXUIElementPerformAction(item,"AXPress" as CFString)
+    guard until({window("open-panel").flatMap{find($0,"CancelButton")} != nil}),let cancel=window("open-panel").flatMap({find($0,"CancelButton")}) else{print("no_cancel_control");exit(3)}
+    let cancelled=AXUIElementPerformAction(cancel,"AXPress" as CFString)
+    let gone=until{window("open-panel")==nil};print("compact_choose=\(chosen.rawValue) cancel=\(cancelled.rawValue) panel_gone=\(gone)");if !gone{exit(3)}
+case "compact-picker":
+    guard let w=window("compact"),let more=find(w,"More") else{print("missing_compact");exit(2)}
+    let opened=AXUIElementPerformAction(more,"AXPress" as CFString)
+    let ready=until{window("compact").flatMap{find($0,"AXMenuItem::Choose Workspace…")} != nil}
+    guard ready,let item=window("compact").flatMap({find($0,"AXMenuItem::Choose Workspace…")}) else{print("menu_not_ready=\(opened.rawValue)");exit(3)}
+    let result=AXUIElementPerformAction(item,"AXPress" as CFString)
+    let panel=until{window("open-panel").flatMap{find($0,"OKButton")} != nil}
+    print("compact_more=\(opened.rawValue) choose=\(result.rawValue) panel_ready=\(panel)");if !panel{exit(3)}
 case "select-row":
     guard let s=scope(args[3]),var e=find(s,args[4]) else{print("missing");exit(2)}
     for _ in 0..<8 {if str(e,"AXRole")=="AXRow"{break};guard let parent=element(e,"AXParent") else{exit(2)};e=parent}

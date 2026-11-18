@@ -1,0 +1,9 @@
+('inspect', 'compact', 'AXMenuItem::Choose Workspace…')
+missing
+Atomic compact More -> Choose Workspace AX action: compact_more=0 choose=0 panel_ready=true (observed native panel)
+('focus', 'open-panel')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=30285 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=open-panel focused=nil
+('escape-key', 'open-panel')
+escape_dismissed=false
+controller=30286 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=23375 target=23375 window=open-panel focused=nil

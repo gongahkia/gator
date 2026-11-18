@@ -13,8 +13,8 @@ env={'PATH':os.environ['PATH'],'HOME':str(root),'GATOR_NATIVE_USER_DATA':str(roo
 archive=root/'native/native/drafts';archive.mkdir(parents=True,mode=0o700)
 file=archive/(hashlib.sha256(str(root/'state').encode()).hexdigest()+'.json')
 file.write_text(json.dumps({'version':1,'selectedConversationID':ids[-1],'drafts':{'conversation:'+ids[-1]:{'text':'Original acceptance draft stays here','revision':str(uuid.uuid4()),'updated':time.time()-978307200}}}));file.chmod(0o600)
-app=pathlib.Path('/tmp/Gator-Native-Parity-P03-Accepted-Desktop.app' if accepted else '/tmp/Gator-Native-Parity-P03-Acceptance-Desktop.app');assert not app.exists(),'Preserve previous fixture bundles'
-shutil.copytree('/tmp/Gator-Native-Parity-P03-Accepted.app' if accepted else '/tmp/Gator-Native-Parity-P03.app',app)
+app=pathlib.Path('/tmp/Gator-Native-Parity-P03-Accepted-Desktop.app' if accepted else '/tmp/Gator-Native-Parity-P03-Acceptance-Desktop.app');assert not app.exists() or '--reuse' in sys.argv,'Preserve previous fixture bundles'
+if not app.exists(): shutil.copytree('/tmp/Gator-Native-Parity-P03-Accepted.app' if accepted else '/tmp/Gator-Native-Parity-P03.app',app)
 p=app/'Contents/Info.plist';info=plistlib.loads(p.read_bytes());info['CFBundleIdentifier']='dev.gator.native.p03.acceptance.fixed' if accepted else 'dev.gator.native.p03.acceptance';p.write_bytes(plistlib.dumps(info))
 subprocess.run(['/usr/bin/defaults','write',info['CFBundleIdentifier'],'gator.notch.enabled','-bool','false'],check=True)
 subprocess.run(['/usr/bin/defaults','write',info['CFBundleIdentifier'],'gator.menuBar.enabled','-bool','true'],check=True)

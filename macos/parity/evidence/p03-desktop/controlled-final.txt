@@ -1,0 +1,187 @@
+('press', 'app', 'Gator, Ready')
+press=0
+('wait', 'compact', 'More')
+ready=true
+('compact-cancel',)
+compact_choose=0 cancel=0 panel_gone=true
+('inspect', 'compact', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(0) enabled=nil pos=(777.0, 531.0000000000001) size=(392.0, 56.0) value=B desktop draft remains with B
+('wait', 'compact', 'More')
+ready=true
+('inspect', 'compact', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(0) enabled=nil pos=(777.0, 531.0000000000001) size=(392.0, 56.0) value=B desktop draft remains with B
+('frames',)
+window= title= pos=(753.0, 35.0) size=(440.0, 620.0) main=Optional(0) focused=Optional(0)
+window=conversation title=Gator – New chat pos=(325.0, 125.0) size=(540.0, 532.0) main=Optional(1) focused=Optional(0)
+captureID=33280 bounds={
+    Height = 620;
+    Width = 440;
+    X = 753;
+    Y = 35;
+}
+captureID=33232 bounds={
+    Height = 532;
+    Width = 540;
+    X = 325;
+    Y = 125;
+}
+/tmp/gator-p03-controlled-compact.png
+CAPTURE gator-p03-controlled-compact 33280
+PASS compact More/picker/Cancel/draft/owner isolation
+('focus', 'conversation')
+activated=Optional(true) raised=-25205 main=0 focus=0 ready=true
+controller=31809 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=conversation focused=AXTextArea:Message Gator:gator.composer.text
+('resize', 'conversation', '540', '480')
+resize=0
+('inspect', 'conversation', 'Choose Workspace…')
+role=AXButton title= desc=Choose Workspace… id=folder focused=Optional(0) enabled=Optional(1) pos=(767.0, 125.0) size=(47.0, 52.0) value=
+('inspect', 'conversation', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(1) enabled=nil pos=(349.0, 513.0) size=(492.0, 76.0) value=B desktop draft remains with B
+('frames',)
+window= title= pos=(753.0, 35.0) size=(440.0, 620.0) main=Optional(0) focused=Optional(0)
+window=conversation title=Gator – New chat pos=(325.0, 125.0) size=(540.0, 532.0) main=Optional(1) focused=Optional(0)
+captureID=33280 bounds={
+    Height = 620;
+    Width = 440;
+    X = 753;
+    Y = 35;
+}
+captureID=33232 bounds={
+    Height = 532;
+    Width = 540;
+    X = 325;
+    Y = 125;
+}
+/tmp/gator-p03-controlled-minimum.png
+CAPTURE gator-p03-controlled-minimum 33232
+PASS minimum window, long path and controls observed
+('press', 'menu', 'All Conversations…')
+press=0
+('wait', 'catalog', 'gator.catalog.row.work-20261118T064511-28d7569231500461')
+ready=true
+('select-row', 'catalog', 'gator.catalog.row.work-20261118T064511-28d7569231500461')
+row_selected=0
+('press', 'catalog', 'Open')
+press=0
+('wait-gone', 'catalog')
+gone=true
+('inspect', 'conversation', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(1) enabled=nil pos=(349.0, 513.0) size=(492.0, 76.0) value=A desktop draft remains with A
+('wait', 'conversation', 'Current workspace: /private/tmp/gator-native-test-p03-acceptance-xat9_7tw/Workspace A')
+ready=true
+('press', 'conversation', 'Choose Workspace…')
+press=0
+('wait', 'open-panel', 'OKButton')
+ready=true
+('inspect', 'open-panel', 'where popup')
+role=AXPopUpButton title=Where: desc= id=where popup focused=Optional(0) enabled=Optional(1) pos=(681.5, 197.0) size=(232.0, 26.0) value=Workspace A
+('focus', 'open-panel')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=31830 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=open-panel focused=AXList::
+('confirm-key', 'open-panel')
+return_dismissed=true
+controller=31831 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window= focused=AXTextArea:Message Gator:gator.composer.text
+('wait', 'conversation', 'Already using this workspace · conversation kept')
+ready=true
+PASS native keyboard Return same A, original owner/draft/source retained
+('press', 'menu', 'All Conversations…')
+press=0
+('wait', 'catalog', 'gator.catalog.row.work-20261118T064549-c3fe983c2eae8b3b')
+ready=true
+('select-row', 'catalog', 'gator.catalog.row.work-20261118T064549-c3fe983c2eae8b3b')
+row_selected=0
+('press', 'catalog', 'Open')
+press=0
+('wait-gone', 'catalog')
+gone=true
+PASS return B exact draft and unchanged PIDs
+('press', 'menu', 'All Conversations…')
+press=0
+('wait', 'catalog', 'gator.catalog.row.work-20261118T064411-ce15bfc5c15ef886')
+ready=true
+('select-row', 'catalog', 'gator.catalog.row.work-20261118T064411-ce15bfc5c15ef886')
+row_selected=0
+('press', 'catalog', 'Open')
+press=0
+('wait-gone', 'catalog')
+gone=true
+('resize', 'conversation', '820', '740')
+resize=0
+('focus', 'conversation')
+activated=Optional(true) raised=-25205 main=0 focus=0 ready=true
+controller=31847 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=conversation focused=AXTextArea:Message Gator:gator.composer.text
+('press', 'menu', 'Find in Current Transcript…')
+press=0
+('wait', 'conversation', 'Find in loaded transcript')
+ready=true
+('set', 'conversation', 'Find in loaded transcript', 'Retained note 0005-15')
+set=0
+('wait', 'conversation', 'Retained note 0005-15')
+ready=true
+('inspect', 'conversation', 'Retained note 0005-15')
+role=AXTextField title= desc=Find in loaded transcript id=gator.window focused=Optional(1) enabled=Optional(1) pos=(362.5, 210.0) size=(593.5, 24.0) value=Retained note 0005-15
+('inspect', 'conversation', 'Find in loaded transcript')
+role=AXTextField title= desc=Find in loaded transcript id=gator.window focused=Optional(1) enabled=Optional(1) pos=(362.5, 210.0) size=(593.5, 24.0) value=Retained note 0005-15
+('frames',)
+window= title= pos=(753.0, 35.0) size=(440.0, 620.0) main=Optional(0) focused=Optional(0)
+window=conversation title=Gator – Retained topic 0005 pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(1) focused=Optional(0)
+captureID=33280 bounds={
+    Height = 620;
+    Width = 440;
+    X = 753;
+    Y = 35;
+}
+captureID=33232 bounds={
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}
+/tmp/gator-p03-controlled-reading-before.png
+CAPTURE gator-p03-controlled-reading-before 33232
+('press', 'conversation', 'Choose Workspace…')
+press=0
+('wait', 'open-panel', 'OKButton')
+ready=true
+('focus', 'open-panel')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=31867 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=open-panel focused=AXList::
+('confirm-key', 'open-panel')
+return_dismissed=true
+controller=31868 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window= focused=AXTextArea:Message Gator:gator.composer.text
+('wait', 'conversation', 'Already using this workspace · conversation kept')
+ready=true
+('inspect', 'conversation', 'Find in loaded transcript')
+role=AXTextField title= desc=Find in loaded transcript id=gator.window focused=Optional(0) enabled=Optional(1) pos=(362.5, 226.0) size=(593.5, 24.0) value=Retained note 0005-15
+('inspect', 'conversation', 'Retained note 0005-15')
+role=AXTextField title= desc=Find in loaded transcript id=gator.window focused=Optional(0) enabled=Optional(1) pos=(362.5, 226.0) size=(593.5, 24.0) value=Retained note 0005-15
+('frames',)
+window= title= pos=(753.0, 35.0) size=(440.0, 620.0) main=Optional(0) focused=Optional(0)
+window=conversation title=Gator – Retained topic 0005 pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(0) focused=Optional(0)
+captureID=33280 bounds={
+    Height = 620;
+    Width = 440;
+    X = 753;
+    Y = 35;
+}
+captureID=33232 bounds={
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}
+/tmp/gator-p03-controlled-reading-after.png
+CAPTURE gator-p03-controlled-reading-after 33232
+PASS unchanged-source Find query, older visible heading, exact draft and owner PIDs
+('focus', 'conversation')
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=31878 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=conversation focused=AXTextField:Find in loaded transcript:gator.window
+('focus-element', 'conversation', 'Find in loaded transcript')
+set=0 focused=true
+controller=31879 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=conversation focused=AXTextField:Find in loaded transcript:gator.window
+('key-focus', 'conversation', '53', '0', 'gator.composer.text')
+key=53 focused_expected=true
+controller=31880 frontName=Gator frontBundle=dev.gator.native.p03.acceptance.fixed front=31583 target=31583 window=conversation focused=AXTextArea:Message Gator:gator.composer.text
+('inspect', 'conversation', 'gator.composer.text')
+role=AXTextArea title= desc=Message Gator id=gator.composer.text focused=Optional(1) enabled=nil pos=(349.0, 721.0) size=(772.0, 76.0) value=Original acceptance draft stays here
+PASS controlled acceptance flow
