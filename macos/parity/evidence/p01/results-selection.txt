@@ -1,0 +1,2 @@
+Selected result Message 90 · Gator; count 2 of 2; popup dismissed.
+focused=Optional(0) enabled=Optional(1) position=(353.0, 327.0) size=(149.0, 19.112899780273438) value=

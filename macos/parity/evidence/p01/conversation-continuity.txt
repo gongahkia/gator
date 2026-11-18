@@ -1,0 +1,37 @@
+press gator.recent-conversations -> press gator.recent-conversations: 0
+press gator.recent.work-20261118T012507-018096e73db406be -> press gator.recent.work-20261118T012507-018096e73db406be: 0
+set gator.composer.text Draft remains unchanged during Find -> 0
+press Find in Current Transcript -> press Find in Current Transcript: 0
+set Find in loaded transcript A-050 -> 0
+press Next match -> press Next match: 0
+VISIBLE Retained note A-050 at (373.0, 288.0) size (149.0, 19.037216186523438)
+press Close Find -> press Close Find: 0
+VISIBLE Retained note A-050 at (373.0, 200.0) size (149.0, 19.037208557128906)
+scrollbars -> value=Optional(0.4472281251165045) position=(1127.0, 176.0) size=(19.0, 498.0)
+press gator.recent-conversations -> press gator.recent-conversations: 0
+press gator.recent.work-20261118T012509-8fab7c09f726dbd3 -> press gator.recent.work-20261118T012509-8fab7c09f726dbd3: 0
+set gator.composer.text Independent B draft -> 0
+press Find in Current Transcript -> press Find in Current Transcript: 0
+set Find in loaded transcript B-012 -> 0
+press Next match -> press Next match: 0
+VISIBLE Retained note B-012 at (373.0, 321.0) size (146.0, 19.0294189453125)
+Direct Go children=76401
+76546
+press gator.recent-conversations -> press gator.recent-conversations: 0
+press gator.recent.work-20261118T012507-018096e73db406be -> press gator.recent.work-20261118T012507-018096e73db406be: 0
+VISIBLE Retained note A-050 at (373.0, 232.8499984741211) size (149.0, 19.150001525878906)
+scrollbars -> value=Optional(0.4549935705100729) position=(1127.0, 209.0) size=(19.0, 465.0)
+inspect gator.composer.text -> focused=Optional(0) enabled=nil position=(349.0, 721.0) size=(772.0, 76.0) value=Draft remains unchanged during Find
+press gator.recent-conversations -> press gator.recent-conversations: 0
+press gator.recent.work-20261118T012509-8fab7c09f726dbd3 -> press gator.recent.work-20261118T012509-8fab7c09f726dbd3: 0
+VISIBLE Retained note B-012 at (373.0, 232.8499984741211) size (146.0, 19.150001525878906)
+inspect gator.composer.text -> focused=Optional(0) enabled=nil position=(349.0, 721.0) size=(772.0, 76.0) value=Independent B draft
+PASS: independent drafts/anchors; Find scope closes on switch; same two Go owners reused
+press gator.recent-conversations -> press gator.recent-conversations: 0
+press gator.recent.work-20261118T012507-018096e73db406be -> press gator.recent.work-20261118T012507-018096e73db406be: 0
+VISIBLE Retained note A-050 at (373.0, 233.0) size (149.0, 19.0)
+press Find in Current Transcript -> press Find in Current Transcript: 0
+set Find in loaded transcript A-001 -> 0
+PASS: A-001 retained but outside latest-100-turn projection is not searchable
+set Find in loaded transcript A-050 -> 0
+press Results… -> press Results…: 0

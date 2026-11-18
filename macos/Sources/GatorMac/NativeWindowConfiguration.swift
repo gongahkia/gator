@@ -11,16 +11,19 @@ import AppKit
 /// Standard scenes retain ownership; this configures only their native window.
 struct NativeWindowConfiguration: NSViewRepresentable {
     let compact: Bool
-    func makeNSView(context: Context) -> WindowView { let view = WindowView(); view.compact = compact; return view }
-    func updateNSView(_ view: WindowView, context: Context) { view.compact = compact; view.configure() }
+    var registersConversation = true
+    func makeNSView(context: Context) -> WindowView { let view = WindowView(); view.compact = compact; view.registersConversation = registersConversation; return view }
+    func updateNSView(_ view: WindowView, context: Context) { view.compact = compact; view.registersConversation = registersConversation; view.configure() }
     final class WindowView: NSView {
         var compact = false
+        var registersConversation = true
         override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); configure() }
         func configure() {
             guard let window else { return }
             // SwiftUI owns its scene/window identifier. Keep weak presentation-only
             // references instead of overwriting the scene's restoration identity.
-            NativeApplicationPresentation.register(window, compact: compact)
+            if registersConversation { NativeApplicationPresentation.register(window, compact: compact) }
+            else if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) }
             if !compact { window.hidesOnDeactivate = false }
             DispatchQueue.main.async { NativeApplicationPresentation.update() }
             #if DEBUG

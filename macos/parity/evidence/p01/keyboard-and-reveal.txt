@@ -1,0 +1,11 @@
+press Close Find -> press Close Find: 0
+set gator.composer.text Draft remains unchanged during Find -> 0
+PASS Command-F focused Find: focused=Optional(1) enabled=Optional(1) position=(362.5, 185.0) size=(571.5, 24.0) value=
+inspect Find in loaded transcript -> focused=Optional(1) enabled=Optional(1) position=(362.5, 185.0) size=(593.5, 24.0) value=A-050
+inspect Retained note A-050 -> focused=Optional(0) enabled=Optional(1) position=(373.0, 287.9744110107422) size=(149.0, 19.025588989257812) value=
+scrollbars -> value=Optional(0.4477968633308439) position=(1127.0, 264.0) size=(19.0, 410.0)
+inspect gator.composer.text -> focused=Optional(1) enabled=nil position=(349.0, 721.0) size=(772.0, 76.0) value=Draft remains unchanged during Find
+PASS typed query, Return next, Shift Return previous, Escape, preserved draft
+scrollbars -> value=Optional(0.4149662232746013) position=(1127.0, 176.0) size=(19.0, 498.0)
+press Jump to Latest -> press Jump to Latest: 0
+PASS Jump to Latest actual normalized position=1.0

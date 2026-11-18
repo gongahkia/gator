@@ -1,0 +1,14 @@
+front -> Optional(73921)
+scrollbars -> value=Optional(0.440223749634396) position=(1127.0, 209.0) size=(19.0, 465.0)
+scroll 600 400 -900 -> 
+heads -> Jump to Latest at (667.5, 641.0) size (135.5, 24.0)
+Retained note A-051 at (373.0, -388.05126953125) size (146.5, 19.05126953125)
+Retained note A-052 at (373.0, -109.05128479003906) size (148.5, 19.051284790039062)
+Retained note A-053 at (373.0, 169.9487190246582) size (149.0, 19.051280975341797)
+Retained note A-054 at (373.0, 448.94873046875) size (149.0, 19.05126953125)
+Retained note A-055 at (373.0, 727.94873046875) size (148.5, 19.05126953125)
+Retained note A-056 at (373.0, 1006.94873046875) size (149.0, 19.05126953125)
+scrollbars -> value=Optional(0.4723854718014236) position=(1127.0, 209.0) size=(19.0, 465.0)
+Manual scroll remains independent of the prior search anchor
+press Jump to Latest -> press Jump to Latest: 0
+PASS Jump to Latest actual normalized offset=1.0

@@ -15,6 +15,10 @@ actor SessionFixture: BridgeTransport {
     let silentBootstrap: Bool
     let focusDelay: Duration
     var autoAdmit = true
+    private var catalogItems: [JSONValue] = []
+    private var catalogOpenGate: CatalogOwnerOpenGate?
+    private var catalogQueryGate: CatalogOwnerOpenGate?
+    func configureCatalog(_ items: [JSONValue], openGate: CatalogOwnerOpenGate? = nil, queryGate: CatalogOwnerOpenGate? = nil) { catalogItems = items; catalogOpenGate = openGate; catalogQueryGate = queryGate }
     init(id: String = "parent", failStart: Bool = false, failFocus: Bool = false, silentBootstrap: Bool = false, focusDelay: Duration = .zero) {
         let stream = AsyncStream<BridgeEvent>.makeStream(); events = stream.stream; output = stream.continuation
         guard case .object(var initial) = sampleState().value else { fatalError() }
@@ -35,6 +39,16 @@ actor SessionFixture: BridgeTransport {
     func send(_ command: BridgeCommand, nonce: String) async throws {
         let frame = try JSONDecoder().decode(JSONValue.self, from: command.data(nonce: nonce)); frames.append(frame)
         switch command {
+        case .host(.catalog(let request)):
+            if request.action == .cancel { break }
+            if request.action == .open { await catalogOpenGate?.wait() }
+            if request.action == .query { await catalogQueryGate?.wait() }
+            var result: [String: JSONValue] = ["request_id": .string(request.id), "action": .string(request.action.rawValue), "page_id": .string("fixture-catalog-page")]
+            if request.action == .query { result["page"] = .object(["items": .array(catalogItems)]) }
+            else if let item = catalogItems.first(where: { $0["id"].string == request.item?.id }) { result["item"] = item }
+            else { result["error"] = .string("Fixture item unavailable") }
+            if request.action == .verify && request.item?.id != state["conversation_id"]?.string { result["error"] = .string("Wrong destination") }
+            patch([request.action == .query ? "native_catalog_query_result" : "native_catalog_action_result": .object(result)])
         case .host(.focus(let focused)):
             if focusDelay != .zero { try await Task.sleep(for: focusDelay) }
             if !failFocus { patch(["foreground": .bool(focused), "session_request": .null]) }

@@ -19,10 +19,12 @@ struct RecentConversationsMenu: View {
     var body: some View {
         Menu {
             RecentConversationItems(sessions: sessions)
+            Divider()
+            AllConversationsButton(sessions: sessions)
         } label: { Label("Recent Conversations", systemImage: "clock") }
         .labelStyle(.titleAndIcon)
         .focusable()
-        .help("Choose a recent conversation. Older history is available in the terminal app.")
+        .help("Choose a recent conversation, or open All Conversations for the complete retained catalog.")
         .accessibilityIdentifier("gator.recent-conversations")
     }
 }

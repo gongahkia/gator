@@ -6,6 +6,7 @@ import GatorCore
 
 struct ConversationView: View {
     @Environment(ManagedSessionCoordinator.self) private var sessions
+    @Environment(NativeReadingPositions.self) private var readingPositions
     private var application: GatorApplicationState { sessions.current }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.openWindow) private var openWindow
@@ -16,10 +17,27 @@ struct ConversationView: View {
     @State private var sessionsExpanded = false
     @State private var connectionDetails = false
     @State private var noticesHeight: CGFloat = 24
+    @State private var find = NativeTranscriptFind()
+    private var searchScope: NativeTranscriptSearch.Scope { .init(context: application.context, generation: application.generation) }
+    private var canFind: Bool { !compact && application.review == nil && sessions.inspection == nil }
 
     var body: some View {
+        conversationContent
+            .environment(application)
+            .environment(find)
+            .focusedSceneValue(\.findInTranscript, findAction)
+            .onChange(of: searchScope) { _, _ in find.close() }
+            .onChange(of: application.transcript) { _, messages in find.refresh(scope: searchScope, messages: messages) }
+            .onChange(of: canFind) { _, allowed in if !allowed { find.close() } }
+    }
+    private var findAction: NativeFindActionKey.Value? {
+        guard canFind else { return nil }
+        return { @MainActor in openFind() }
+    }
+    private var conversationContent: some View {
         VStack(spacing: 0) {
             if compact { header.padding(.horizontal, 14).padding(.vertical, 10); Divider() }
+            if !compact && find.isPresented { NativeTranscriptFindBar(find: find, close: closeFind); Divider() }
             if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
             if compact, let inspection = sessions.inspection {
                 TaskInspectorView(inspection: inspection, owner: sessions.inspectedOwner, compact: compact).padding(12)
@@ -33,7 +51,10 @@ struct ConversationView: View {
                         Text("What can I help with?").font(compact ? .title3.weight(.medium) : .title2.weight(.medium))
                         Text("Ask a question, make a plan, or pick up where you left off.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 330)
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else { NativeTranscriptView(compact: compact).id(application.context) }
+                } else {
+                    NativeTranscriptView(compact: compact, initialPosition: readingPositions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)))
+                        .id(application.context)
+                }
             }
             ScrollView {
                 notices.padding(.horizontal, 14).padding(.vertical, 4)
@@ -62,7 +83,6 @@ struct ConversationView: View {
             }
         }
         .navigationSubtitle(compact ? "" : application.title)
-        .environment(application)
         .tint(gatorAccent)
         .transaction { if reduceMotion { $0.animation = nil; $0.disablesAnimations = true } }
         .environment(\.openURL, OpenURLAction { url in
@@ -71,6 +91,9 @@ struct ConversationView: View {
         })
         .accessibilityIdentifier(compact ? "gator.compact" : "gator.window")
     }
+
+    private func openFind() { find.open(scope: searchScope, messages: application.transcript) }
+    private func closeFind() { find.close(); sessions.focusComposer() }
 
     private var header: some View {
         HStack(spacing: 10) {
@@ -84,6 +107,9 @@ struct ConversationView: View {
     }
     @ViewBuilder private var headerActions: some View {
         if !compact {
+            AllConversationsButton(sessions: sessions).labelStyle(.iconOnly)
+            Button(action: openFind) { Image(systemName: "magnifyingglass") }
+                .help("Find in current loaded transcript · ⌘F").accessibilityLabel("Find in Current Transcript").disabled(!canFind)
             Button { Task { await sessions.newConversation() } } label: { Image(systemName: "square.and.pencil") }
                 .disabled(!sessions.canNavigate).help("New Conversation · ⌘N").accessibilityLabel("New Conversation")
         }
@@ -126,6 +152,7 @@ struct ConversationView: View {
                 }
                 if application.snapshot?.value["recent_conversations"].array.isEmpty != false { Text("No recent conversations") }
             }
+            AllConversationsButton(sessions: sessions)
             Divider()
             Menu("Configured Models") { modelChoices }
             Menu("Effort") {
@@ -256,7 +283,8 @@ struct ConversationView: View {
 private struct MessageRow: View, Equatable {
     @Environment(ManagedSessionCoordinator.self) private var sessions
     let message: BridgeMessage
-    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.message == rhs.message }
+    var searchSelected = false
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.message == rhs.message && lhs.searchSelected == rhs.searchSelected }
     var body: some View {
         HStack(alignment: .top) {
             if message.isUser { Spacer(minLength: 40) }
@@ -289,6 +317,7 @@ private struct MessageRow: View, Equatable {
             .background(message.isUser ? gatorAccent.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 12))
             if !message.isUser { Spacer(minLength: 20) }
         }.frame(maxWidth: .infinity)
+            .overlay { if searchSelected { RoundedRectangle(cornerRadius: 8).strokeBorder(gatorAccent, lineWidth: 2).allowsHitTesting(false) } }
     }
     private var validTaskLink: Bool {
         let id = message.result["preview"]["task_chat"].string
@@ -300,14 +329,26 @@ private struct NativeTranscriptView: View {
     @Environment(GatorApplicationState.self) private var application
     @Environment(ManagedSessionCoordinator.self) private var sessions
     @Environment(NativeReadingPositions.self) private var positions
+    @Environment(NativeTranscriptFind.self) private var find
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.controlActiveState) private var activeState
     let compact: Bool
+    let initialPosition: NativeReadingPositions.Position
     @State private var following = true
     @State private var nearBottom = true
     @State private var userScrolling = false
     @State private var visibleMessage: String?
     @State private var activityExpanded = false
+    @State private var lastReveal: UUID?
+    @State private var restorationAnchor: String?
+    private struct Layout: Equatable { let content: CGSize; let container: CGSize }
+    init(compact: Bool, initialPosition: NativeReadingPositions.Position) {
+        self.compact = compact; self.initialPosition = initialPosition
+        _following = State(initialValue: initialPosition.following)
+        _nearBottom = State(initialValue: initialPosition.following)
+        _visibleMessage = State(initialValue: initialPosition.following ? "latest" : initialPosition.anchor)
+        _restorationAnchor = State(initialValue: initialPosition.following ? nil : initialPosition.anchor)
+    }
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -321,7 +362,9 @@ private struct NativeTranscriptView: View {
                     if application.snapshot?.value["dialogue_more"].bool == true {
                         Text("Earlier conversation history is available in the terminal app.").font(.caption).foregroundStyle(.secondary)
                     }
-                    ForEach(application.transcript.filter(\.hasVisibleContent)) { message in MessageRow(message: message).equatable() }
+                    ForEach(application.transcript.filter(\.hasVisibleContent)) { message in
+                        MessageRow(message: message, searchSelected: !compact && find.selected?.messageID == message.id).equatable()
+                    }
                     if application.snapshot?.running == true {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
@@ -343,19 +386,27 @@ private struct NativeTranscriptView: View {
                     Color.clear.frame(height: 1).id("latest")
                 }.scrollTargetLayout().padding(compact ? 16 : 24).frame(maxWidth: 780, alignment: .leading).frame(maxWidth: .infinity)
             }
-            .defaultScrollAnchor(.bottom)
+            .defaultScrollAnchor(initialPosition.following ? .bottom : .top)
             .scrollPosition(id: $visibleMessage, anchor: .top)
             .onScrollPhaseChange { _, new in
-                if new == .interacting || new == .decelerating || new == .tracking { userScrolling = true }
+                if new == .interacting || new == .decelerating || new == .tracking { userScrolling = true; restorationAnchor = nil }
                 if new == .idle, userScrolling {
                     following = nearBottom
                     positions.remember(application.context, anchor: visibleMessage, following: following)
                     userScrolling = false
+                    revealMatch(proxy)
                 }
             }
             .onScrollGeometryChange(for: Bool.self) { geometry in geometry.contentSize.height - geometry.visibleRect.maxY < 80 } action: { _, near in
                 nearBottom = near
                 if userScrolling { following = near }
+            }
+            .onScrollGeometryChange(for: Layout.self) { Layout(content: $0.contentSize, container: $0.containerSize) } action: { _, layout in
+                // lazy rows refine estimated heights after initial restoration and
+                // Find changes the viewport. Keep the requested row anchored until
+                // the reader takes over; never scroll against an active gesture.
+                guard !userScrolling, !following, layout.container.height > 0, let anchor = restorationAnchor else { return }
+                visibleMessage = anchor; proxy.scrollTo(anchor, anchor: .top)
             }
             .onChange(of: application.transcript) { _, _ in
                 guard !userScrolling else { return }
@@ -363,6 +414,7 @@ private struct NativeTranscriptView: View {
                 else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
             }
             .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following && !userScrolling { scrollToLatest(proxy) } }
+            .onChange(of: find.reveal) { _, _ in revealMatch(proxy) }
             .task {
                 await Task.yield()
                 restore(proxy)
@@ -370,16 +422,29 @@ private struct NativeTranscriptView: View {
             .onChange(of: activeState) { _, new in if new == .key && !userScrolling { restore(proxy) } }
             .overlay(alignment: .bottom) {
                 if !following && !nearBottom {
-                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; positions.remember(application.context, anchor: nil, following: true); scrollToLatest(proxy) }
+                    Button("Jump to Latest", systemImage: "arrow.down") { following = true; restorationAnchor = nil; positions.remember(application.context, anchor: nil, following: true); scrollToLatest(proxy) }
                         .buttonStyle(.bordered).background(.regularMaterial, in: Capsule()).padding(8)
                 }
             }
         }
     }
 
+    private func revealMatch(_ proxy: ScrollViewProxy) {
+        guard !compact, !userScrolling, let request = find.reveal, request.id != lastReveal,
+              let id = NativeTranscriptSearch.revealTarget(request.match, scope: .init(context: application.context, generation: application.generation), messages: application.transcript) else { return }
+        lastReveal = request.id
+        following = false
+        restorationAnchor = id
+        visibleMessage = id
+        positions.remember(application.context, anchor: id, following: false)
+        // the binding and imperative scroll must use exactly the same stable row id.
+        proxy.scrollTo(id, anchor: .top)
+    }
+
     private func restore(_ proxy: ScrollViewProxy) {
         let saved = positions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id))
         following = saved.following
+        restorationAnchor = saved.following ? nil : saved.anchor
         if saved.following { scrollToLatest(proxy) }
         else if let anchor = saved.anchor { visibleMessage = anchor; proxy.scrollTo(anchor, anchor: .top) }
     }

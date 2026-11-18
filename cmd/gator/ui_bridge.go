@@ -16,6 +16,7 @@ import (
 )
 
 type uiFrame struct {
+	NativeCatalog   *workapp.NativeCatalogAction       `json:"native_catalog,omitempty"`
 	RequestRecovery *workapp.RequestRecoveryAction     `json:"request_recovery,omitempty"`
 	DialogueHost    *workapp.DialogueHost              `json:"dialogue_host,omitempty"`
 	DialogueResult  *workapp.DialogueDispatchResult    `json:"dialogue_result,omitempty"`
@@ -69,6 +70,13 @@ func (m *uiBridgeModel) Update(value tea.Msg) (tea.Model, tea.Cmd) {
 	switch frame := value.(type) {
 	case uiFrame:
 		switch frame.Type {
+		case "native_catalog":
+			if frame.NativeCatalog == nil {
+				return m, nil
+			}
+			next, command = m.model.ApplyNativeCatalog(*frame.NativeCatalog)
+		case "refresh_conversations":
+			next = m.model.RefreshBridgeConversationTitles()
 		case "dialogue_host":
 			if frame.DialogueHost == nil {
 				return m, nil

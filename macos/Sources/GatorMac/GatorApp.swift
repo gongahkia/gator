@@ -9,9 +9,11 @@ struct GatorApp: App {
     @State private var application = NativeEnvironment.application()
     @State private var readingPositions = NativeReadingPositions()
     @AppStorage("gator.menuBar.enabled") private var menuBarEnabled = true
+    @FocusedValue(\.findInTranscript) private var findInTranscript
+    @FocusedValue(\.findInCatalog) private var findInCatalog
 
     var body: some Scene {
-        MenuBarExtra(isInserted: $menuBarEnabled) {
+        MenuBarExtra(isInserted: .constant(menuBarEnabled)) {
             NativeConversationContent(sessions: application, readingPositions: readingPositions, delegate: delegate, compact: true)
                 .frame(width: 440, height: 620)
         } label: {
@@ -27,6 +29,10 @@ struct GatorApp: App {
         .windowToolbarStyle(.unified)
         .defaultLaunchBehavior(!menuBarEnabled || ProcessInfo.processInfo.arguments.contains("--open-window") ? .presented : .suppressed)
         .commands {
+            CommandGroup(after: .textEditing) {
+                Button(findInCatalog == nil ? "Find in Current Transcript…" : "Search All Conversations…") { if let findInCatalog { findInCatalog() } else { findInTranscript?() } }
+                    .keyboardShortcut("f").disabled(findInTranscript == nil && findInCatalog == nil)
+            }
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
                 Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
@@ -38,6 +44,7 @@ struct GatorApp: App {
                 Button("Select All") { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }.keyboardShortcut("a")
             }
             CommandMenu("Conversation") {
+                AllConversationsButton(sessions: application)
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 MenuBarVisibilityToggle()
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
@@ -54,6 +61,12 @@ struct GatorApp: App {
                     .keyboardShortcut("n").disabled(!application.canNavigate)
             }
         }
+
+        Window("All Conversations", id: "catalog") {
+            ConversationCatalogView(sessions: application).frame(minWidth: 540, minHeight: 480)
+        }
+        .defaultSize(width: 800, height: 680)
+        .defaultLaunchBehavior(.suppressed)
     }
 }
 

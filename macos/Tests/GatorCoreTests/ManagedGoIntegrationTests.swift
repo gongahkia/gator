@@ -68,6 +68,18 @@ import Testing
         try await managedEventually("guide to exact original Work") { parent.snapshot?.value["dialogue"].array.contains { $0["text"].string == "Keep the venues under $2,000" && $0["state"].string == "guided" } == true }
         #expect(child.snapshot?.running == true)
 
+        // search reads the foreground projection while both real Go owners work.
+        let searchOwnerCount = app.ownerCount, searchDraft = parent.draftText
+        let searchIDs = parent.transcript.map(\.id)
+        let searchScope = NativeTranscriptSearch.Scope(context: parent.context, generation: parent.generation)
+        let searchIndex = NativeTranscriptSearch(scope: searchScope, messages: parent.transcript)
+        let searchMatches = searchIndex.search("Hello while working").matches
+        #expect(!searchMatches.isEmpty)
+        #expect(searchMatches.allSatisfy { NativeTranscriptSearch.revealTarget($0, scope: searchScope, messages: parent.transcript) == $0.messageID })
+        #expect(app.current === parent); #expect(app.ownerCount == searchOwnerCount)
+        #expect(parent.draftText == searchDraft); #expect(parent.transcript.map(\.id) == searchIDs)
+        #expect(parent.pendingSubmission == nil); #expect(parent.snapshot?.running == true); #expect(child.snapshot?.running == true)
+
         try Data().write(to: root.appendingPathComponent("release-child"))
         try await managedEventually("retained child completion") { child.snapshot?.running == false && parent.snapshot?.value["dialogue_peers"].array.contains { $0["conversation_id"].string == childID && $0["state"].string == "completed" } == true }
         #expect(app.current === parent); #expect(parent.snapshot?.running == true)

@@ -1,0 +1,45 @@
+resize 820 740 -> 0
+press Close Find -> press Close Find: 0
+press AXMenuItem::Show Menu Bar Icon -> press AXMenuItem::Show Menu Bar Icon: 0
+press Gator, Ready -> press Gator, Ready: 0
+frames -> window  (791.0, 35.0) (440.0, 620.0)
+window Gator – New chat (325.0, 125.0) (820.0, 740.0)
+25365 {
+    Height = 620;
+    Width = 440;
+    X = 791;
+    Y = 35;
+}
+25329 {
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}
+heads -> Jump to Latest at (943.5, 451.0) size (135.5, 24.0)
+Retained note A-049 at (811.0, -25.72222137451172) size (149.5, 19.22222137451172)
+Retained note A-050 at (811.0, 291.27777099609375) size (149.0, 19.22222900390625)
+Retained note A-051 at (811.0, 608.2777709960938) size (146.5, 19.22222900390625)
+Jump to Latest at (667.5, 641.0) size (135.5, 24.0)
+Retained note A-048 at (373.0, -325.05126953125) size (149.5, 19.05126953125)
+Retained note A-049 at (373.0, -46.05128479003906) size (149.5, 19.051284790039062)
+Retained note A-050 at (373.0, 232.94871520996094) size (149.0, 19.051284790039062)
+Retained note A-051 at (373.0, 511.94873046875) size (146.5, 19.05126953125)
+Retained note A-052 at (373.0, 790.94873046875) size (148.5, 19.05126953125)
+Retained note A-053 at (373.0, 1069.94873046875) size (149.0, 19.05126953125)
+press Open full Gator window -> press Open full Gator window: 0
+heads -> Jump to Latest at (943.5, 451.0) size (135.5, 24.0)
+Retained note A-049 at (811.0, -174.22222900390625) size (149.5, 19.22222900390625)
+Retained note A-050 at (811.0, 142.77777862548828) size (149.0, 19.22222137451172)
+Retained note A-051 at (811.0, 459.77777099609375) size (146.5, 19.22222900390625)
+Retained note A-052 at (811.0, 776.7777709960938) size (148.5, 19.22222900390625)
+Jump to Latest at (667.5, 641.0) size (135.5, 24.0)
+Retained note A-048 at (373.0, -325.05126953125) size (149.5, 19.05126953125)
+Retained note A-049 at (373.0, -46.05128479003906) size (149.5, 19.051284790039062)
+Retained note A-050 at (373.0, 232.94871520996094) size (149.0, 19.051284790039062)
+Retained note A-051 at (373.0, 511.94873046875) size (146.5, 19.05126953125)
+Retained note A-052 at (373.0, 790.94873046875) size (148.5, 19.05126953125)
+Retained note A-053 at (373.0, 1069.94873046875) size (149.0, 19.05126953125)
+scrollbars -> value=Optional(0.4504777478517378) position=(1213.0, 119.0) size=(19.0, 365.00000000000006)
+value=Optional(0.440690992936354) position=(1127.0, 209.0) size=(19.0, 465.0)
+Compact has no Find controls; expansion retained the shared A reading anchor

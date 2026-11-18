@@ -1,0 +1,3 @@
+GATOR_P01_BENCH messages=50 build=0.000167458 seconds query20=0.005406166 seconds absent20=0.003673917 seconds resolve1000=0.000539083 seconds liveResolve100=0.000730708 seconds
+GATOR_P01_BENCH messages=500 build=0.001590083 seconds query20=0.055908209 seconds absent20=0.037057625 seconds resolve1000=0.000519458 seconds liveResolve100=0.005032959 seconds
+GATOR_P01_BENCH messages=2000 build=0.006185833 seconds query20=0.220401792 seconds absent20=0.147491417 seconds resolve1000=0.000531 seconds liveResolve100=0.01904475 seconds

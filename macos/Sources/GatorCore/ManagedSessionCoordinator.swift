@@ -19,6 +19,9 @@ public final class ManagedSessionCoordinator {
     public private(set) var issue = ""
     public private(set) var started = false
     public private(set) var stopping = false
+    public let catalog = NativeConversationCatalog()
+    @ObservationIgnored private var catalogOrigin: GatorApplicationState?
+    @ObservationIgnored private var catalogGeneration: UUID?
     private var inspections: [String: NativeTaskInspection] = [:]
     private var records: [UUID: GatorApplicationState] = [:]
     private var order: [UUID] = []
@@ -61,6 +64,7 @@ public final class ManagedSessionCoordinator {
     public var canNavigate: Bool { !switching && !stopping && started }
     public var persistenceIssue: String { records.values.map(\.persistenceIssue).first(where: { !$0.isEmpty }) ?? "" }
     public var quitGuard: String? {
+        if catalog.acting { return "A conversation catalog operation is awaiting Go confirmation. Quitting stops the owner; an unconfirmed title change must be inspected after reopening, never replayed automatically." }
         if switching || !uncertain.isEmpty { return "A chat transition or task-control outcome is unconfirmed. Quit stops all Go owners and preserves retained work; nothing is replayed on restart." }
         let held = records.values.filter { $0.quitGuard != nil }
         return held.isEmpty ? nil : "\(held.count) chat(s) have work, review, queued input or an unconfirmed submission. Quit stops all Go owners. History and drafts are kept; work and approvals will not be replayed."
@@ -137,6 +141,7 @@ public final class ManagedSessionCoordinator {
         return nil
     }
     private func disposable(_ owner: GatorApplicationState) -> Bool {
+        if owner === catalogOrigin && catalog.retainsHost { return false }
         guard let key = key(for: owner), !uncertain.contains(key), owner !== current, owner.pendingSubmission == nil, owner.operation.isEmpty, owner.attachmentImport == nil, !owner.approvalSending, owner.planOperation?.blocksAuthorization != true, owner.receiptOperation?.unresolved != true, owner.recoveryPreparation?.blocks != true, owner.recovery?.unresolved != true else { return false }
         // Even a disconnected owner can retain uncertain work or an exact review.
         return owner.snapshot?.unsafeToNavigate == false && owner.snapshot?.unsupportedNotice == nil
@@ -160,9 +165,10 @@ public final class ManagedSessionCoordinator {
         catch { _ = await owner.shutdown(confirmed: true); records.removeValue(forKey: key); order.removeAll { $0 == key }; expected.removeValue(forKey: key); seenSessions.removeValue(forKey: key); seenDispatches.removeValue(forKey: key); hostSignatures.removeValue(forKey: key); throw error }
         scheduleHostProjection(); return owner
     }
-    private func select(id: String = "", new: Bool = false, source: String = "") async throws {
+    private func select(id: String = "", new: Bool = false, source: String = "", catalogItem: NativeCatalogItem? = nil) async throws {
         switching = true; issue = ""; defer { switching = false }
         let previous = current
+        let wasCached = !id.isEmpty && owners[id] != nil
         var next: GatorApplicationState?
         do {
             if previous.isConnected { try await focus(previous, false) }
@@ -173,12 +179,20 @@ public final class ManagedSessionCoordinator {
                 return
             }
             let owner = try await create(id: id, new: new, source: source); next = owner
+            if let catalogItem {
+                var verification = NativeCatalogRequest(.verify); verification.item = catalogItem
+                let result = try await owner.nativeCatalog(verification)
+                guard result.error?.isEmpty != false, result.item?.id == catalogItem.id, result.item?.version == catalogItem.version, result.item?.source == catalogItem.source else { throw BridgeFailure(result.error ?? "The destination conversation changed. Refresh and select it again.") }
+            }
             try await focus(owner, true)
             guard !stopping else { throw BridgeFailure("Gator is closing.") }
             try await store.selectConversation(owner.conversationID)
             current = owner; attention.removeValue(forKey: owner.conversationID)
         } catch {
             if let next, next !== previous, next.isConnected { try? await focus(next, false) }
+            if catalogItem != nil, !wasCached, let next, disposable(next), let key = key(for: next), await next.shutdown() {
+                records.removeValue(forKey: key); order.removeAll { $0 == key }; hostSignatures.removeValue(forKey: key); seenSessions.removeValue(forKey: key); seenDispatches.removeValue(forKey: key); expected.removeValue(forKey: key)
+            }
             if previous.isConnected { try? await focus(previous, true) }
             current = previous
             throw error
@@ -207,6 +221,43 @@ public final class ManagedSessionCoordinator {
             }.value
             await settled()
         }
+    }
+    public func showCatalog() {
+        guard started, !stopping else { return }
+        if catalog.isPresented, catalogOrigin?.isConnected == true, catalogGeneration == catalogOrigin?.generation { catalog.focusSearch(); return }
+        if !catalog.acting, catalogOrigin?.isConnected != true || catalogGeneration != catalogOrigin?.generation || !catalog.retainsHost {
+            catalogOrigin = current; catalogGeneration = current.generation
+        }
+        let origin = catalogOrigin, generation = catalogGeneration
+        catalog.present { [weak self, weak origin] request in
+            guard let self, let origin, generation == origin.generation, origin.isConnected else { throw BridgeFailure("The catalog owner disconnected. Reconnect a chat explicitly, then reopen All Conversations to refresh; nothing was replayed.") }
+            return try await self.catalogRequest(request, origin: origin)
+        }
+    }
+    private func catalogRequest(_ request: NativeCatalogRequest, origin: GatorApplicationState) async throws -> NativeCatalogResult {
+        if request.action == .query || request.action == .cancel { return try await origin.nativeCatalog(request) }
+        let foreground = current, foregroundGeneration = current.generation
+        var result: NativeCatalogResult?, failure: (any Error)?
+        await enqueue { [self] in
+            do {
+                guard !stopping else { throw BridgeFailure("Gator is closing. The catalog operation was not sent.") }
+                let confirmed = try await origin.nativeCatalog(request)
+                if request.action == .open, confirmed.error?.isEmpty != false {
+                    guard catalog.isPresented, current === foreground, current.generation == foregroundGeneration, catalog.pageID == request.pageID, let item = confirmed.item, item.id == request.item?.id, item.version == request.item?.version else { throw BridgeFailure("The selected view or catalog changed. Choose Open again; original chat kept.") }
+                    try await select(id: item.id, catalogItem: item)
+                }
+                if request.action == .rename, confirmed.error?.isEmpty != false, let item = confirmed.item {
+                    for owner in records.values where owner !== origin && owner.isConnected {
+                        do { try await owner.host(.refreshConversations) { $0.conversationID != item.id || $0.title == item.title } }
+                        catch { issue = "The title was saved, but a cached owner could not refresh its display: " + error.localizedDescription }
+                    }
+                }
+                result = confirmed
+            } catch { failure = error }
+        }.value
+        if let failure { throw failure }
+        guard let result else { throw BridgeFailure("Gator closed before the catalog operation was confirmed. Refresh and inspect; nothing was replayed.") }
+        return result
     }
     private func canOpenActivity(_ id: String, from owner: GatorApplicationState) -> Bool {
         activity.contains(where: { $0.id == id }) || owner.snapshot?.value["branch"]["conversation_id"].string == id || owner.snapshot?.value["dialogue_task"]["parent_id"].string == id || owner.snapshot?.value["dialogue"].array.contains(where: { $0["task_chat"].string == id }) == true
@@ -501,6 +552,8 @@ public final class ManagedSessionCoordinator {
         stopping = true
         // one synchronous barrier covers every owner before the first await.
         for owner in records.values { owner.beginClosing() }
+        catalog.cancelSearch()
+        await catalog.finishActions()
         var success = false
         defer {
             if !success {

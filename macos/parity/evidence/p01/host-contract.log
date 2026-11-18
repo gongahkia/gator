@@ -1,0 +1,47 @@
+✔ plan-first intent survives an empty draft restart and follows retention controls (17.033375ms)
+✔ old drafts remain readable and malformed review intent never silently becomes direct work (2.018583ms)
+✔ update reply drafts retain their referent independently of text across restart (1.915417ms)
+✔ pending draft failures remain visible to update and shutdown preparation (1.449833ms)
+✔ drafts survive restart, stay scoped, and save serially with private permissions (5.907667ms)
+✔ expired drafts are removed and disabling clears retained text (3.863292ms)
+✔ draft requests reject arbitrary fields, large text, and malformed stores recover explicitly (1.142334ms)
+✔ native helpers preserve literal argv, bound output and support cancellation (58.614291ms)
+✔ native playback carries language and rate without exposing reply text in arguments (1.3625ms)
+✔ cancelling voice enumeration prevents native playback (0.101167ms)
+✔ explicit system voices use installed names and keep speech text out of arguments (0.134625ms)
+✔ local voice model downloads can be cancelled and manual reading stops with its chat (0.969875ms)
+✔ dictation captures the provider route and cannot deliver into another conversation (0.262917ms)
+✔ spoken output ignores retained history, speaks only new replies and aborts on close (0.127333ms)
+✔ spoken output stops on chat switch, preference disable and explicit playback cancellation (0.1595ms)
+✔ PDF preview renders actual distinct page images and rejects nonexistent pages (2198.5895ms)
+✔ reading anchors reopen privately without storing conversation text and remain isolated by chat/profile (11.954417ms)
+✔ invalid and linked anchors fail explicitly without modifying history or the retained file (4.352125ms)
+✔ dialogue dispatch starts one background owner and returns results without moving focus (2.820916ms)
+✔ an unconfirmed background admission or control is reported and never automatically replayed (0.518ms)
+✔ plan cancellation reports the original owner's confirmed receipt without moving focus (0.283417ms)
+✔ plan revision admission releases the parent conversation while its original owner prepares (0.67325ms)
+✔ a plan correction rechecks the task limit while stop remains available (1.260667ms)
+✔ managed navigation waits for the new owner's applied view and preserves original execution (0.596084ms)
+✔ a failed managed view acknowledgement retires only the new view and restores the original owner (0.398625ms)
+✔ direct ancestry navigation uses only the current owner's exact parent even when idle (0.202709ms)
+✔ browser sign-in retains its owner and Connections returns to it (1.132459ms)
+✔ durable update badges include unopened chats and clear from fresh receipts (0.791291ms)
+✔ chat navigation retains original execution, approvals and unread results (0.388334ms)
+✔ session capacity never evicts running or queued work and admissions are bounded (0.357791ms)
+✔ reviewed plan starts share the existing three-working-chat admission limit (0.382291ms)
+✔ failed chat startup restores focus and leaves original work running (0.154125ms)
+✔ host navigation events are consumed once and reconnect targets only the selected chat (4.775375ms)
+✔ profile maintenance closes idle cached chats and refuses pending background work (0.180917ms)
+✔ receipt_busy retains its runtime and blocks profile maintenance and restart (0.185708ms)
+✔ catalog_busy retains its runtime and blocks profile maintenance and restart (0.116333ms)
+✔ goal_busy retains its runtime and blocks profile maintenance and restart (0.123ms)
+✔ action corrections reuse the exact local or delegated owner without allocating work (0.169333ms)
+✔ confirmed preference changes refresh cached owners once without replaying tasks (0.139791ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2432.988708

@@ -1,0 +1,96 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/21] Compiling GatorCore NativeRecovery.swift
+[3/21] Compiling GatorCore NativeRecoveryPreparation.swift
+[4/22] Compiling GatorCore NativeUploadStore.swift
+[5/22] Compiling GatorCore NativeTaskReview.swift
+[6/22] Compiling GatorCore NativeTranscriptSearch.swift
+[7/22] Compiling GatorCore NativeMessageContent.swift
+[8/22] Compiling GatorCore NativePlanExecution.swift
+[9/22] Emitting module GatorCore
+[10/22] Compiling GatorCore ManagedSessionCoordinator.swift
+[11/22] Compiling GatorCore ManagedSessionProtocol.swift
+[12/22] Compiling GatorCore NativeDraftAttachments.swift
+[13/22] Compiling GatorCore NativeDraftStore.swift
+[14/22] Compiling GatorCore GatorApplicationState.swift
+[15/22] Compiling GatorCore GoBridgeConnection.swift
+[16/22] Compiling GatorCore BridgePipeIO.swift
+[17/22] Compiling GatorCore BridgeProtocol.swift
+[18/71] Compiling GatorCoreTests NativePerformanceTests.swift
+[19/71] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[20/71] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[21/74] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[22/74] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[23/74] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[24/74] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[25/74] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[26/74] Compiling GatorCoreTests NativeMessageContentTests.swift
+[27/74] Emitting module GatorMac
+[28/74] Compiling GatorMac NativeStatusMessage.swift
+[29/74] Compiling GatorMac NativeTranscriptFind.swift
+[30/74] Compiling GatorMac NativeWindowConfiguration.swift
+[34/77] Compiling GatorMac AppDelegate.swift
+[35/77] Compiling GatorMac ApprovalReviewView.swift
+[36/77] Compiling GatorMac AttachmentSelectionView.swift
+[37/77] Compiling GatorMac ComposerView.swift
+[38/77] Compiling GatorMac RecoveryInspectorContent.swift
+[39/77] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[40/77] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[41/77] Compiling GatorMac ExactDecisionButton.swift
+[42/77] Compiling GatorMac ExactReviewContent.swift
+[43/77] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[50/77] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[51/77] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[52/77] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[56/77] Compiling GatorCoreTests resource_bundle_accessor.swift
+[57/77] Emitting module GatorCoreTests
+[65/77] Compiling GatorMac ConversationView.swift
+[72/76] Linking GatorMac
+[73/76] Applying GatorMac
+[75/81] Compiling GatorMacTests NotchGeometryTests.swift
+[76/81] Emitting module GatorMacTests
+[77/81] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[78/81] Compiling GatorMacTests NativeInputTests.swift
+[79/81] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[80/83] Compiling GatorNativePackageTests runner.swift
+[81/83] Emitting module GatorNativePackageTests
+[81/82] Linking GatorNativePackageTests
+Build complete! (12.42s)
+Test Suite 'Selected tests' started at 2026-11-18 09:47:21.467.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-18 09:47:21.467.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-18 09:47:21.467.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-18 09:47:21.467.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 1.648 seconds.
+◇ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() started.
+✔ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() passed after 0.001 seconds.
+◇ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() started.
+✔ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() passed after 0.001 seconds.
+◇ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() started.
+✔ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() passed after 0.001 seconds.
+◇ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() started.
+✔ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() passed after 0.001 seconds.
+◇ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() started.
+✔ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() passed after 0.001 seconds.
+◇ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() started.
+✔ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() passed after 0.118 seconds.
+◇ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() started.
+✔ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() passed after 0.001 seconds.
+◇ Test transcriptSearchBenchmarks() started.
+GATOR_P01_BENCH messages=50 build=0.000167542 seconds query20=0.005581958 seconds absent20=0.003715209 seconds resolve1000=0.000521917 seconds liveResolve100=0.000717916 seconds
+GATOR_P01_BENCH messages=500 build=0.001575667 seconds query20=0.055353125 seconds absent20=0.036904084 seconds resolve1000=0.000526625 seconds liveResolve100=0.004986042 seconds
+GATOR_P01_BENCH messages=2000 build=0.006176084 seconds query20=0.221123375 seconds absent20=0.149018 seconds resolve1000=0.000527875 seconds liveResolve100=0.018847625 seconds
+✔ Test transcriptSearchBenchmarks() passed after 0.510 seconds.
+◇ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() started.
+✔ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() passed after 0.001 seconds.
+◇ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() started.
+✔ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() passed after 0.001 seconds.
+◇ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() started.
+✔ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() passed after 0.001 seconds.
+✔ Test run with 12 tests in 0 suites passed after 2.280 seconds.

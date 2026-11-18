@@ -18,6 +18,10 @@ import (
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
+	case nativeCatalogLoaded:
+		return m.finishNativeCatalogLoad(value)
+	case nativeCatalogChanged:
+		return m.finishNativeCatalogChange(value)
 	case conversationRouted:
 		return m.finishConversationRoute(value)
 	case taskPlanPrepared:
