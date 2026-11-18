@@ -1,0 +1,39 @@
+{
+  "captures" : [
+    {
+      "matches" : [
+        {
+          "height" : 0.017694268428104065,
+          "left" : 0.11046511891426065,
+          "text" : "Retained note 0005-15",
+          "top" : 0.30683624818294897
+        }
+      ],
+      "messageHeading" : {
+        "height" : 0.017694268428104065,
+        "left" : 0.11046511891426065,
+        "text" : "Retained note 0005-15",
+        "top" : 0.30683624818294897
+      },
+      "path" : "macos\/parity\/evidence\/p03-desktop\/reading-before-final.png"
+    },
+    {
+      "matches" : [
+        {
+          "height" : 0.017571884806793614,
+          "left" : 0.091569766006540751,
+          "text" : "Retained note 0005-15",
+          "top" : 0.32907348229708244
+        }
+      ],
+      "messageHeading" : {
+        "height" : 0.017571884806793614,
+        "left" : 0.091569766006540751,
+        "text" : "Retained note 0005-15",
+        "top" : 0.32907348229708244
+      },
+      "path" : "macos\/parity\/evidence\/p03-desktop\/reading-after-final.png"
+    }
+  ],
+  "result" : "PASS"
+}

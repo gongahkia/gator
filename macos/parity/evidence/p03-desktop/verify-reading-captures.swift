@@ -12,7 +12,7 @@ for path in CommandLine.arguments.dropFirst() {
         guard let text = observation.topCandidates(1).first?.string,
               text.trimmingCharacters(in: .whitespacesAndNewlines) == "Retained note 0005-15" else { return nil }
         let b = observation.boundingBox
-        return ["text": text, "top": 1 - b.maxY, "height": b.height, "left": b.minX]
+        return ["text": text, "top": Double(1 - b.maxY), "height": Double(b.height), "left": Double(b.minX)]
     }.sorted { ($0["top"] as! Double) < ($1["top"] as! Double) }
     let messageMatches = matches.filter { ($0["top"] as! Double) > 0.20 && ($0["top"] as! Double) < 0.65 }
     guard messageMatches.count == 1, let heading = messageMatches.first,

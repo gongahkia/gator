@@ -1,0 +1,154 @@
+{
+  "startingHEAD": "07675f2c5dac1fc336446116a0cecc5cf38efb94",
+  "finalObservedHEAD": "8211d710ae52b298b7923c650771725d9faa4439",
+  "changedSourceFiles": {
+    "macos/Sources/GatorCore/NativeWorkspaceSelection.swift": {
+      "before": "bfac491bd3f897c06ab35cb57968774d4d4184381dc2e0f78fed11957fd30e1f",
+      "after": "ce9a5f14f20676b9565903f9ef7b6e08e93ddbdf2132d7b41af553116a9e5004"
+    },
+    "macos/Tests/GatorCoreTests/NativeWorkspaceIntegrationTests.swift": {
+      "before": "a9f28f38395faa728f383addf7a38e05d56819ef519d9b47a32415680be04c9f",
+      "after": "4b7af5584c23b214b156a0193b6ffa8381182758c0211d7b8b34376e0fc19187"
+    },
+    "internal/workapp/bridge_workspace.go": {
+      "before": "f8086080424baca355c85b90f5c2323d38f7c33fdd2e1c7858605a1848fbc3df",
+      "after": "595506a2a346932db12eddde92ff0d33df28437ef00027cd60fbb0b6d8e2e274"
+    },
+    "internal/workapp/bridge_workspace_test.go": {
+      "before": "d2eb01ee5c915290c24dd145f6e32351914b3682fb3d90390da7e7d3e12973ac",
+      "after": "de7d4423fc6732193564911abcd128b9e45680763d9f4ab2f78d2eeb9e16502d"
+    }
+  },
+  "unchangedBaselineFiles": 511,
+  "protected": {
+    "macos/Sources/GatorCore/NativeDraftStore.swift": {
+      "sha256": "3aec34b85e60a3a18c08437b0d243df695b448f499b73647a025912df799fab6",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/GatorApplicationState.swift": {
+      "sha256": "88ab986e253566f2e8c2c5dd2518b2610aea57f46987518936a0aeac75fb3ee9",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/GoBridgeConnection.swift": {
+      "sha256": "17ada0b512e8e2120dc818c87079fc4245353275932fd7280f57e299421c9c6e",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/BridgePipeIO.swift": {
+      "sha256": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
+      "unchanged": true
+    },
+    "macos/Tests/GatorCoreTests/NativeArchiveSafetyTests.swift": {
+      "sha256": "5febae12a5d4afc6ad218dad056a97276201e7f52139d7f519845f3110462bba",
+      "unchanged": true
+    },
+    "macos/Tests/GatorCoreTests/NativeClosingSafetyTests.swift": {
+      "sha256": "ef210eb2e2f597164d2264a0b84f9233947c0076d8a217dd7c621e0e99d4c4a4",
+      "unchanged": true
+    },
+    "macos/Tests/GatorCoreTests/BridgeShutdownSafetyTests.swift": {
+      "sha256": "e955688ce49ec0a4ffb90abf3f9dcca5396e78c0b0b141a8f6124f600932707c",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/NativeUploadStore.swift": {
+      "sha256": "94dc5406ef0a1d1a579efcbf3c60d9d862aeca487947be4c91096810382ef8d3",
+      "unchanged": true
+    },
+    "macos/Sources/GatorMac/AppDelegate.swift": {
+      "sha256": "29df7c92278f1c27c4738e1b8a1fd444fd54caf9f65d1cfbd279a4c9060049cb",
+      "unchanged": true
+    },
+    "macos/Sources/GatorMac/NativeReadingPositions.swift": {
+      "sha256": "af252f0fbb83f9d169b7c2f536211fc6fd825fda60e8437984f56fd4429716bc",
+      "unchanged": true
+    },
+    "internal/worksession/catalog.go": {
+      "sha256": "d8bdf4342e3003c1473b490cf1f2d63128dabbc3495c28c24f0dc9862006cce8",
+      "unchanged": true
+    },
+    "internal/worksession/catalog_sqlite.go": {
+      "sha256": "402d4b77fe86f958e8cadcdfbbe0081760b9b5991e91dcd74421f75637b95c4c",
+      "unchanged": true
+    },
+    "macos/Sources/GatorCore/NativeTranscriptSearch.swift": {
+      "sha256": "e94c042a07e5c70a7086843cf5e4e7fb919b804a697a27327fecd511bdc5c336",
+      "unchanged": true
+    },
+    "macos/Sources/GatorMac/NativeTranscriptFind.swift": {
+      "sha256": "1c77267007aabf1018f4d1a604b74660553d866d49531f0d4acd4976328630c3",
+      "unchanged": true
+    },
+    "macos/Tests/GatorCoreTests/NativeTranscriptSearchTests.swift": {
+      "sha256": "af102c658e516560baef328c8b5142e8bdb4046c112c7360277805a3d2533b47",
+      "unchanged": true
+    },
+    "macos/Tests/GatorMacTests/NativeTranscriptFindTests.swift": {
+      "sha256": "a9293e7cafc335dc22971440245dd1743223010114bb04858a965de32e700e2d",
+      "unchanged": true
+    }
+  },
+  "apps": {
+    "P03": {
+      "MacOS/GatorMac": "fe1938459fa1c7e09cb73b243289702113dbf399eaa152af982fadbcb437014f",
+      "Resources/gator-runtime": "8f09d57b1e28f4195fb72993b9445e27ff2e313b373a7f0876518c4f7e584977"
+    },
+    "P03-Accepted": {
+      "MacOS/GatorMac": "82ed0dc19e5b54393fa82771965bb396ddc86f145c2dc4dc9f2f554a95c6279e",
+      "Resources/gator-runtime": "b97e001a9e4e436553cc271477b4006e8b8e5552435f1182fac682dc87df31dd"
+    }
+  },
+  "desktopExecutablesMatchAcceptedCandidate": true,
+  "testedGoRuntimeMatchesCandidate": true,
+  "screenshots": {
+    "picker-a-selected-original.png": {
+      "sha256": "a8961504b1ddf808529e5cf9a1953c5abd68e8bbfd6f4586512937b3a6efb779",
+      "pixels": [
+        2178,
+        1032
+      ]
+    },
+    "reading-before-final.png": {
+      "sha256": "0b0be9ed555b265a5bbe2df42c9020dbc9b8cb8dda8a22e3976c21369b88b37f",
+      "pixels": [
+        1864,
+        1704
+      ]
+    },
+    "workspace-a-original.png": {
+      "sha256": "cb1c9e82046bb9fb581a87b4705283c7f232aa2e2b0180e2a1cbaa39ae8b52c4",
+      "pixels": [
+        1776,
+        1616
+      ]
+    },
+    "compact-final.png": {
+      "sha256": "ca6134c370c6c5ab4c72e98f8c34e0b8d37e61c224bcf1a00952c488a902d67b",
+      "pixels": [
+        972,
+        1332
+      ]
+    },
+    "minimum-final.png": {
+      "sha256": "abee28f239195f52e1e783ac71a3d9ebf1f4978e148e69d33a729b7bd2ac8a97",
+      "pixels": [
+        1304,
+        1288
+      ]
+    },
+    "unicode-error-original.png": {
+      "sha256": "ed49878d901a8b9435e832b0982c6953ab5570694093fd8b30c82e2eb7b1a5fa",
+      "pixels": [
+        1776,
+        1616
+      ]
+    },
+    "reading-after-final.png": {
+      "sha256": "60b3440524f9985558c8d6110bf98c2a33bb4f29fa02aa681b5555d40dfc21ae",
+      "pixels": [
+        1776,
+        1616
+      ]
+    }
+  },
+  "controlledFixture": "/tmp/gator-native-test-p03-acceptance-xat9_7tw",
+  "provenance": "Original candidate and prior bundles preserved. Corrected candidate Swift/Go bytes equal the disposable-domain copy used in the final user-reserved desktop session. Complete 215-test runtime bytes equal candidate Go resource."
+}

@@ -191,3 +191,17 @@ Physical VoiceOver, IME, actual macOS 15, OS preference variants, network/remova
 Final development candidate: `/tmp/Gator-Native-Parity-P03.app`. P01 and P02 bundles are byte-preserved. Swift and Go executable hashes match the tested desktop copy; the bundled Go binary also matches a fresh current-source build. No signing/notarization or distribution work was performed.
 
 **P03 is not fully accepted until the outstanding targeted desktop checks are completed.** The implementation and headless verification are ready for that review. P04 was not started.
+
+## 10. Desktop acceptance closure — supersedes the earlier pending verdict
+
+See [P03 desktop acceptance](P03-DESKTOP-ACCEPTANCE.md) for the complete final evidence, focus diagnosis and limits.
+
+**Final P03 verdict: PASS for `/tmp/Gator-Native-Parity-P03-Accepted.app`.** The original `/tmp/Gator-Native-Parity-P03.app` and previous bundles are preserved. Earlier sections describe the original implementation/evidence; this closure records the subsequent focused correction.
+
+Actual desktop testing found a reproducible Unicode source-spelling defect: composed/decomposed macOS paths could cause destination verification to reject a valid new owner. It failed both a real-Go Swift regression and a Go unit regression before correction. The native Go resolver now confirms directory identity with `os.SameFile` when source spellings differ and retains the exact current source for a same-directory selection; Swift checks wire-byte consistency. Directory identity remains Go-owned. No source snapshot, execution, approval, archive, coordinator, transport or Quit implementation was changed.
+
+After the correction: **215 Swift tests PASS**, **17 targeted strict Swift 6 tests PASS**, **four Go packages PASS**, **41 host tests PASS**. The one additional Swift test covers Unicode forms through handoff and repeated same-source selection. [Regression and integrity evidence](evidence/p03-desktop/integrity.json).
+
+A fresh, user-reserved desktop session conclusively verified A/B selection, Go source/conversation identity, cached-owner and exact draft continuity, same-workspace Return confirmation, keyboard Go to Folder/Return and Escape, compact More/picker/Cancel, the 540×532 outer minimum, long-path truncation, original-transcript Find/older reading continuity, no new request admission and normal Quit. [Compact](evidence/p03-desktop/compact-final.png), [minimum](evidence/p03-desktop/minimum-final.png), [reading before](evidence/p03-desktop/reading-before-final.png), [reading after](evidence/p03-desktop/reading-after-final.png), [controlled observations](evidence/p03-desktop/controlled-final.txt).
+
+Initial focus-contended attempts and an earlier fixture changed by shared input were excluded from final continuity/no-Send acceptance. Physical VoiceOver/IME/input preference variants, actual macOS 15, physical volume/TCC revocation and all compact Escape permutations remain untested as documented in the closure report. No new P0/P1 was reproduced in the clean run. No P04 work or another feature increment was started.

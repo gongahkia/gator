@@ -56,3 +56,107 @@ Reproduction helpers: [setup](evidence/p03-desktop/setup.py), [launch](evidence/
 ## Final candidate results
 
 Final regression and remaining desktop observations are recorded here after the corrected application is packaged and exercised.
+
+### Corrected candidate and final controlled session
+
+**Final verdict: PASS for P03 desktop acceptance.**
+
+Final application: **`/tmp/Gator-Native-Parity-P03-Accepted.app`**. Its Swift and Go executables are byte-identical to `/tmp/Gator-Native-Parity-P03-Accepted-Desktop.app`, used with the isolated preference domain `dev.gator.native.p03.acceptance.fixed`. The final Go resource is byte-identical to `/tmp/gator-p03-accepted-runtime`, which passed the complete regression suite. [Integrity manifest](evidence/p03-desktop/integrity.json).
+
+Before the final session, unrelated desktop input changed an earlier corrected fixture's conversation, opened task inspection and admitted its unsent fixture text. Its loopback provider was unavailable, so no model inference or external operation occurred. That profile was **invalidated for final continuity/no-Send acceptance**; these observations were not treated as a proven Gator defect. The user then reserved an uninterrupted five-minute desktop window. A fresh profile was created and the required interactions were repeated successfully. The earlier session's valid captures are explicitly labeled “original”; they are not the final acceptance evidence.
+
+Final profile: `/tmp/gator-native-test-p03-acceptance-xat9_7tw`. Client PID 31583; retained direct Go PIDs **31584, 31649, 31767** throughout A/B navigation, same-source choice, compact cancellation and reading-position checks.
+
+| Conversation | Exact retained ID | Go-confirmed source |
+| --- | --- | --- |
+| Original fixture | `work-20261118T064411-ce15bfc5c15ef886` | `/tmp/gator-native-test-p03-acceptance-xat9_7tw/workspace` — existing retained spelling preserved. |
+| Workspace A | `work-20261118T064511-28d7569231500461` | `/private/tmp/gator-native-test-p03-acceptance-xat9_7tw/Workspace A` |
+| Workspace B | `work-20261118T064549-c3fe983c2eae8b3b` | `/private/tmp/gator-native-test-p03-acceptance-xat9_7tw/A deliberately long parent folder for readable truncated workspace paths with spaces and café 日本/Workspace B` |
+
+The stored B path uses decomposed Unicode; the picker can supply composed text. Go confirms filesystem identity and retains the existing spelling for a same-directory choice. [Final retained records, drafts and owner PIDs](evidence/p03-desktop/controlled-final.json).
+
+### Desktop result matrix
+
+| Required interaction | Result | Observed evidence |
+| --- | --- | --- |
+| Native menu/action opens standard directory picker | PASS | Conversation menu and toolbar invoked the existing NSOpenPanel. The browser selected actual temporary directories; no raw source command was sent. [Selection log](evidence/p03-desktop/selection-accepted.txt). |
+| Select A successfully | PASS | Panel dismissed, new conversation/owner appeared, Go persisted A's canonical source and the composer was empty/available. Original draft/owner remained. |
+| Select B successfully, including spaces/Unicode | PASS | Separate conversation and third owner; B source in UI agrees with Go metadata. A source/owner/draft remained unchanged. |
+| Return A → B | PASS | Exact native catalog rows opened the original cached owners, with their original sources and independent drafts. No new owner/PID on return. [Controlled log](evidence/p03-desktop/controlled-final.txt). |
+| Same current workspace | PASS | Return in the native picker confirmed A again. Go reported “Already using this workspace · conversation kept”; conversation, owner PIDs and exact draft remained unchanged. A prior keyboard Go to Folder check also confirmed B using both Unicode representations without another owner. [Keyboard log](evidence/p03-desktop/keyboard-same-workspace.txt), [same-owner receipt](evidence/p03-desktop/same-workspace.json). |
+| Keyboard navigation/confirmation | PASS | With actual window/focused-element checks: Command-Shift-G opened the nested native Go to Folder sheet, Command-A selected its path, keyboard text entry changed it, Return navigated and Return confirmed the native picker. No shortcut system changed. |
+| Escape/cancellation and focus | PASS | Full-window Escape dismissed the picker with unchanged archive/selection/draft. After native confirmation the composer had focus. In the final session Escape closed transcript Find and focused the composer without sending. [Cancellation observations](evidence/p03-desktop/return-minimum-cancel.txt), [final controlled observations](evidence/p03-desktop/controlled-final.txt). |
+| Compact More → Choose Workspace → Cancel | PASS | The controller resolved the **actual compact More menu's** workspace item, observed the native picker, pressed its native Cancel button and observed dismissal. Reopened compact chat retained B's exact draft and source; archive and all three owner PIDs stayed unchanged. No dashboard or notch change. [Final log](evidence/p03-desktop/controlled-final.txt), [compact capture](evidence/p03-desktop/compact-final.png). |
+| Minimum supported full window | PASS | Requesting a smaller frame clamped to **540×532 outer points** (540×480 content minimum). Workspace action and composer remained accessible. Long source visibly truncated in the middle, retaining the Workspace B suffix and read-only label. Full source remains exposed through the existing accessibility/help value. [Minimum capture](evidence/p03-desktop/minimum-final.png). |
+| P01/reading position during same-source selection | PASS | Find retained “Retained note 0005-15”, count 1 of 1, the actual older message remained visible with its selected outline, Jump to Latest stayed explicit and the original draft remained. [Before](evidence/p03-desktop/reading-before-final.png), [after](evidence/p03-desktop/reading-after-final.png). |
+| No accidental Send/admitted Work in the final fixture | PASS | A/B have no request journal, snapshot or revisions; original/A/B drafts retain their exact texts. The provider points only to unreachable loopback. No pending approval/queue/run authority was inherited by the new chats. |
+| Background-work scope | PASS via real-Go regression, not a new GUI model request | The unchanged managed-work integration exercises workspace selection while original Work runs, checking source and parent/child draft isolation. It passed in the targeted and complete corrected suite. Desktop selection did not start Work. |
+| Normal Quit | PASS | Final controlled client exited normally and all three direct Go owners were gone. [Cleanup record](evidence/p03-desktop/cleanup.txt). |
+
+The first reading geometry probe matched the Find field because its value equaled the target heading text. That geometry assertion is **not** used as proof of transcript position. The actual message heading is visible in both delivered window captures; a separate headless Vision check identifies the unique exact heading in the transcript region at normalized top positions **0.3068 before / 0.3291 after**. The status row changes layout slightly; pixel-exact preservation is not claimed. [Image-based verification](evidence/p03-desktop/reading-captures.json). The helper's future selector is qualified as `AXHeading`; the actual saved captures remain the primary visual evidence.
+
+### Regression after the focused fix
+
+Code changes justified rerunning regression; no suites were rerun merely for a new count.
+
+```sh
+go test ./internal/workapp -run TestNativeWorkspace -count=1
+go build -trimpath -o /tmp/gator-p03-accepted-runtime ./cmd/gator
+GATOR_TEST_BINARY=/tmp/gator-p03-accepted-runtime swift test --package-path macos \
+  --scratch-path /tmp/gator-native-build --no-parallel \
+  --filter 'workspace|actualGoManagedDialogue'
+swift build --package-path macos --scratch-path /tmp/gator-native-build
+GATOR_TEST_BINARY=/tmp/gator-p03-accepted-runtime swift test --package-path macos \
+  --scratch-path /tmp/gator-native-build --no-parallel
+GATOR_TEST_BINARY=/tmp/gator-p03-accepted-runtime swift test --package-path macos \
+  --scratch-path /tmp/gator-native-build --no-parallel \
+  -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors \
+  --filter 'workspace|actualGoManagedDialogue'
+go test ./cmd/gator ./internal/workapp ./internal/worksession ./internal/workspace
+/Users/gongahkia/.local/share/fnm/node-versions/v26.7.0/installation/bin/node --test \
+  app-host/tests/native.test.mjs app-host/tests/sessions.test.mjs \
+  app-host/tests/drafts.test.mjs app-host/tests/reading-state.test.mjs \
+  app-host/tests/backend.test.mjs
+GATOR_NATIVE_APP_PATH=/tmp/Gator-Native-Parity-P03-Accepted.app \
+  bash macos/scripts/build-dev-app.sh
+python3 macos/parity/evidence/p03-desktop/verify-integrity.py
+git diff --check
+```
+
+| Verification | Result |
+| --- | --- |
+| Targeted Swift workspace/managed-work | **17 PASS**, 17.671 seconds. [Log](evidence/p03-desktop/swift-targeted.log). |
+| Complete sequential Swift | **215 PASS**, 132.673 seconds. Original 214 plus one new real-Go Unicode regression. [Log](evidence/p03-desktop/swift-full.log). |
+| Strict Swift 6, warnings-as-errors | **17 selected PASS**, 13.863 seconds; production and test sources compiled. [Log](evidence/p03-desktop/swift-strict.log). |
+| Go cmd/gator / workapp / worksession / workspace | **Four packages PASS**; 33.540 s / 8.999 s / cached / cached. [Log](evidence/p03-desktop/go-regression.log). |
+| Host native/session/draft/reading/backend | **41 PASS**, zero failures/skips, 2.262 seconds. [Log](evidence/p03-desktop/host-regression.log). |
+| Package/plist/minimum platform | PASS. macOS minimum **15.0**, SDK 26.5, no new dependencies. [Package log](evidence/p03-desktop/package.log). |
+| Source/bundle/safety integrity and diff whitespace | PASS. Exactly two production and two test files changed relative to this closure's baseline; original P03 and protected prior safety/P01/P02 files preserved. [Manifest](evidence/p03-desktop/integrity.json). |
+
+The first after-fix Swift attempt correctly exercised the handoff but its new test compared `/var` with `/private/var`; its expected path was corrected to the existing filesystem-canonical fixture helper, retaining the source assertion. Existing tests/assertions were not weakened. Initial capture-analysis attempts assumed OCR would recognize both the caret-bearing Find field and the message heading, and then encountered a CGFloat/Double conversion mistake; those helper failures are not application defects or counted regression passes. The final image probe checks the unique exact body heading in the actual transcript region.
+
+Only these implementation/test files changed during closure:
+
+- `internal/workapp/bridge_workspace.go`
+- `internal/workapp/bridge_workspace_test.go`
+- `macos/Sources/GatorCore/NativeWorkspaceSelection.swift`
+- `macos/Tests/GatorCoreTests/NativeWorkspaceIntegrationTests.swift`
+
+All other changes are the requested reports and acceptance evidence/helpers. No production UI, coordinator, transport, archive, Quit or approval/recovery implementation changed during this closure.
+
+### Remaining limits and optional operator checklist
+
+No new P0/P1 defect was reproduced in the clean controlled run or corrected regression suites. The reproduced P2 Unicode reliability defect is corrected and covered by actual-Go, Go unit and native desktop evidence. Existing recovery/owner-retirement P2 limits remain unchanged.
+
+Not tested: physical VoiceOver speech/order, IME, Full Keyboard Access/input-layout variants, macOS 15 runtime, real removable/network-volume loss, TCC revocation, and every compact Escape/focus permutation under competing applications. The earlier compact Escape attempt had no focused input element and is not counted as a keyboard pass. Compact cancellation was conclusively verified through its native Cancel control in the reserved session. A long multiline error was observed on the original candidate before correction; corrected-candidate minimum-size error typography was not separately induced. No blanket accessibility or all-error-layout certification is claimed.
+
+The uncontrolled earlier fixture remained alive after its Go owners had closed while a task inspector was present. Two native Quit attempts were made; its verified, isolated client PID alone was then terminated for cleanup. This did not reproduce in the clean final session, which quit normally. The uncontrolled observation is retained as an evidence limit, not presented as a new confirmed shutdown regression.
+
+Optional human follow-up, always with a disposable profile and temporary folders:
+
+1. Use keyboard-only native menu access under the operator's preferred Full Keyboard Access/input settings; choose A, then B, and inspect the full path via help/accessibility.
+2. Repeat compact Escape and focus return while the menu-bar popover is the only visible presentation.
+3. With VoiceOver/IME enabled, check the workspace path, read-only explanation, cancellation and composer focus without sending.
+4. At minimum width, inspect a deliberately rejected temporary-folder error and verify its full help text remains available.
+
+These optional preference/accessibility variants do not leave any of the four original acceptance gaps unresolved in the tested configuration. **P03 desktop acceptance is PASS for the corrected candidate.** P04 and other parity features were not started.
