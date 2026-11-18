@@ -14,11 +14,11 @@ for path in CommandLine.arguments.dropFirst() {
         let b = observation.boundingBox
         return ["text": text, "top": 1 - b.maxY, "height": b.height, "left": b.minX]
     }.sorted { ($0["top"] as! Double) < ($1["top"] as! Double) }
-    guard matches.count >= 2, let heading = matches.last,
+    let messageMatches = matches.filter { ($0["top"] as! Double) > 0.20 && ($0["top"] as! Double) < 0.65 }
+    guard messageMatches.count == 1, let heading = messageMatches.first,
           let top = heading["top"] as? Double,
-          top > 0.20, top < 0.65,
-          top - (matches.first!["top"] as! Double) > 0.08 else {
-        throw NSError(domain: "ReadingCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: "Find input and visible message heading were not independently recognized in \(path): \(matches)"])
+          top > 0.20, top < 0.65 else {
+        throw NSError(domain: "ReadingCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: "The message heading was not uniquely recognized in the transcript region in \(path): \(matches)"])
     }
     evidence.append(["path": path, "matches": matches, "messageHeading": heading])
 }

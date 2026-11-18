@@ -34,9 +34,9 @@ call('press','conversation','Choose Workspace…');call('wait','open-panel','OKB
 log.write('PASS native keyboard Return same A, original owner/draft/source retained\n')
 open_id(m['bID']);assert_state(m['bID'],'B desktop draft remains with B');log.write('PASS return B exact draft and unchanged PIDs\n')
 # Inspect an older retained message, then choose the unchanged source.
-open_id(m['ids'][-1]);assert_state(m['ids'][-1],'Original acceptance draft stays here');call('resize','conversation','820','740');call('focus','conversation');call('press','menu','Find in Current Transcript…');call('wait','conversation','Find in loaded transcript');call('set','conversation','Find in loaded transcript','Retained note 0005-15');call('wait','conversation','Retained note 0005-15')
-head_before=call('inspect','conversation','Retained note 0005-15');call('inspect','conversation','Find in loaded transcript');capture('gator-p03-controlled-reading-before',820)
-call('press','conversation','Choose Workspace…');call('wait','open-panel','OKButton');call('focus','open-panel');call('confirm-key','open-panel');call('wait','conversation','Already using this workspace · conversation kept');call('inspect','conversation','Find in loaded transcript');head_after=call('inspect','conversation','Retained note 0005-15');capture('gator-p03-controlled-reading-after',820)
+open_id(m['ids'][-1]);assert_state(m['ids'][-1],'Original acceptance draft stays here');call('resize','conversation','820','740');call('focus','conversation');call('press','menu','Find in Current Transcript…');call('wait','conversation','Find in loaded transcript');call('set','conversation','Find in loaded transcript','Retained note 0005-15');call('wait','conversation','AXHeading::Retained note 0005-15')
+head_before=call('inspect','conversation','AXHeading::Retained note 0005-15');call('inspect','conversation','Find in loaded transcript');capture('gator-p03-controlled-reading-before',820)
+call('press','conversation','Choose Workspace…');call('wait','open-panel','OKButton');call('focus','open-panel');call('confirm-key','open-panel');call('wait','conversation','Already using this workspace · conversation kept');call('inspect','conversation','Find in loaded transcript');head_after=call('inspect','conversation','AXHeading::Retained note 0005-15');capture('gator-p03-controlled-reading-after',820)
 assert_state(m['ids'][-1],'Original acceptance draft stays here')
 # Check the same heading stays in the actual transcript viewport, not just loaded.
 for head in [head_before,head_after]:
