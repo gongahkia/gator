@@ -1,0 +1,35 @@
+original A0-host-no-RealityKit-initialization pid 32227
+original A3-or-A4-visible-idle pid 32227
+original A3-or-A4-visible-active pid 32227
+original A5-returned-to-idle pid 32227
+original A6-hidden pid 32227
+original A7-destroyed pid 32227
+original DONE 105.45
+direct96 A0-host-no-RealityKit-initialization pid 32436
+direct96 A3-or-A4-visible-idle pid 32436
+direct96 A3-or-A4-visible-active pid 32436
+direct96 A5-returned-to-idle pid 32436
+direct96 A6-hidden pid 32436
+direct96 A7-destroyed pid 32436
+direct96 DONE 105.57
+direct256 A0-host-no-RealityKit-initialization pid 32940
+direct256 A3-or-A4-visible-idle pid 32940
+direct256 A3-or-A4-visible-active pid 32940
+direct256 A5-returned-to-idle pid 32940
+direct256 A6-hidden pid 32940
+direct256 A7-destroyed pid 32940
+direct256 DONE 106.06
+mtk96 A0-host-no-RealityKit-initialization pid 33458
+mtk96 A3-or-A4-visible-idle pid 33458
+mtk96 A3-or-A4-visible-active pid 33458
+mtk96 A5-returned-to-idle pid 33458
+mtk96 A6-hidden pid 33458
+mtk96 A7-destroyed pid 33458
+mtk96 DONE 104.84
+msaa A0-host-no-RealityKit-initialization pid 35145
+msaa A3-or-A4-visible-idle pid 35145
+msaa A3-or-A4-visible-active pid 35145
+msaa A5-returned-to-idle pid 35145
+msaa A6-hidden pid 35145
+msaa A7-destroyed pid 35145
+msaa DONE 105.07

@@ -1,0 +1,31 @@
+{
+  "startingHead": "12ee4a43b6677f4d01a4ab6882951a35d09ac678",
+  "finalHead": "a8b96697a1f7bbf853303c51f386e3d1bd879db5",
+  "protectedFileCount": 1916,
+  "changedProtectedFiles": [],
+  "changedP04BundleFiles": [],
+  "originalA1Preserved": true,
+  "prototypeOnly": "/tmp/Gator-Mascot-P04M-A2-Renderer-Lab.app",
+  "prototypeFiles": {
+    "Contents/Info.plist": "93c73ac28faa6df614f6001c6db97a7e22e8884ec881f6d8d8d357691ee14904",
+    "Contents/MacOS/MascotValidation": "f36cde9cb207a027742301584e42084400811b6669336e4c21c6be58715984cf",
+    "Contents/Resources/Assets/Gator-B.usda": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3",
+    "Contents/Resources/Assets/Gator-B.usdz": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+    "Contents/Resources/Assets/Gator-B.usdc": "8266167f007e6e93cd4d3e9b203eeda064dfae78b19cca9ebffa75e72d8ff24d",
+    "Contents/Resources/Assets/B-static.png": "f0d9d1a75c116da54adfe2d2650b106d7982fe66ad426234f9e7b0afe552ec2d"
+  },
+  "sourceFiles": {
+    "macos/mascot/validation/ReproduceAsset.swift": "48864d778d0860f4444f172fd0e77fa841102d6027c548191c383947212df050",
+    "macos/mascot/validation/CheckRig.swift": "bf88b355aaa09d215d1d751a87b4dc64dbf016e13cc0dd9e2c4c13917c0b53a5",
+    "macos/mascot/validation/RealtimeRenderer.swift": "de84403dd0a265b3a2e474fb25081b745dc9baa071179781412c106bdcab44e6",
+    "macos/mascot/validation/MascotRig.swift": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20",
+    "macos/mascot/validation/RecordWindow.swift": "ad14f406935c1384fcbec823807fc25b89e0b66eba851570fea768f5679a5d23",
+    "macos/mascot/validation/build.sh": "ecc999c7568efa3c4c09b6e13942cd61e34ae83e850d9629e862415ab7c3593d",
+    "macos/mascot/validation/RendererLab.swift": "f6d16315f372e8bab50eca8bf9a5a18d417c3af44c7d63ee7bcfe04ce0af3e98",
+    "macos/mascot/validation/Assets/Gator-B.usda": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3",
+    "macos/mascot/validation/Assets/Gator-B.usdz": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+    "macos/mascot/validation/Assets/Gator-B.usdc": "8266167f007e6e93cd4d3e9b203eeda064dfae78b19cca9ebffa75e72d8ff24d",
+    "macos/mascot/validation/Assets/B-static.png": "f0d9d1a75c116da54adfe2d2650b106d7982fe66ad426234f9e7b0afe552ec2d"
+  },
+  "officialIntegratedBundleCreated": false
+}

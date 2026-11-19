@@ -1,0 +1,8 @@
+{
+  "macos/mascot/validation/MascotRig.swift": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20",
+  "macos/mascot/validation/RealtimeRenderer.swift": "de84403dd0a265b3a2e474fb25081b745dc9baa071179781412c106bdcab44e6",
+  "macos/mascot/gate2/Metrics.swift": "43de910631576fde3cbd0156276bda50c1347fc2665fa56a1cd5db3127fe2cac",
+  "macos/mascot/gate2/Engine.swift": "df76871ffcb5248c1de5ac37181fa77608c1302d5bf3e029304600164e3df4f0",
+  "macos/mascot/gate2/Gate2Lab.swift": "293fcd927963cc947c62277c01a26e0b8b155f2422db77350feb9d26c25ce4e9",
+  "binary": "c627baf3a2874f5f463975290858b20456b9071b34e581d847aa97f52a0dad37"
+}

@@ -1,0 +1,320 @@
+{
+  "elapsed" : 124.50906801223755,
+  "events" : [
+
+  ],
+  "macOS" : "Version 26.5.2 (Build 25F84)",
+  "mode" : "quick",
+  "modelLoads" : 4,
+  "pid" : 21506,
+  "processors" : 8,
+  "renders" : 145,
+  "results" : [
+    {
+      "cpuPercentOneCore" : 0.44488082065743767,
+      "liveRenderers" : 0,
+      "phase" : "static-cold",
+      "renderMillisecondsP50" : 0,
+      "renderMillisecondsP95" : 0,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 88.8125,
+      "rssMiBSamples" : [
+        87.859375,
+        94.296875,
+        94.296875,
+        94.296875,
+        94.296875,
+        94.234375,
+        94.1875,
+        94.1875,
+        94.1875,
+        94.1875,
+        94.109375,
+        88.8125
+      ],
+      "seconds" : 12.536615967750549
+    },
+    {
+      "firstFrameMilliseconds" : 14.384031295776367,
+      "loadHeartbeatMaximumGapMs" : 30.191500000000001,
+      "loadMilliseconds" : 186.5769624710083,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "rigValidation" : {
+        "assertions" : 21,
+        "cycles" : 1000,
+        "independentParts" : [
+          "Jaw_Pivot",
+          "Eye_Left\/Pupil",
+          "Eye_Right\/Pupil",
+          "Eye_Left\/Upper_Lid",
+          "Eye_Right\/Upper_Lid",
+          "Eye_Left\/Lower_Lid",
+          "Eye_Right\/Lower_Lid"
+        ],
+        "jawPivot" : [
+          0,
+          -0.30000001192092896,
+          0.23999999463558197
+        ]
+      }
+    },
+    {
+      "alpha" : {
+        "transparent" : 29320,
+        "visible" : 20856
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.10648770460038742,
+      "liveRenderers" : 1,
+      "phase" : "one-idle-no-draw",
+      "renderMillisecondsP50" : 14.384031295776367,
+      "renderMillisecondsP95" : 14.384031295776367,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 135.5,
+      "rssMiBSamples" : [
+        136.546875,
+        136.171875,
+        136.171875,
+        136.203125,
+        136.203125,
+        136.09375,
+        136.046875,
+        136.046875,
+        136,
+        136,
+        136,
+        136,
+        136,
+        135.5,
+        135.5
+      ],
+      "seconds" : 15.574568033218384
+    },
+    {
+      "cpuPercentOneCore" : 0.4154686959696437,
+      "liveRenderers" : 1,
+      "phase" : "one-idle-blink",
+      "renderMillisecondsP50" : 2.8359889984130859,
+      "renderMillisecondsP95" : 14.384031295776367,
+      "renders" : 12,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 135.5,
+      "rssMiBSamples" : [
+        135.5,
+        135.484375,
+        135.484375,
+        135.4375,
+        135.4375,
+        135.4375,
+        135.4375,
+        135.515625,
+        135.515625,
+        135.515625,
+        135.515625,
+        135.515625,
+        135.484375,
+        135.484375,
+        135.5
+      ],
+      "seconds" : 15.767974972724915
+    },
+    {
+      "cpuPercentOneCore" : 1.2775879064560176,
+      "liveRenderers" : 1,
+      "phase" : "one-responding",
+      "renderMillisecondsP50" : 2.8309822082519531,
+      "renderMillisecondsP95" : 4.9349069595336914,
+      "renders" : 48,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 135.53125,
+      "rssMiBSamples" : [
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125,
+        135.53125
+      ],
+      "seconds" : 13.827072024345398
+    },
+    {
+      "firstFrameMilliseconds" : 10.825037956237793,
+      "loadHeartbeatMaximumGapMs" : 16.46425,
+      "loadMilliseconds" : 84.753036499023438,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 7.4179172515869141,
+      "loadHeartbeatMaximumGapMs" : 11.053083000000001,
+      "loadMilliseconds" : 70.498943328857422,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.077995014702696763,
+      "liveRenderers" : 2,
+      "phase" : "two-idle",
+      "renderMillisecondsP50" : 10.825037956237793,
+      "renderMillisecondsP95" : 10.825037956237793,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 142.9375,
+      "rssMiBSamples" : [
+        143.078125,
+        143.078125,
+        143.078125,
+        143.078125,
+        143.078125,
+        143.03125,
+        142.953125,
+        142.9375,
+        142.9375,
+        142.9375,
+        142.9375,
+        142.9375
+      ],
+      "seconds" : 12.520030975341797
+    },
+    {
+      "cpuPercentOneCore" : 2.8222266284319222,
+      "liveRenderers" : 2,
+      "phase" : "two-responding",
+      "renderMillisecondsP50" : 2.9189586639404297,
+      "renderMillisecondsP95" : 4.9079656600952148,
+      "renders" : 80,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 144.09375,
+      "rssMiBSamples" : [
+        143.015625,
+        143.03125,
+        143.046875,
+        143.046875,
+        144.140625,
+        144.140625,
+        144.140625,
+        144.140625,
+        144.140625,
+        144.09375
+      ],
+      "seconds" : 12.89690899848938
+    },
+    {
+      "firstFrameMilliseconds" : 8.6790323257446289,
+      "loadHeartbeatMaximumGapMs" : 16.740500000000001,
+      "loadMilliseconds" : 89.128017425537109,
+      "points" : 40,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 40,
+        "viewWidth" : 40
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.094332275274768937,
+      "liveRenderers" : 1,
+      "phase" : "collapsed-idle",
+      "renderMillisecondsP50" : 8.6790323257446289,
+      "renderMillisecondsP95" : 8.6790323257446289,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 144.65625,
+      "rssMiBSamples" : [
+        144.625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.703125,
+        144.703125,
+        144.703125,
+        144.65625,
+        144.65625,
+        144.65625
+      ],
+      "seconds" : 12.493072986602783
+    },
+    {
+      "cpuPercentOneCore" : 0.26993763352489591,
+      "liveRenderers" : 0,
+      "phase" : "hidden-teardown",
+      "renderMillisecondsP50" : 0,
+      "renderMillisecondsP95" : 0,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 144.734375,
+      "rssMiBSamples" : [
+        144.671875,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.765625,
+        144.71875,
+        144.71875,
+        144.734375,
+        144.734375,
+        144.734375,
+        144.734375,
+        144.734375,
+        144.71875
+      ],
+      "seconds" : 15.685474991798401
+    },
+    {
+      "cpuPercentOneCore" : 0.42447846025741598,
+      "liveRenderers" : 0,
+      "phase" : "reduced-static-after-engine",
+      "renderMillisecondsP50" : 0,
+      "renderMillisecondsP95" : 0,
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 144.75,
+      "rssMiBSamples" : [
+        144.734375,
+        144.796875,
+        144.796875,
+        144.796875,
+        144.796875,
+        144.796875,
+        144.796875,
+        144.796875,
+        144.75,
+        144.75,
+        144.75,
+        144.75
+      ],
+      "seconds" : 12.482141017913818
+    }
+  ]
+}

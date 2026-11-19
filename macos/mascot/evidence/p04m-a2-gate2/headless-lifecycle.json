@@ -1,0 +1,37 @@
+{
+  "assertions" : 27,
+  "created" : {
+    "engine" : 15,
+    "headlessTarget" : 19,
+    "RealityRenderer" : 15,
+    "sceneRoot" : 15
+  },
+  "frames" : 127,
+  "live" : {
+    "engine" : 1,
+    "headlessTarget" : 1,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0
+  },
+  "pendingTask" : false,
+  "rig" : {
+    "assertions" : 21,
+    "cycles" : 1000,
+    "independentParts" : [
+      "Jaw_Pivot",
+      "Eye_Left\/Pupil",
+      "Eye_Right\/Pupil",
+      "Eye_Left\/Upper_Lid",
+      "Eye_Right\/Upper_Lid",
+      "Eye_Left\/Lower_Lid",
+      "Eye_Right\/Lower_Lid"
+    ],
+    "jawPivot" : [
+      0,
+      -0.30000001192092896,
+      0.23999999463558197
+    ]
+  },
+  "subscriptionsCreated" : 0,
+  "windowsCreated" : 0
+}

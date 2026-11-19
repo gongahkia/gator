@@ -1,0 +1,302 @@
+{
+  "macos/mascot/P04M-A2-INTEGRATION.md": {
+    "bytes": 8131,
+    "sha256": "0f0fbdc0cc957c3db53fb5fbea4c0f2136d4ec78d7f713df6739ac2b6a9081aa"
+  },
+  "macos/mascot/P04M-A2-RENDERER-VALIDATION.md": {
+    "bytes": 20758,
+    "sha256": "e6ac797888d29dcefd64b3848381ecfa67c169689efe21c4446b90797aa5f6d0"
+  },
+  "macos/mascot/evidence/p04m-a2/asset-reproduction.json": {
+    "bytes": 295,
+    "sha256": "8f7e09a10272415b5cfe6d4ee47155a8283bc61c0778471669332e899b9a978b"
+  },
+  "macos/mascot/evidence/p04m-a2/assets.json": {
+    "bytes": 991,
+    "sha256": "401fd4302c29d48c637717c78e214a3c3e5897e0363cdb7fb113a12596b24775"
+  },
+  "macos/mascot/evidence/p04m-a2/baseline.json": {
+    "bytes": 225377,
+    "sha256": "f7995722a3f333cb0d5942d8420c1e6dfe5b237dfea77836b88815a6db6aa932"
+  },
+  "macos/mascot/evidence/p04m-a2/build-final.log": {
+    "bytes": 110,
+    "sha256": "82da5aab4e4f2cc78fd31ced0c94e4b8a62cbd72048516d035aeba43b6ec583b"
+  },
+  "macos/mascot/evidence/p04m-a2/build-headless-checks.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "macos/mascot/evidence/p04m-a2/build-lab-v3.log": {
+    "bytes": 88,
+    "sha256": "b7f1bef938ed55398c5041cf6c6e9ae1c63dc673b04a35566e970728dee41bad"
+  },
+  "macos/mascot/evidence/p04m-a2/build-lab-v4.log": {
+    "bytes": 88,
+    "sha256": "3edac88ecabccd0563599b7a2bfa24691d5d1d5ba13711de7a672f4b7dd5761a"
+  },
+  "macos/mascot/evidence/p04m-a2/build-lab-v5.log": {
+    "bytes": 931,
+    "sha256": "77168e4abd72682d298ac1d7b3dce9968ed7753714c584c2d7049f0692a3df9a"
+  },
+  "macos/mascot/evidence/p04m-a2/build-lab-v6.log": {
+    "bytes": 88,
+    "sha256": "d8486508084b0b4718afa7a3bf2c828a762f10e3b4b4418003afe78e501655f7"
+  },
+  "macos/mascot/evidence/p04m-a2/build-lab.log": {
+    "bytes": 88,
+    "sha256": "527e912674161469dbe947b6c63c09df7f615d619f0e17abf3ed4e39c7057385"
+  },
+  "macos/mascot/evidence/p04m-a2/build-prototype-final.log": {
+    "bytes": 124,
+    "sha256": "6c450f1c3b63328a44219447b2dd6b2b434b2b39572a4a682f57b1e0bb84d3b5"
+  },
+  "macos/mascot/evidence/p04m-a2/build-prototype.log": {
+    "bytes": 104,
+    "sha256": "1ed0ffac2405807164f573c76079d671d2e08eee05287c1450791ef6e10ceb2f"
+  },
+  "macos/mascot/evidence/p04m-a2/build-recorder.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "macos/mascot/evidence/p04m-a2/checks/measurements.json": {
+    "bytes": 1786,
+    "sha256": "15723068f9349f491844bf78f9ca10607c5bb6983dfc8d3b933fd6cf76e39a33"
+  },
+  "macos/mascot/evidence/p04m-a2/checks/neutral.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/checks-final/measurements.json": {
+    "bytes": 1954,
+    "sha256": "e095f71d7b45b587392ecd5f5d71798753ac99594efc56031a8a7d422d204cde"
+  },
+  "macos/mascot/evidence/p04m-a2/checks-final/neutral.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/blink.png": {
+    "bytes": 19705,
+    "sha256": "3326218d7d4aab16f094f820eeedbd5f3cb70a5fd1ad9f48811acbe804bf1c38"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/completed.png": {
+    "bytes": 23798,
+    "sha256": "bb470e08efec9f8b2f4f14386662f435c33116925d2648495ac8cc4616799e3d"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/disconnected.png": {
+    "bytes": 23621,
+    "sha256": "3e05161673da1250be9a518a04091699ec22435fabedea8778c2e62a512bf4c1"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/idle.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/measurements.json": {
+    "bytes": 1757,
+    "sha256": "8667fb559819b345ed4ccbf4700dceb3c9408a54ebe44e2c9ab11a4bc004a130"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/needsAttention.png": {
+    "bytes": 23399,
+    "sha256": "a6ebe3a0de1a47d4b25618055a4cbd30baedac9139b79d28f654342003a7f65f"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/quarter.png": {
+    "bytes": 25365,
+    "sha256": "15d1452181ab993574cff7ddf30f320e96f33cd36d3e2130477bee3c8cb336c0"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/responding.png": {
+    "bytes": 21739,
+    "sha256": "a1559339921ec26a39a2dc1dcdc903639771443e51657470265e300d43a15ce4"
+  },
+  "macos/mascot/evidence/p04m-a2/demo/working.png": {
+    "bytes": 25026,
+    "sha256": "34c2e9a6f2cfcd8ec923aae1c1a27f31e3e86e08aafc3dea4f59f28fc7ffaf6b"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/blink.png": {
+    "bytes": 19705,
+    "sha256": "3326218d7d4aab16f094f820eeedbd5f3cb70a5fd1ad9f48811acbe804bf1c38"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/completed.png": {
+    "bytes": 23798,
+    "sha256": "bb470e08efec9f8b2f4f14386662f435c33116925d2648495ac8cc4616799e3d"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/disconnected.png": {
+    "bytes": 23621,
+    "sha256": "3e05161673da1250be9a518a04091699ec22435fabedea8778c2e62a512bf4c1"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/idle.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/measurements.json": {
+    "bytes": 1767,
+    "sha256": "1bb427a679ccea0d1de2f0d40fb790e42804aa3b22478556772c776f179be507"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/needsAttention.png": {
+    "bytes": 23399,
+    "sha256": "a6ebe3a0de1a47d4b25618055a4cbd30baedac9139b79d28f654342003a7f65f"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/quarter.png": {
+    "bytes": 25365,
+    "sha256": "15d1452181ab993574cff7ddf30f320e96f33cd36d3e2130477bee3c8cb336c0"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/responding.png": {
+    "bytes": 21739,
+    "sha256": "a1559339921ec26a39a2dc1dcdc903639771443e51657470265e300d43a15ce4"
+  },
+  "macos/mascot/evidence/p04m-a2/demo-current/working.png": {
+    "bytes": 25026,
+    "sha256": "34c2e9a6f2cfcd8ec923aae1c1a27f31e3e86e08aafc3dea4f59f28fc7ffaf6b"
+  },
+  "macos/mascot/evidence/p04m-a2/earlier-live-renderer-window.mp4": {
+    "bytes": 2235178,
+    "sha256": "f0d7ac9f7d55e455e60af740ba8919188e12b064f30a8a5b451425fcb3a1c91e"
+  },
+  "macos/mascot/evidence/p04m-a2/headless-checks.json": {
+    "bytes": 586,
+    "sha256": "76710a30dde17ef63032a3b68ce6f56933572c5f080e1d326a20dec3bddbebeb"
+  },
+  "macos/mascot/evidence/p04m-a2/headless-checks.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "macos/mascot/evidence/p04m-a2/initial-clipped-surface.png": {
+    "bytes": 330702,
+    "sha256": "65d310233c42bb55893c9741c84cd03088e93dc72270a07f6558495a161932ab"
+  },
+  "macos/mascot/evidence/p04m-a2/lifecycle-before-presenter-flag-fix/measurements.json": {
+    "bytes": 26531,
+    "sha256": "35c59b400a4179da9554ea9ef485ad503fa14f0767644d70d4e523a87948a573"
+  },
+  "macos/mascot/evidence/p04m-a2/live-eyelids.png": {
+    "bytes": 244028,
+    "sha256": "5ae1cb324d6d96458a469c9eb81152d9474486a9f0191a915e7ddc08af0cb823"
+  },
+  "macos/mascot/evidence/p04m-a2/live-jaw.png": {
+    "bytes": 195787,
+    "sha256": "535c25253d71f5e32e35e489bdecae987d6b1f0ba9d13dad76c54fd76c83e8ac"
+  },
+  "macos/mascot/evidence/p04m-a2/live-neutral.png": {
+    "bytes": 219750,
+    "sha256": "c47cda7f51ea7f4bcdef25ac8d2ebddf38b585e7f7514f9fdc34a67c8b2c8791"
+  },
+  "macos/mascot/evidence/p04m-a2/live-renderer-window.mp4": {
+    "bytes": 1970982,
+    "sha256": "64be459b5f02e13f4bfe4250a7245a90200af9424d53c0a9ed366cd65061e231"
+  },
+  "macos/mascot/evidence/p04m-a2/metal-validation.log": {
+    "bytes": 85,
+    "sha256": "f699ee3316003559f9021a3fbae504f1bca2e736b235a1c6bbc2e70ab28e2296"
+  },
+  "macos/mascot/evidence/p04m-a2/native-renderer.png": {
+    "bytes": 219750,
+    "sha256": "c47cda7f51ea7f4bcdef25ac8d2ebddf38b585e7f7514f9fdc34a67c8b2c8791"
+  },
+  "macos/mascot/evidence/p04m-a2/preservation.json": {
+    "bytes": 2352,
+    "sha256": "e9184307cfeb9387daac97daf3c2e002d9534d767939961e36f6556e4620792b"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-current/measurements.json": {
+    "bytes": 7662,
+    "sha256": "9e027302657415765d1ec8c80786488901af73aef4aba698b675b866dcaba64d"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-current/neutral.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-initial-1/measurements.json": {
+    "bytes": 5985,
+    "sha256": "79ff2f62f66b2a74ee0569da87345e1d8983cf1da913a309f971c54cea7769a4"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-initial-1/neutral.png": {
+    "bytes": 23007,
+    "sha256": "f07cd2e895bc8d5881135cff9e40df611e2a452705dabd44b2f36c337db3e0cd"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-initial-2/measurements.json": {
+    "bytes": 6536,
+    "sha256": "94bcfa380829a77d47034e7b5f9838a67c116c13a71ceb5838c0b8ba53290130"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-initial-2/neutral.png": {
+    "bytes": 23007,
+    "sha256": "f07cd2e895bc8d5881135cff9e40df611e2a452705dabd44b2f36c337db3e0cd"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-optimized/measurements.json": {
+    "bytes": 7611,
+    "sha256": "8d22d7d3c453bcd14b2104085600d588f312d5b12bab261bca7fdb3e26a81679"
+  },
+  "macos/mascot/evidence/p04m-a2/quick-optimized/neutral.png": {
+    "bytes": 20923,
+    "sha256": "2d8daa9421be680e6593272ad16fc3020ad2668aabbf9527daa0c341a72dfeb1"
+  },
+  "macos/mascot/evidence/p04m-a2/recording-current.log": {
+    "bytes": 80,
+    "sha256": "3b9701f66934a1519c2c6c88bc17933f61e712090578e85e4082ddfbc25c83d8"
+  },
+  "macos/mascot/evidence/p04m-a2/recording-final.log": {
+    "bytes": 80,
+    "sha256": "9f70fe8892836acd32138651f7b7c7a20c68501931f6101aa330611d14f88b04"
+  },
+  "macos/mascot/evidence/p04m-a2/recording.log": {
+    "bytes": 306,
+    "sha256": "27cd0bc273ee2de2226997e2843e9a112c4ca99e23bad9439e9062c3185cc0a6"
+  },
+  "macos/mascot/evidence/p04m-a2/reproduction.log": {
+    "bytes": 136,
+    "sha256": "ce3f4f5b848a32279a9678446283ecaa5a74f3b0f76cdf953c053df18cbcf5b6"
+  },
+  "macos/mascot/evidence/p04m-a2/results-summary.json": {
+    "bytes": 4043,
+    "sha256": "0efefe6945828a5259673f4023e50038c710a7963757b3d81cd1d6df4579bd06"
+  },
+  "macos/mascot/evidence/p04m-a2/usdchecker.log": {
+    "bytes": 697,
+    "sha256": "75db7cb59ab58d3cfcb31946fd2adb9bf6b9804b181ad62aa32c29e8036d8f69"
+  },
+  "macos/mascot/evidence/p04m-a2/usdtree.txt": {
+    "bytes": 4491,
+    "sha256": "d9816f5b8534debde3002a02c884ec9f259d79c61d3b1b2e47e8ceea3c3e6a56"
+  },
+  "macos/mascot/validation/Assets/B-static.png": {
+    "bytes": 27738,
+    "sha256": "f0d9d1a75c116da54adfe2d2650b106d7982fe66ad426234f9e7b0afe552ec2d"
+  },
+  "macos/mascot/validation/Assets/Gator-B.usda": {
+    "bytes": 865504,
+    "sha256": "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3"
+  },
+  "macos/mascot/validation/Assets/Gator-B.usdc": {
+    "bytes": 58124,
+    "sha256": "8266167f007e6e93cd4d3e9b203eeda064dfae78b19cca9ebffa75e72d8ff24d"
+  },
+  "macos/mascot/validation/Assets/Gator-B.usdz": {
+    "bytes": 58290,
+    "sha256": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca"
+  },
+  "macos/mascot/validation/CheckRig.swift": {
+    "bytes": 1755,
+    "sha256": "bf88b355aaa09d215d1d751a87b4dc64dbf016e13cc0dd9e2c4c13917c0b53a5"
+  },
+  "macos/mascot/validation/MascotRig.swift": {
+    "bytes": 6013,
+    "sha256": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20"
+  },
+  "macos/mascot/validation/RealtimeRenderer.swift": {
+    "bytes": 6666,
+    "sha256": "de84403dd0a265b3a2e474fb25081b745dc9baa071179781412c106bdcab44e6"
+  },
+  "macos/mascot/validation/RecordWindow.swift": {
+    "bytes": 2823,
+    "sha256": "ad14f406935c1384fcbec823807fc25b89e0b66eba851570fea768f5679a5d23"
+  },
+  "macos/mascot/validation/RendererLab.swift": {
+    "bytes": 18325,
+    "sha256": "f6d16315f372e8bab50eca8bf9a5a18d417c3af44c7d63ee7bcfe04ce0af3e98"
+  },
+  "macos/mascot/validation/ReproduceAsset.swift": {
+    "bytes": 1600,
+    "sha256": "48864d778d0860f4444f172fd0e77fa841102d6027c548191c383947212df050"
+  },
+  "macos/mascot/validation/build.sh": {
+    "bytes": 1585,
+    "sha256": "ecc999c7568efa3c4c09b6e13942cd61e34ae83e850d9629e862415ab7c3593d"
+  }
+}

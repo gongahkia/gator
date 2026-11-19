@@ -1,0 +1,75 @@
+{
+  "elapsed" : 0.96357405185699463,
+  "macOS" : "Version 26.5.2 (Build 25F84)",
+  "mode" : "checks",
+  "modelLoads" : 3,
+  "pid" : 19350,
+  "processors" : 8,
+  "renders" : 5,
+  "results" : [
+    {
+      "firstFrameMilliseconds" : 157.64904022216797,
+      "loadMilliseconds" : 237.54405975341797,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "rigValidation" : {
+        "assertions" : 21,
+        "cycles" : 1000,
+        "independentParts" : [
+          "Jaw_Pivot",
+          "Eye_Left\/Pupil",
+          "Eye_Right\/Pupil",
+          "Eye_Left\/Upper_Lid",
+          "Eye_Right\/Upper_Lid",
+          "Eye_Left\/Lower_Lid",
+          "Eye_Right\/Lower_Lid"
+        ],
+        "jawPivot" : [
+          0,
+          -0.30000001192092896,
+          0.23999999463558197
+        ]
+      }
+    },
+    {
+      "alpha" : {
+        "transparent" : 29320,
+        "visible" : 20856
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 13.58795166015625,
+      "loadMilliseconds" : 95.937967300415039,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 8.134007453918457,
+      "loadMilliseconds" : 81.439971923828125,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "cancellation" : "after confirmed first frame, before transition completion",
+      "lifecycleAssertions" : 6,
+      "missingResource" : "static fallback; chat-independent"
+    }
+  ]
+}

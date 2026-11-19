@@ -1,0 +1,88 @@
+{
+  "elapsed" : 24.25271999835968,
+  "events" : [
+
+  ],
+  "macOS" : "Version 26.5.2 (Build 25F84)",
+  "mode" : "demo",
+  "modelLoads" : 1,
+  "pid" : 25467,
+  "processors" : 8,
+  "renders" : 96,
+  "results" : [
+    {
+      "firstFrameMilliseconds" : 14.657974243164062,
+      "loadHeartbeatMaximumGapMs" : 30.429375,
+      "loadMilliseconds" : 187.78300285339355,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "rigValidation" : {
+        "assertions" : 21,
+        "cycles" : 1000,
+        "independentParts" : [
+          "Jaw_Pivot",
+          "Eye_Left\/Pupil",
+          "Eye_Right\/Pupil",
+          "Eye_Left\/Upper_Lid",
+          "Eye_Right\/Upper_Lid",
+          "Eye_Left\/Lower_Lid",
+          "Eye_Right\/Lower_Lid"
+        ],
+        "jawPivot" : [
+          0,
+          -0.30000001192092896,
+          0.23999999463558197
+        ]
+      }
+    },
+    {
+      "alpha" : {
+        "transparent" : 29320,
+        "visible" : 20856
+      },
+      "state" : "idle"
+    },
+    {
+      "alpha" : {
+        "transparent" : 29315,
+        "visible" : 20861
+      },
+      "state" : "working"
+    },
+    {
+      "alpha" : {
+        "transparent" : 28460,
+        "visible" : 21716
+      },
+      "state" : "responding"
+    },
+    {
+      "alpha" : {
+        "transparent" : 29150,
+        "visible" : 21026
+      },
+      "state" : "completed"
+    },
+    {
+      "alpha" : {
+        "transparent" : 29322,
+        "visible" : 20854
+      },
+      "state" : "needsAttention"
+    },
+    {
+      "alpha" : {
+        "transparent" : 29329,
+        "visible" : 20847
+      },
+      "state" : "disconnected"
+    }
+  ]
+}

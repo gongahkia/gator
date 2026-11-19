@@ -1,0 +1,295 @@
+{
+  "elapsed" : 124.45945203304291,
+  "macOS" : "Version 26.5.2 (Build 25F84)",
+  "mode" : "quick",
+  "modelLoads" : 4,
+  "pid" : 18625,
+  "processors" : 8,
+  "renders" : 145,
+  "results" : [
+    {
+      "cpuPercentOneCore" : 0.50885484854359564,
+      "liveRenderers" : 0,
+      "phase" : "static-cold",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 89,
+      "rssMiBSamples" : [
+        88.03125,
+        94.390625,
+        94.390625,
+        94.390625,
+        94.390625,
+        94.34375,
+        94.34375,
+        94.34375,
+        94.34375,
+        94.34375,
+        94.3125,
+        89
+      ],
+      "seconds" : 12.218219041824341
+    },
+    {
+      "firstFrameMilliseconds" : 27.388095855712891,
+      "loadMilliseconds" : 222.45395183563232,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 112,
+        "drawableWidth" : 112,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "rigValidation" : {
+        "assertions" : 21,
+        "cycles" : 1000,
+        "independentParts" : [
+          "Jaw_Pivot",
+          "Eye_Left\/Pupil",
+          "Eye_Right\/Pupil",
+          "Eye_Left\/Upper_Lid",
+          "Eye_Right\/Upper_Lid",
+          "Eye_Left\/Lower_Lid",
+          "Eye_Right\/Lower_Lid"
+        ],
+        "jawPivot" : [
+          0,
+          -0.30000001192092896,
+          0.23999999463558197
+        ]
+      }
+    },
+    {
+      "alpha" : {
+        "transparent" : 29116,
+        "visible" : 21060
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.087561642096139217,
+      "liveRenderers" : 1,
+      "phase" : "one-idle-no-draw",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 136.390625,
+      "rssMiBSamples" : [
+        137.765625,
+        137.375,
+        137.375,
+        137.375,
+        137.375,
+        137.21875,
+        137.21875,
+        137.21875,
+        137.21875,
+        137.21875,
+        137.21875,
+        137.21875,
+        136.4375,
+        136.4375,
+        136.390625
+      ],
+      "seconds" : 15.462249994277954
+    },
+    {
+      "cpuPercentOneCore" : 0.35456529523974062,
+      "liveRenderers" : 1,
+      "phase" : "one-idle-blink",
+      "renders" : 12,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 136.421875,
+      "rssMiBSamples" : [
+        136.390625,
+        136.375,
+        136.375,
+        136.375,
+        136.375,
+        136.375,
+        136.375,
+        136.421875,
+        136.421875,
+        136.421875,
+        136.421875,
+        136.421875,
+        136.421875,
+        136.421875,
+        136.421875
+      ],
+      "seconds" : 16.016795992851257
+    },
+    {
+      "cpuPercentOneCore" : 1.0145463574779741,
+      "liveRenderers" : 1,
+      "phase" : "one-responding",
+      "renders" : 48,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 136.4375,
+      "rssMiBSamples" : [
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375,
+        136.4375
+      ],
+      "seconds" : 14.038293957710266
+    },
+    {
+      "firstFrameMilliseconds" : 14.739036560058594,
+      "loadMilliseconds" : 101.72498226165771,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 112,
+        "drawableWidth" : 112,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 12.359976768493652,
+      "loadMilliseconds" : 87.447047233581543,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 112,
+        "drawableWidth" : 112,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.080437320227307013,
+      "liveRenderers" : 2,
+      "phase" : "two-idle",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 143.765625,
+      "rssMiBSamples" : [
+        143.9375,
+        143.9375,
+        143.9375,
+        143.9375,
+        143.9375,
+        143.765625,
+        143.765625,
+        143.765625,
+        143.765625,
+        143.765625,
+        143.765625,
+        143.765625
+      ],
+      "seconds" : 12.412148952484131
+    },
+    {
+      "cpuPercentOneCore" : 1.8141918320498627,
+      "liveRenderers" : 2,
+      "phase" : "two-responding",
+      "renders" : 80,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 143.8125,
+      "rssMiBSamples" : [
+        143.796875,
+        143.796875,
+        143.796875,
+        143.796875,
+        143.796875,
+        143.796875,
+        143.796875,
+        143.796875,
+        143.8125,
+        143.8125
+      ],
+      "seconds" : 12.721863031387329
+    },
+    {
+      "firstFrameMilliseconds" : 10.366916656494141,
+      "loadMilliseconds" : 91.575026512145996,
+      "points" : 40,
+      "surface" : {
+        "drawableHeight" : 40,
+        "drawableWidth" : 40,
+        "viewHeight" : 40,
+        "viewWidth" : 40
+      }
+    },
+    {
+      "cpuPercentOneCore" : 0.079214792690331839,
+      "liveRenderers" : 1,
+      "phase" : "collapsed-idle",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 144.171875,
+      "rssMiBSamples" : [
+        144.21875,
+        144.25,
+        144.25,
+        144.25,
+        144.25,
+        144.25,
+        144.21875,
+        144.21875,
+        144.21875,
+        144.21875,
+        144.21875,
+        144.21875
+      ],
+      "seconds" : 12.534275054931641
+    },
+    {
+      "cpuPercentOneCore" : 0.35434635205274873,
+      "liveRenderers" : 0,
+      "phase" : "hidden-teardown",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 145.046875,
+      "rssMiBSamples" : [
+        144.21875,
+        145.359375,
+        145.359375,
+        145.359375,
+        145.359375,
+        145.359375,
+        145.359375,
+        145.28125,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375
+      ],
+      "seconds" : 15.580801010131836
+    },
+    {
+      "cpuPercentOneCore" : 0.40602440199785589,
+      "liveRenderers" : 0,
+      "phase" : "reduced-static-after-engine",
+      "renders" : 0,
+      "retiredStillAlive" : 0,
+      "rssFinalMiB" : 145.09375,
+      "rssMiBSamples" : [
+        145.046875,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375,
+        145.09375
+      ],
+      "seconds" : 12.596040964126587
+    }
+  ]
+}

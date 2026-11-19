@@ -13,7 +13,8 @@ import QuartzCore
         metalLayer.device = device
         metalLayer.pixelFormat = .bgra8Unorm_srgb
         metalLayer.isOpaque = false
-        metalLayer.framebufferOnly = true
+        // the offscreen RealityKit output is blitted into the drawable
+        metalLayer.framebufferOnly = false
         metalLayer.drawableSize = CGSize(width: 224, height: 224)
         layer = metalLayer
         setAccessibilityElement(false)

@@ -1,0 +1,5 @@
+native96 A0-host-no-RealityKit-initialization pid 44605
+native96 A3-or-A4-visible-idle pid 44605
+native96 A3-or-A4-visible-active pid 44605
+native96 A5-returned-to-idle pid 44605
+native96 A6-hidden pid 44605

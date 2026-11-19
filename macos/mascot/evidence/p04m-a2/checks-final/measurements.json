@@ -1,0 +1,81 @@
+{
+  "elapsed" : 0.87632906436920166,
+  "events" : [
+
+  ],
+  "macOS" : "Version 26.5.2 (Build 25F84)",
+  "mode" : "checks",
+  "modelLoads" : 3,
+  "pid" : 26023,
+  "processors" : 8,
+  "renders" : 5,
+  "results" : [
+    {
+      "firstFrameMilliseconds" : 135.66696643829346,
+      "loadHeartbeatMaximumGapMs" : 126.15983300000001,
+      "loadMilliseconds" : 263.49508762359619,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "rigValidation" : {
+        "assertions" : 21,
+        "cycles" : 1000,
+        "independentParts" : [
+          "Jaw_Pivot",
+          "Eye_Left\/Pupil",
+          "Eye_Right\/Pupil",
+          "Eye_Left\/Upper_Lid",
+          "Eye_Right\/Upper_Lid",
+          "Eye_Left\/Lower_Lid",
+          "Eye_Right\/Lower_Lid"
+        ],
+        "jawPivot" : [
+          0,
+          -0.30000001192092896,
+          0.23999999463558197
+        ]
+      }
+    },
+    {
+      "alpha" : {
+        "transparent" : 29320,
+        "visible" : 20856
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 11.52801513671875,
+      "loadHeartbeatMaximumGapMs" : 13.27,
+      "loadMilliseconds" : 73.814034461975098,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "firstFrameMilliseconds" : 7.9989433288574219,
+      "loadHeartbeatMaximumGapMs" : 17.174833,
+      "loadMilliseconds" : 68.114995956420898,
+      "points" : 112,
+      "surface" : {
+        "drawableHeight" : 224,
+        "drawableWidth" : 224,
+        "viewHeight" : 112,
+        "viewWidth" : 112
+      }
+    },
+    {
+      "cancellation" : "after confirmed first frame, before transition completion",
+      "lifecycleAssertions" : 6,
+      "missingResource" : "static fallback; chat-independent"
+    }
+  ]
+}
