@@ -1,0 +1,454 @@
+{
+  "assertions" : 26,
+  "done" : true,
+  "elapsed" : 145.66269302368164,
+  "phase" : "all-released",
+  "pid" : 7312,
+  "results" : [
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.50740029293742239,
+      "footprint" : 21152584,
+      "peakFootprint" : 21201736,
+      "phase" : "host-baseline",
+      "rss" : 96485376
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "neutral",
+      "loadMilliseconds" : 5.061030387878418,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.099101960160284205,
+      "footprint" : 21021512,
+      "peakFootprint" : 21201736,
+      "phase" : "rendered-static",
+      "rss" : 91144192
+    },
+    {
+      "activeFrameBytes" : 2408448,
+      "expression" : "working",
+      "loadMilliseconds" : 22.700905799865723,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 2.6988983154296875,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 13.252973556518555,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 16.143918037414551,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 16.673088073730469,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 15.843987464904785,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 17.488956451416016,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 16.099929809570312,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 13.576984405517578,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 8.2249641418457031,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 17.220973968505859,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 14.034032821655273,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 17.764091491699219,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 1.61645763001634,
+      "footprint" : 20579144,
+      "peakFootprint" : 23659336,
+      "phase" : "rendered-active",
+      "rss" : 86228992
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "neutral",
+      "loadMilliseconds" : 3.6380290985107422,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.060583832688702377,
+      "footprint" : 20579144,
+      "peakFootprint" : 23659336,
+      "phase" : "rendered-idle",
+      "rss" : 85590016
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "neutral",
+      "loadMilliseconds" : 2.2439956665039062,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.26026207441148896,
+      "footprint" : 20579144,
+      "peakFootprint" : 23659336,
+      "phase" : "classic-static",
+      "rss" : 85573632
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.21100044250488281,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 1806336,
+      "expression" : "responding",
+      "loadMilliseconds" : 11.230945587158203,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.15592575073242188,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.17499923706054688,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.11897087097167969,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.2269744873046875,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.08392333984375,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.29790401458740234,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.22792816162109375,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.24998188018798828,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.23198127746582031,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "responding",
+      "loadMilliseconds" : 0.23794174194335938,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.5293655305604209,
+      "footprint" : 21431112,
+      "peakFootprint" : 23659336,
+      "phase" : "classic-active",
+      "rss" : 87998464
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 0.17595291137695312,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.087022781372070312,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 1.0672958124075576,
+      "footprint" : 21463880,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-0",
+      "rss" : 88031232
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 1.4879703521728516,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.21600723266601562,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.090521754291432471,
+      "footprint" : 21529416,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-1",
+      "rss" : 88096768
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 2.0459890365600586,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.077009201049804688,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.11352834744498209,
+      "footprint" : 21611336,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-2",
+      "rss" : 88178688
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 0.91207027435302734,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.16188621520996094,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.10324335866257214,
+      "footprint" : 21480264,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-3",
+      "rss" : 88129536
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 2.1148920059204102,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.10597705841064453,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.085500723849424073,
+      "footprint" : 21513032,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-4",
+      "rss" : 88178688
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 1.5140771865844727,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.10704994201660156,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.088976135032060602,
+      "footprint" : 21545800,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-5",
+      "rss" : 88211456
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 1.6069412231445312,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.18703937530517578,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.10265493230913755,
+      "footprint" : 21152584,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-6",
+      "rss" : 88260608
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 1.9789934158325195,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.1430511474609375,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.1032651837270976,
+      "footprint" : 21185352,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-7",
+      "rss" : 88293376
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 0.58996677398681641,
+      "style" : "rendered"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.44000148773193359,
+      "style" : "classic"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.10419866045274929,
+      "footprint" : 21152584,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-8",
+      "rss" : 88260608
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "attention",
+      "loadMilliseconds" : 1.1099576950073242,
+      "style" : "classic"
+    },
+    {
+      "activeFrameBytes" : 0,
+      "expression" : "disconnected",
+      "loadMilliseconds" : 0.21100044250488281,
+      "style" : "rendered"
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.11794001695734921,
+      "footprint" : 21152584,
+      "peakFootprint" : 23659336,
+      "phase" : "hidden-9",
+      "rss" : 88211456
+    },
+    {
+      "activeAnimations" : 0,
+      "cacheBytes" : 0,
+      "cpu" : 0.16971303553074224,
+      "footprint" : 21087048,
+      "peakFootprint" : 23659336,
+      "phase" : "all-released",
+      "rss" : 88162304
+    },
+    {
+      "owningTaskReleased" : true,
+      "retiredViewsAliveAfterTask" : 0
+    }
+  ]
+}

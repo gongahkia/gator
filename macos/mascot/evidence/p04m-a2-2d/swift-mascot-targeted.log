@@ -1,0 +1,53 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Compiling GatorMacTests NativeMascotTests.swift
+[4/6] Emitting module GatorMacTests
+[5/8] Emitting module GatorNativePackageTests
+[6/8] Compiling GatorNativePackageTests runner.swift
+[6/8] Write Objects.LinkFileList
+[7/8] Linking GatorNativePackageTests
+Build complete! (1.82s)
+Test Suite 'Selected tests' started at 2026-11-19 14:37:15.357.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-19 14:37:15.358.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-19 14:37:15.358.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-19 14:37:15.358.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test mascotOnlyOffersTheTwoSelectedAppearances() started.
+✔ Test mascotOnlyOffersTheTwoSelectedAppearances() passed after 0.001 seconds.
+◇ Test mascotPreferencesPersistUsingNativeAppStorage() started.
+✔ Test mascotPreferencesPersistUsingNativeAppStorage() passed after 0.002 seconds.
+◇ Test mascotStatePrecedenceAndOwnerReplacement() started.
+✔ Test mascotStatePrecedenceAndOwnerReplacement() passed after 0.001 seconds.
+◇ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() started.
+✔ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() passed after 0.001 seconds.
+◇ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() started.
+✔ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() passed after 0.001 seconds.
+◇ Test mascotCompletionRequiresCanonicalFinishedOutcome() started.
+✔ Test mascotCompletionRequiresCanonicalFinishedOutcome() passed after 0.001 seconds.
+◇ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() started.
+✔ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() passed after 0.001 seconds.
+◇ Test mascotCollapseDoesNotMutateReadingAnchors() started.
+✔ Test mascotCollapseDoesNotMutateReadingAnchors() passed after 0.001 seconds.
+◇ Test mascotReadingAnchorRemainsExactAcrossAppearanceChanges() started.
+✔ Test mascotReadingAnchorRemainsExactAcrossAppearanceChanges() passed after 0.001 seconds.
+◇ Test mascotFrameCacheIsBoundedAndStaticDoesNotDecodeTheClip() started.
+✔ Test mascotFrameCacheIsBoundedAndStaticDoesNotDecodeTheClip() passed after 0.006 seconds.
+◇ Test mascotExportManifestMatchesFinitePlaybackSpecifications() started.
+✔ Test mascotExportManifestMatchesFinitePlaybackSpecifications() passed after 0.001 seconds.
+◇ Test mascotAnimationUsesFiniteNativeKeyframes() started.
+✔ Test mascotAnimationUsesFiniteNativeKeyframes() passed after 0.002 seconds.
+◇ Test mascotHiddenAndReduceMotionCancelPlaybackAndReleaseFrames() started.
+✔ Test mascotHiddenAndReduceMotionCancelPlaybackAndReleaseFrames() passed after 0.002 seconds.
+◇ Test mascotStaleDecodeAndHiddenResponsesCannotReplay() started.
+✔ Test mascotStaleDecodeAndHiddenResponsesCannotReplay() passed after 0.001 seconds.
+◇ Test mascotMissingAssetsRemainNonfatalAndDoNotLoop() started.
+✔ Test mascotMissingAssetsRemainNonfatalAndDoNotLoop() passed after 0.001 seconds.
+◇ Test mascotProductionSourceHasNoLive3DOrExecutionDependency() started.
+✔ Test mascotProductionSourceHasNoLive3DOrExecutionDependency() passed after 0.002 seconds.
+✔ Test run with 16 tests in 0 suites passed after 0.021 seconds.

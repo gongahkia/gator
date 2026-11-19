@@ -1,0 +1,110 @@
+AXWindow | Gator – hmmm |  |  | conversation
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-mascot-mwzxmaad/workspace | gator.window
+  AXStaticText |  |  | Read-only in Work | gator.window
+  AXScrollArea |  |  |  | gator.window
+   AXOpaqueProviderGroup |  |  |  | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Animate approved Gator from public text | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Review mascot | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | This retained Work revision ended with status failed. | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXScrollArea |  | Conversation status and recovery |  | gator.window
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+  AXScrollArea |  |  |  | gator.window
+   AXTextArea |  | Message Gator |  | gator.composer.text
+  AXStaticText |  |  | Message Gator… | gator.window
+  AXButton |  | Attach Files |  | gator.window
+  AXMenuButton | Photo | Image attachment options |  | gator.window
+  AXCheckBox |  | Plan first |  | gator.window
+  AXStaticText |  |  | ⇧ Return: new line | gator.window
+  AXButton |  | Send message |  | gator.window
+ AXToolbar |  |  |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | Recent Conversations |  |  | gator.recent-conversations
+  AXButton |  | Choose Workspace… |  | folder
+  AXButton |  | Models and Providers… |  | gator.providers.open
+  AXButton |  | All Conversations… |  | gator.catalog.open
+  AXButton |  | Find in Current Transcript |  | magnifyingglass
+  AXButton |  | New Conversation |  | square.and.pencil
+  AXButton |  | Inspect Current Task |  | doc.text.magnifyingglass
+  AXButton |  | Return to Requesting Chat |  | arrow.uturn.backward
+  AXGroup |  |  |  | 
+   AXMenuButton | More | More |  | ellipsis.circle
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+   AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator | 
+ AXStaticText |  |  | hmmm | 
+ AXSheet |  |  |  | 
+  AXGroup |  |  |  | 
+   AXHeading |  | Task details |  | gator.task.inspector.work-20261119T064304-c7b7cbaeb67a052d
+   AXButton |  | Back to Conversation |  | gator.task.inspector.work-20261119T064304-c7b7cbaeb67a052d
+   AXStaticText |  |  | Conversation: hmmm | gator.task.inspector.work-20261119T064304-c7b7cbaeb67a052d
+   AXScrollArea |  |  |  | gator.task.inspector.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | hmmm | 
+    AXStaticText |  |  | Task status: Completed | 
+    AXDisclosureTriangle |  | Task summary |  | 
+    AXDisclosureTriangle |  | Task identity and ownership |  | 
+    AXHeading |  | Recovery and retained evidence |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Inspect what happened before choosing a next step. Nothing runs or sends when you inspect. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXUnknown |  | Warning: Some outcomes still need review. Inspect the evidence before preparing any next step. |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Review mascot | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Interrupted · not resumed | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained queue identity. Opening these details does not run or resume it. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Interrupted · not resumed |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work activity | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Failed · recorded error | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained text may be partial. It does not establish completed execution. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Failed · recorded error |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained result bundle | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Completed · retained evidence | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Completed · retained evidence |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained result bundle | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Completed · retained evidence | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Completed · retained evidence |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained result bundle | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Completed · retained evidence | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Completed · retained evidence |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained result bundle | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Completed · retained evidence | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Completed · retained evidence |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained result bundle | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Retained work status: Failed · recorded error | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXStaticText |  |  | Sealed output is retained evidence, not proof that every external effect completed. | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXDisclosureTriangle |  | Evidence for Failed · recorded error |  | gator.recovery.work-20261119T064304-c7b7cbaeb67a052d
+    AXScrollBar |  |  |  | 
+     AXValueIndicator |  |  |  | 
+     AXButton |  |  |  | 
+     AXButton |  |  |  | 
+     AXButton |  |  |  | 
+     AXButton |  |  |  | 

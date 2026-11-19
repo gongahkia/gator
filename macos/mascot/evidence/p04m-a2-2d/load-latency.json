@@ -1,0 +1,14 @@
+[
+  {
+    "style": "rendered",
+    "count": 25,
+    "medianLoadMilliseconds": 5.061030387878418,
+    "maxLoadMilliseconds": 22.700905799865723
+  },
+  {
+    "style": "classic",
+    "count": 23,
+    "medianLoadMilliseconds": 0.2319812774658203,
+    "maxLoadMilliseconds": 11.230945587158203
+  }
+]

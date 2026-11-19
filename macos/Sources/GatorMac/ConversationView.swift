@@ -18,6 +18,7 @@ struct ConversationView: View {
     @State private var connectionDetails = false
     @State private var noticesHeight: CGFloat = 24
     @State private var find = NativeTranscriptFind()
+    @State private var readingHistory = false
     private var searchScope: NativeTranscriptSearch.Scope { .init(context: application.context, generation: application.generation) }
     private var canFind: Bool { !compact && application.review == nil && sessions.inspection == nil }
 
@@ -29,6 +30,7 @@ struct ConversationView: View {
             .onChange(of: searchScope) { _, _ in find.close() }
             .onChange(of: application.transcript) { _, messages in find.refresh(scope: searchScope, messages: messages) }
             .onChange(of: canFind) { _, allowed in if !allowed { find.close() } }
+            .onPreferenceChange(NativeMascotReadingKey.self) { readingHistory = $0 }
     }
     private var findAction: NativeFindActionKey.Value? {
         guard canFind else { return nil }
@@ -40,6 +42,8 @@ struct ConversationView: View {
             NativeWorkspaceContext(sessions: sessions, compact: compact)
             if !compact && find.isPresented { NativeTranscriptFindBar(find: find, close: closeFind); Divider() }
             if sessions.activity.count > 1 { sessionActivity.padding(.horizontal, 14).padding(.vertical, 6) }
+            NativeMascotHeader(application: application, compact: compact, reading: readingHistory,
+                               reviewing: application.review != nil || sessions.inspection != nil, height: contentSize.height)
             if compact, let inspection = sessions.inspection {
                 TaskInspectorView(inspection: inspection, owner: sessions.inspectedOwner, compact: compact).padding(12)
             } else if let review = application.review {
@@ -173,6 +177,7 @@ struct ConversationView: View {
             }
             Toggle("Notch Quick Access", isOn: $notchEnabled)
             MenuBarVisibilityToggle()
+            SettingsLink { Text("Mascot Appearance…") }
             Button("Connection & Model Details") { connectionDetails = true }
             Divider()
             Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)
@@ -346,6 +351,7 @@ private struct NativeTranscriptView: View {
     @State private var activityExpanded = false
     @State private var lastReveal: UUID?
     @State private var restorationAnchor: String?
+    @State private var mascotReading = false
     private struct Layout: Equatable { let content: CGSize; let container: CGSize }
     init(compact: Bool, initialPosition: NativeReadingPositions.Position) {
         self.compact = compact; self.initialPosition = initialPosition
@@ -353,6 +359,7 @@ private struct NativeTranscriptView: View {
         _nearBottom = State(initialValue: initialPosition.following)
         _visibleMessage = State(initialValue: initialPosition.following ? "latest" : initialPosition.anchor)
         _restorationAnchor = State(initialValue: initialPosition.following ? nil : initialPosition.anchor)
+        _mascotReading = State(initialValue: !initialPosition.following)
     }
     var body: some View {
         ScrollViewReader { proxy in
@@ -404,7 +411,11 @@ private struct NativeTranscriptView: View {
             }
             .onScrollGeometryChange(for: Bool.self) { geometry in geometry.contentSize.height - geometry.visibleRect.maxY < 80 } action: { _, near in
                 nearBottom = near
+                if near { mascotReading = false }
                 if userScrolling { following = near }
+            }
+            .onScrollGeometryChange(for: Bool.self) { $0.contentSize.height - $0.visibleRect.maxY > 160 } action: { _, far in
+                if far && (!following || userScrolling) { mascotReading = true }
             }
             .onScrollGeometryChange(for: Layout.self) { Layout(content: $0.contentSize, container: $0.containerSize) } action: { _, layout in
                 // lazy rows refine estimated heights after initial restoration and
@@ -431,7 +442,7 @@ private struct NativeTranscriptView: View {
                         .buttonStyle(.bordered).background(.regularMaterial, in: Capsule()).padding(8)
                 }
             }
-        }
+        }.preference(key: NativeMascotReadingKey.self, value: mascotReading)
     }
 
     private func revealMatch(_ proxy: ScrollViewProxy) {

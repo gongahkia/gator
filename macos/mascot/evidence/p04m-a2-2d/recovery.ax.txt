@@ -1,0 +1,64 @@
+AXWindow | Gator – hmmm |  |  | conversation
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-mascot-mwzxmaad/workspace | gator.window
+  AXStaticText |  |  | Read-only in Work | gator.window
+  AXScrollArea |  |  |  | gator.window
+   AXOpaqueProviderGroup |  |  |  | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Animate approved Gator from public text | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Review mascot | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | This retained Work revision ended with status failed. | 
+    AXDisclosureTriangle |  | Retained work result |  | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXScrollArea |  | Conversation status and recovery |  | gator.window
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+   AXButton |  | Inspect recovery evidence for the selected conversation |  | 
+   AXUnknown |  | Information: Retained queued work is Go-owned. Native queue editing and resuming are not available yet. |  | 
+  AXScrollArea |  |  |  | gator.window
+   AXTextArea |  | Message Gator |  | gator.composer.text
+  AXStaticText |  |  | Message Gator… | gator.window
+  AXButton |  | Attach Files |  | gator.window
+  AXMenuButton |  | Image attachment options |  | gator.window
+  AXCheckBox |  | Plan first |  | gator.window
+  AXStaticText |  |  | ⇧ Return: new line | gator.window
+  AXButton |  | Send message |  | gator.window
+ AXToolbar |  |  |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | Recent Conversations |  |  | gator.recent-conversations
+  AXButton |  | Choose Workspace… |  | folder
+  AXButton |  | Models and Providers… |  | gator.providers.open
+  AXButton |  | All Conversations… |  | gator.catalog.open
+  AXButton |  | Find in Current Transcript |  | magnifyingglass
+  AXButton |  | New Conversation |  | square.and.pencil
+  AXButton |  | Inspect Current Task |  | doc.text.magnifyingglass
+  AXButton |  | Return to Requesting Chat |  | arrow.uturn.backward
+  AXGroup |  |  |  | 
+   AXMenuButton | More | More |  | ellipsis.circle
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator | 
+ AXStaticText |  |  | hmmm | 

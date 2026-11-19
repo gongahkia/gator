@@ -1,0 +1,60 @@
+AXWindow | Gator – Retained topic 0002 |  |  | conversation
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-mascot-mwzxmaad/workspace | gator.window
+  AXStaticText |  |  | Read-only in Work | gator.window
+  AXDisclosureTriangle |  | Work continues in another chat |  | gator.window
+  AXScrollArea |  |  |  | gator.window
+   AXOpaqueProviderGroup |  |  |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | h | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | I've started that as independent work. You can keep talking here. | 
+    AXDisclosureTriangle |  | Retained conversation context |  | 
+    AXButton |  | Open Original Task |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | hi | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | I've started that as independent work. You can keep talking here. | 
+    AXDisclosureTriangle |  | Retained conversation context |  | 
+    AXButton |  | Open Original Task |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | hmmm | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | I've started that as independent work. You can keep talking here. | 
+    AXDisclosureTriangle |  | Retained conversation context |  | 
+    AXButton |  | Open Original Task |  | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXScrollArea |  | Conversation status and recovery |  | gator.window
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+   AXStaticText |  |  | Request: running | 
+  AXScrollArea |  |  |  | gator.window
+   AXTextArea |  | Message Gator |  | gator.composer.text
+  AXStaticText |  |  | Message Gator… | gator.window
+  AXButton |  | Attach Files |  | gator.window
+  AXMenuButton |  | Image attachment options |  | gator.window
+  AXCheckBox |  | Plan first |  | gator.window
+  AXStaticText |  |  | ⇧ Return: new line | gator.window
+  AXButton |  | Send message |  | gator.window
+ AXToolbar |  |  |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | Recent Conversations |  |  | gator.recent-conversations
+  AXButton |  | Choose Workspace… |  | folder
+  AXButton |  | Models and Providers… |  | gator.providers.open
+  AXButton |  | All Conversations… |  | gator.catalog.open
+  AXButton |  | Find in Current Transcript |  | magnifyingglass
+  AXButton |  | New Conversation |  | square.and.pencil
+  AXButton |  | Inspect Current Task |  | doc.text.magnifyingglass
+  AXGroup |  |  |  | 
+   AXMenuButton |  | More |  | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator | 
+ AXStaticText |  |  | Retained topic 0002 | 

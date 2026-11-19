@@ -1,0 +1,43 @@
+[
+  {
+    "recording": "live-classic.mp4",
+    "crop": [
+      760,
+      220,
+      220,
+      210
+    ],
+    "framesAt10FPS": 289,
+    "distinctCharacterFramesMeanDifferenceAbove2": 7,
+    "selectedTimesSeconds": [
+      0.0,
+      3.9,
+      4.0,
+      4.5,
+      11.0,
+      11.4,
+      15.4
+    ]
+  },
+  {
+    "recording": "live-rendered-final.mp4",
+    "crop": [
+      760,
+      220,
+      220,
+      210
+    ],
+    "framesAt10FPS": 205,
+    "distinctCharacterFramesMeanDifferenceAbove2": 8,
+    "selectedTimesSeconds": [
+      0.0,
+      1.4,
+      1.5,
+      1.6,
+      2.6,
+      8.6,
+      8.7,
+      8.8
+    ]
+  }
+]

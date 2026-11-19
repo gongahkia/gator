@@ -1,0 +1,22 @@
+[
+  {
+    "file": "live-classic.mp4",
+    "status": "ACCEPTED \u2014 actual Classic response motion"
+  },
+  {
+    "file": "live-rendered-final.mp4",
+    "status": "ACCEPTED \u2014 actual rendered-style response motion"
+  },
+  {
+    "file": "live-rendered.mp4",
+    "status": "DIAGNOSTIC \u2014 includes disabled/settings interaction"
+  },
+  {
+    "file": "live-rendered-verified.mp4",
+    "status": "DIAGNOSTIC \u2014 before final successful stream probe"
+  },
+  {
+    "file": "live-rendered-stream.mp4",
+    "status": "DIAGNOSTIC \u2014 includes switching to task inspection"
+  }
+]

@@ -1,0 +1,48 @@
+AXWindow |  |  |  | 
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Gator | gator.compact
+  AXStaticText |  |  | Retained topic 0002 | gator.compact
+  AXButton |  | Inspect Current Task |  | gator.compact
+  AXMenuButton |  | More |  | gator.compact
+  AXButton |  | Open full Gator window |  | gator.compact
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-mascot-mwzxmaad/workspace | gator.compact
+  AXStaticText |  |  | Read-only in Work | gator.compact
+  AXDisclosureTriangle |  | Another chat needs attention |  | gator.compact
+  AXScrollArea |  |  |  | gator.compact
+   AXOpaqueProviderGroup |  |  |  | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained conversation context |  | 
+    AXButton |  | Open Original Task |  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | hmmm | 
+    AXStaticText |  |  | Gator | 
+    AXStaticText |  |  | I've started that as independent work. You can keep talking here. | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | A small, local answer |  | 
+    AXStaticText |  |  | The mascot observes this public response. This is a loopback fixture, with no external account or model request. | 
+    AXUnknown |  | •, Your draft stays in its conversation. |  | 
+    AXUnknown |  | •, The character does not approve anything. |  | 
+    AXUnknown |  | •, Work remains owned by Go. |  | 
+    AXDisclosureTriangle |  | Retained conversation context |  | 
+    AXButton |  | Open Original Task |  | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXScrollArea |  | Conversation status and recovery |  | gator.compact
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+  AXScrollArea |  |  |  | gator.compact
+   AXTextArea |  | Message Gator | Keep mascot draft intact | gator.composer.text
+  AXButton |  | Attach Files |  | gator.compact
+  AXMenuButton |  | Image attachment options |  | gator.compact
+  AXCheckBox |  | Plan first |  | gator.compact
+  AXStaticText |  |  | ⇧↩ newline | gator.compact
+  AXButton |  | Send message |  | gator.compact

@@ -1,0 +1,14 @@
+{
+  "UTC": "2026-11-19T07:19:40.442523+00:00",
+  "HEAD": "662f5825d81aea1ff4b9f991dbb314746564d31a",
+  "sources": {
+    "macos/Sources/GatorMac/ConversationView.swift": "6fb515115ace21a75a3663560fd689186e84f54b60943a838c443061235e6f3d",
+    "macos/Sources/GatorMac/GatorApp.swift": "c0db26c0e4cbe1a0c2918cba3a1ca44ad7e6b1e24ecc3d0ece892ca506618402",
+    "macos/scripts/build-dev-app.sh": "ec41356f3cc00ccc460bd6962bfc6a0300d6fd14623f2544c62cc2c032f81ec7",
+    "macos/Sources/GatorMac/NativeMascotPlayback.swift": "22f1660e66f5418830971132c6d0a8168445632a4e945e50653a0fc0964743ea",
+    "macos/Sources/GatorMac/NativeMascotPreferences.swift": "9906a6b2d1bca46469515010206f3c5b21a64711f167f8f0c896633ee12d64d3",
+    "macos/Sources/GatorMac/NativeMascotView.swift": "ad4e86bcaa74e65291d858635e0f357b430c8ee6f3cc4d4f9a9925cbd084b7a1",
+    "macos/Sources/GatorMac/NativeMascotModel.swift": "39c06e215aeb7d03860e52f4af31e75cbd324d834032430fc5a821929a03b4ee",
+    "macos/Tests/GatorMacTests/NativeMascotTests.swift": "ed7a24ea052e799d57c3d3c90a29712aa35bb1bba8853f8089163107fc1018df"
+  }
+}

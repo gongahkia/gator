@@ -1,0 +1,17 @@
+{
+  "playbackGate": "PASS",
+  "nativeIntegration": "PASS with documented platform/operator limits",
+  "SwiftTests": 243,
+  "strictMascotTests": 16,
+  "standaloneChecks": 63,
+  "nativeLabAssertions": 26,
+  "GoPackages": 8,
+  "hostTestsNode26": 41,
+  "bundledAssetFilesVerified": 119,
+  "acceptedPlayerUnchangedSinceGate": true,
+  "GPU_energy": "NOT TESTED",
+  "macOS15_runtime": "NOT TESTED",
+  "physicalVoiceOverAndIME": "NOT TESTED",
+  "app": "/tmp/Gator-Native-P04M-2D.app",
+  "nextWorkStarted": false
+}

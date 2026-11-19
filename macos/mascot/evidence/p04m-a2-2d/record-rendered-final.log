@@ -1,0 +1,14 @@
+fixturePID=24436 bundle=dev.gator.mascot.2d.acceptance path=/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app screenCapture=true
+candidate=48993 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48992 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48989 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48988 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48986 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48985 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48991 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48995 title=Gator Settings onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48981 title=Gator onScreen=true bundle=dev.gator.mascot.2d.acceptance
+candidate=48987 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+candidate=48990 title= onScreen=false bundle=dev.gator.mascot.2d.acceptance
+recording started
+recording finished; audio=false; desktop=false

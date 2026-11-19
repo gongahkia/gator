@@ -1,0 +1,11 @@
+{
+  "decision": "PASS",
+  "UTC": "2026-11-19T06:30:07.910895+00:00",
+  "elapsed": 145.66269302368164,
+  "headlessChecks": 63,
+  "nativeAssertions": 26,
+  "hostFootprintMiB": 20.17267608642578,
+  "peakTotalFootprintMiB": 22.56330108642578,
+  "peakIncrementalFootprintMiB": 2.390625,
+  "productionIntegrationBeginsAfterThisRecord": true
+}

@@ -1,0 +1,51 @@
+AXWindow | Gator – hmmm |  |  | conversation
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-mascot-mwzxmaad/workspace | gator.window
+  AXStaticText |  |  | Read-only in Work | gator.window
+  AXDisclosureTriangle |  | Open chats and retained tasks |  | gator.window
+  AXHeading |  | Review this exact action |  | gator.window
+  AXStaticText |  |  | Owner: hmmm | gator.window
+  AXScrollArea |  |  |  | gator.window
+   AXHeading |  | Review web research access |  | 
+   AXStaticText |  |  | Local mascot layout fixture. No fetch is implemented. Do not approve. | 
+   AXStaticText |  |  | Web scope: https://mascot.example.invalid | 
+   AXStaticText |  |  | Search service: unavailable: no search provider configured | 
+   AXStaticText |  |  | Shared limits: 8 search requests within 32 total web requests | 
+   AXStaticText |  |  | This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access o | 
+   AXDisclosureTriangle |  | Complete exact review data |  | 
+   AXStaticText |  |  | Approving permits exactly this proposed operation. Only Gator's retained outcome can confirm execution or delivery. | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXButton |  | Back to Conversation |  | gator.window
+  AXButton |  | Request Correction |  | gator.window
+  AXStaticText |  |  | Space or click chooses · Return never approves | gator.window
+  AXButton |  | Decline |  | gator.window
+  AXButton |  | Approve Exact Action |  | gator.window
+  AXScrollArea |  | Conversation status and recovery |  | gator.window
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+   AXStaticText |  |  | Request: running | 
+ AXToolbar |  |  |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | Recent Conversations |  |  | gator.recent-conversations
+  AXButton |  | Choose Workspace… |  | folder
+  AXButton |  | Models and Providers… |  | gator.providers.open
+  AXButton |  | All Conversations… |  | gator.catalog.open
+  AXButton |  | Find in Current Transcript |  | magnifyingglass
+  AXButton |  | New Conversation |  | square.and.pencil
+  AXButton |  | Inspect Current Task |  | doc.text.magnifyingglass
+  AXButton |  | Return to Requesting Chat |  | arrow.uturn.backward
+  AXButton |  | Stop |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | More | More |  | ellipsis.circle
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+   AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator | 
+ AXStaticText |  |  | hmmm | 

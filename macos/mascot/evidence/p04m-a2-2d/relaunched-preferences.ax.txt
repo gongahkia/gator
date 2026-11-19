@@ -1,0 +1,23 @@
+AXWindow | Gator Settings |  |  | com_apple_SwiftUI_Settings_window
+ AXGroup |  |  |  | 
+  AXScrollArea |  |  |  | 
+   AXHeading |  | Gator Mascot |  | 
+   AXGroup |  |  |  | 
+    AXStaticText |  |  | Show Gator Mascot | 
+    AXCheckBox |  |  |  | gator.mascot.shown
+    AXStaticText |  |  | Mascot Style | 
+    AXPopUpButton |  |  | Classic 2D | gator.mascot.style
+    AXStaticText |  |  | Animate Mascot | 
+    AXCheckBox |  |  |  | gator.mascot.animated
+    AXStaticText |  |  | Short reactions to the current conversation. macOS Reduce Motion takes precedence. | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator Settings | 

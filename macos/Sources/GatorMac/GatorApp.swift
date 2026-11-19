@@ -49,6 +49,7 @@ struct GatorApp: App {
                 AllConversationsButton(sessions: application).keyboardShortcut("o", modifiers: [.command, .shift])
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 MenuBarVisibilityToggle()
+                SettingsLink { Text("Mascot Appearance…") }
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(delegate.quickAccess?.canShow != true)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
@@ -75,6 +76,8 @@ struct GatorApp: App {
         }
         .defaultSize(width: 800, height: 680)
         .defaultLaunchBehavior(.suppressed)
+
+        Settings { NativeMascotPreferencesView() }
     }
 }
 

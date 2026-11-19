@@ -1,0 +1,24 @@
+{
+  "integrated-post-stream": {
+    "samples": 12,
+    "RSSMiB": 139.7265625,
+    "physicalFootprintMiB": 59.016517639160156,
+    "lifetimePeakFootprintMiB": 61.219642639160156,
+    "CPUPercentOneCore": 0.02567909286403869
+  },
+  "integrated-idle": {
+    "samples": 12,
+    "RSSMiB": 159.8046875,
+    "physicalFootprintMiB": 68.28995513916016,
+    "lifetimePeakFootprintMiB": 121.89151763916016,
+    "CPUPercentOneCore": 0.03413219318805913
+  },
+  "integrated-hidden": {
+    "samples": 12,
+    "RSSMiB": 159.484375,
+    "physicalFootprintMiB": 68.77433013916016,
+    "lifetimePeakFootprintMiB": 121.89151763916016,
+    "CPUPercentOneCore": 0.026640724226490022
+  },
+  "limits": "Whole-app totals, different PIDs and UI histories. Post-stream sample is not sustained-stream CPU. Idle visibility was not continuously verified; hidden state was explicitly observed. These are not incremental mascot measurements."
+}

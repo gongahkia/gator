@@ -1,0 +1,1241 @@
+[
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 20375,
+    "requestedConversation": "work-20261119T064300-df0416aa21488cb0",
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_bootstrap",
+    "frameKeys": [
+      "nonce",
+      "dialogue_parent",
+      "version",
+      "type",
+      "dialogue_turn"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "type",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "nonce",
+      "version",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-20374.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 20377,
+    "requestedConversation": "work-20261119T064302-10bb90db3ca89b36",
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_bootstrap",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "dialogue_parent",
+      "type",
+      "dialogue_turn"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "type",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "dialogue_host",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "type",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "version",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-20376.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 19584,
+    "requestedConversation": "work-20261119T064153-24c0e332b26abfb7",
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce",
+      "foreground"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "upload",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "dialogue_host",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_result",
+    "frameKeys": [
+      "type",
+      "version",
+      "dialogue_result",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "type",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "type",
+      "upload"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_result",
+    "frameKeys": [
+      "version",
+      "dialogue_result",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "dialogue_host",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "upload",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_result",
+    "frameKeys": [
+      "dialogue_result",
+      "version",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "type",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "type",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "native_provider",
+    "frameKeys": [
+      "type",
+      "native_provider",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "dialogue_host",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "native_catalog",
+    "frameKeys": [
+      "type",
+      "native_catalog",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "nonce",
+      "version",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "type",
+      "nonce",
+      "foreground",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "dialogue_host",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "dialogue_host",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "version",
+      "foreground",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-19582.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 25304,
+    "requestedConversation": "work-20261119T064304-c7b7cbaeb67a052d",
+    "trace": "bridge-25303.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-25303.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "version",
+      "foreground"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-25303.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-25303.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-25303.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 24438,
+    "requestedConversation": "work-20261119T064153-24c0e332b26abfb7",
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "type",
+      "dialogue_host",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "foreground",
+      "version",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "version",
+      "type",
+      "foreground",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "dialogue_host",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "dialogue_host",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "type",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "type",
+      "version",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-24437.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 20385,
+    "requestedConversation": "work-20261119T064304-c7b7cbaeb67a052d",
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_bootstrap",
+    "frameKeys": [
+      "type",
+      "dialogue_parent",
+      "dialogue_turn",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "dialogue_host",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "type",
+      "dialogue_host"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "foreground",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "type",
+      "version",
+      "upload",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "version",
+      "type",
+      "upload",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "type",
+      "nonce",
+      "version",
+      "foreground"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "version",
+      "type",
+      "nonce"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-20384.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 24483,
+    "requestedConversation": "work-20261119T064304-c7b7cbaeb67a052d",
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "foreground",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "version",
+      "dialogue_host",
+      "nonce",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "upload",
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "version",
+      "nonce",
+      "type",
+      "upload"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "upload_submit",
+    "frameKeys": [
+      "upload",
+      "nonce",
+      "type",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "nonce",
+      "version",
+      "type"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-24482.jsonl"
+  },
+  {
+    "direction": "launch",
+    "runtime": "/tmp/gator-native-test-mascot-mwzxmaad/Gator-Mascot-Desktop.app/Contents/Resources/gator-runtime",
+    "pid": 23136,
+    "requestedConversation": "work-20261119T064153-24c0e332b26abfb7",
+    "trace": "bridge-23135.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "dialogue_host",
+    "frameKeys": [
+      "dialogue_host",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-23135.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "focus_session",
+    "frameKeys": [
+      "foreground",
+      "type",
+      "nonce",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-23135.jsonl"
+  },
+  {
+    "direction": "command",
+    "type": "exit",
+    "frameKeys": [
+      "nonce",
+      "type",
+      "version"
+    ],
+    "interaction": null,
+    "tokenSHA256": null,
+    "approved": null,
+    "trace": "bridge-23135.jsonl"
+  },
+  {
+    "direction": "exit",
+    "status": 0,
+    "trace": "bridge-23135.jsonl"
+  }
+]

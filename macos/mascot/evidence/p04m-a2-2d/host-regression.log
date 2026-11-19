@@ -1,0 +1,228 @@
+TAP version 13
+# Subtest: host streams Go state and closes its child on exit
+ok 1 - host streams Go state and closes its child on exit
+  ---
+  duration_ms: 89.094291
+  ...
+# Subtest: restart preparation waits for the canonical application and never forces a busy child to exit
+ok 2 - restart preparation waits for the canonical application and never forces a busy child to exit
+  ---
+  duration_ms: 34.679042
+  ...
+# Subtest: plan-first intent survives an empty draft restart and follows retention controls
+ok 3 - plan-first intent survives an empty draft restart and follows retention controls
+  ---
+  duration_ms: 25.955167
+  ...
+# Subtest: old drafts remain readable and malformed review intent never silently becomes direct work
+ok 4 - old drafts remain readable and malformed review intent never silently becomes direct work
+  ---
+  duration_ms: 4.038
+  ...
+# Subtest: update reply drafts retain their referent independently of text across restart
+ok 5 - update reply drafts retain their referent independently of text across restart
+  ---
+  duration_ms: 2.216583
+  ...
+# Subtest: pending draft failures remain visible to update and shutdown preparation
+ok 6 - pending draft failures remain visible to update and shutdown preparation
+  ---
+  duration_ms: 3.064375
+  ...
+# Subtest: drafts survive restart, stay scoped, and save serially with private permissions
+ok 7 - drafts survive restart, stay scoped, and save serially with private permissions
+  ---
+  duration_ms: 4.971666
+  ...
+# Subtest: expired drafts are removed and disabling clears retained text
+ok 8 - expired drafts are removed and disabling clears retained text
+  ---
+  duration_ms: 4.644167
+  ...
+# Subtest: draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+ok 9 - draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+  ---
+  duration_ms: 1.181333
+  ...
+# Subtest: native helpers preserve literal argv, bound output and support cancellation
+ok 10 - native helpers preserve literal argv, bound output and support cancellation
+  ---
+  duration_ms: 57.552125
+  ...
+# Subtest: native playback carries language and rate without exposing reply text in arguments
+ok 11 - native playback carries language and rate without exposing reply text in arguments
+  ---
+  duration_ms: 1.707125
+  ...
+# Subtest: cancelling voice enumeration prevents native playback
+ok 12 - cancelling voice enumeration prevents native playback
+  ---
+  duration_ms: 0.112708
+  ...
+# Subtest: explicit system voices use installed names and keep speech text out of arguments
+ok 13 - explicit system voices use installed names and keep speech text out of arguments
+  ---
+  duration_ms: 0.185917
+  ...
+# Subtest: local voice model downloads can be cancelled and manual reading stops with its chat
+ok 14 - local voice model downloads can be cancelled and manual reading stops with its chat
+  ---
+  duration_ms: 2.687791
+  ...
+# Subtest: dictation captures the provider route and cannot deliver into another conversation
+ok 15 - dictation captures the provider route and cannot deliver into another conversation
+  ---
+  duration_ms: 0.93625
+  ...
+# Subtest: spoken output ignores retained history, speaks only new replies and aborts on close
+ok 16 - spoken output ignores retained history, speaks only new replies and aborts on close
+  ---
+  duration_ms: 0.19875
+  ...
+# Subtest: spoken output stops on chat switch, preference disable and explicit playback cancellation
+ok 17 - spoken output stops on chat switch, preference disable and explicit playback cancellation
+  ---
+  duration_ms: 0.335625
+  ...
+# Subtest: PDF preview renders actual distinct page images and rejects nonexistent pages
+not ok 18 - PDF preview renders actual distinct page images and rejects nonexistent pages
+  ---
+  duration_ms: 46.11775
+  location: '/Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/native.test.mjs:138:1'
+  failureType: 'testCodeFailure'
+  error: 'Promise.withResolvers is not a function'
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    <instance_members_initializer> (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21892:25)
+    new PDFDocumentLoadingTask (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21890:1)
+    getDocument (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21745:16)
+    renderPDF (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/src/pdf.mjs:13:19)
+    async TestContext.<anonymous> (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/native.test.mjs:140:17)
+    async Test.run (node:internal/test_runner/test:797:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: reading anchors reopen privately without storing conversation text and remain isolated by chat/profile
+ok 19 - reading anchors reopen privately without storing conversation text and remain isolated by chat/profile
+  ---
+  duration_ms: 18.711583
+  ...
+# Subtest: invalid and linked anchors fail explicitly without modifying history or the retained file
+ok 20 - invalid and linked anchors fail explicitly without modifying history or the retained file
+  ---
+  duration_ms: 9.955667
+  ...
+# Subtest: dialogue dispatch starts one background owner and returns results without moving focus
+ok 21 - dialogue dispatch starts one background owner and returns results without moving focus
+  ---
+  duration_ms: 4.085292
+  ...
+# Subtest: an unconfirmed background admission or control is reported and never automatically replayed
+ok 22 - an unconfirmed background admission or control is reported and never automatically replayed
+  ---
+  duration_ms: 0.405208
+  ...
+# Subtest: plan cancellation reports the original owner's confirmed receipt without moving focus
+ok 23 - plan cancellation reports the original owner's confirmed receipt without moving focus
+  ---
+  duration_ms: 0.381583
+  ...
+# Subtest: plan revision admission releases the parent conversation while its original owner prepares
+ok 24 - plan revision admission releases the parent conversation while its original owner prepares
+  ---
+  duration_ms: 0.218666
+  ...
+# Subtest: a plan correction rechecks the task limit while stop remains available
+ok 25 - a plan correction rechecks the task limit while stop remains available
+  ---
+  duration_ms: 2.78725
+  ...
+# Subtest: managed navigation waits for the new owner's applied view and preserves original execution
+ok 26 - managed navigation waits for the new owner's applied view and preserves original execution
+  ---
+  duration_ms: 0.543083
+  ...
+# Subtest: a failed managed view acknowledgement retires only the new view and restores the original owner
+ok 27 - a failed managed view acknowledgement retires only the new view and restores the original owner
+  ---
+  duration_ms: 0.797916
+  ...
+# Subtest: direct ancestry navigation uses only the current owner's exact parent even when idle
+ok 28 - direct ancestry navigation uses only the current owner's exact parent even when idle
+  ---
+  duration_ms: 0.44275
+  ...
+# Subtest: browser sign-in retains its owner and Connections returns to it
+ok 29 - browser sign-in retains its owner and Connections returns to it
+  ---
+  duration_ms: 1.229125
+  ...
+# Subtest: durable update badges include unopened chats and clear from fresh receipts
+ok 30 - durable update badges include unopened chats and clear from fresh receipts
+  ---
+  duration_ms: 0.947291
+  ...
+# Subtest: chat navigation retains original execution, approvals and unread results
+ok 31 - chat navigation retains original execution, approvals and unread results
+  ---
+  duration_ms: 0.685917
+  ...
+# Subtest: session capacity never evicts running or queued work and admissions are bounded
+ok 32 - session capacity never evicts running or queued work and admissions are bounded
+  ---
+  duration_ms: 0.389666
+  ...
+# Subtest: reviewed plan starts share the existing three-working-chat admission limit
+ok 33 - reviewed plan starts share the existing three-working-chat admission limit
+  ---
+  duration_ms: 0.351458
+  ...
+# Subtest: failed chat startup restores focus and leaves original work running
+ok 34 - failed chat startup restores focus and leaves original work running
+  ---
+  duration_ms: 1.479209
+  ...
+# Subtest: host navigation events are consumed once and reconnect targets only the selected chat
+ok 35 - host navigation events are consumed once and reconnect targets only the selected chat
+  ---
+  duration_ms: 8.500959
+  ...
+# Subtest: profile maintenance closes idle cached chats and refuses pending background work
+ok 36 - profile maintenance closes idle cached chats and refuses pending background work
+  ---
+  duration_ms: 0.598625
+  ...
+# Subtest: receipt_busy retains its runtime and blocks profile maintenance and restart
+ok 37 - receipt_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 1.044209
+  ...
+# Subtest: catalog_busy retains its runtime and blocks profile maintenance and restart
+ok 38 - catalog_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 0.867209
+  ...
+# Subtest: goal_busy retains its runtime and blocks profile maintenance and restart
+ok 39 - goal_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 0.465833
+  ...
+# Subtest: action corrections reuse the exact local or delegated owner without allocating work
+ok 40 - action corrections reuse the exact local or delegated owner without allocating work
+  ---
+  duration_ms: 0.9255
+  ...
+# Subtest: confirmed preference changes refresh cached owners once without replaying tasks
+ok 41 - confirmed preference changes refresh cached owners once without replaying tasks
+  ---
+  duration_ms: 0.380333
+  ...
+1..41
+# tests 41
+# suites 0
+# pass 40
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 315.656458
