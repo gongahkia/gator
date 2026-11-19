@@ -1,0 +1,7 @@
+native96 A0-host-no-RealityKit-initialization pid 85892
+native96 A3-or-A4-visible-idle pid 85892
+native96 A3-or-A4-visible-active pid 85892
+native96 A5-returned-to-idle pid 85892
+native96 A6-hidden pid 85892
+native96 A7-destroyed pid 85892
+native96 DONE 106.4

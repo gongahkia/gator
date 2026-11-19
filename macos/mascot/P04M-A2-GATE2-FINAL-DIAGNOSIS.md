@@ -38,6 +38,7 @@ Experiment groups are separate:
 - `getrusage` CPU deltas use 100% for one core. The policy comparison uses the same eight 1 Hz gestures, 56 actual frames per block, in reuse/burst/burst/reuse order.
 - `footprint` and `vmmap` inspect only controlled fixture PIDs. Their captures are supplemental snapshots; a tool invocation can span a phase boundary, so the phase-tagged kernel-ledger samples are the temporal attribution evidence.
 - Metal allocated bytes are neither RSS nor resident GPU memory; counters overlap and are not summed. GPU power/utilization/energy are **NOT TESTED**.
+- After a diagnostic releases its Metal device reference, the Metal-allocation counter is unavailable and summarized as `null`, not as zero allocated backing. Other kernel counters remain sampled independently.
 - Correctness tests await actual completion/cancellation. Timed waits are confined to resource sampling/settling periods and gesture pacing, not used to claim operation success.
 
 Some headless material controls ran in separate processes during v1 attribution. The reported ledgers are process-specific, but shared-GPU scheduling can affect timing, so those trials are diagnostic rather than isolated GPU-energy benchmarks. The paired v2 comparison and final endurance did not overlap another mascot-rendering experiment. The independent sampler only reads counters.
@@ -172,6 +173,8 @@ Same corrected executable, one model decode, same eight 1 Hz response gestures /
 
 The complete test creates 19 engines (including the poster preparation) with **one model decode**, then zero renderer/scene/surface/layer owners after teardown. Both policies use actual 3D jaw geometry, a static cached pose at idle and no hidden render loop.
 
+The ABBA host is a resource-comparison fixture: it leaves the cached image underneath its transparent live layer. That composition is matched across both policy cases and is **not accepted as a visual handoff**. The qualified full/compact lab has a separate first-frame reveal that removes its cached cover. Neither the ABBA timings nor the direct-render recording certify subframe hybrid transition quality.
+
 Destroying the renderer after every text gesture is **not adopted as an optimization**: it approximately doubles CPU here and does not remove the peak footprint. Retaining one active scene only during actual response activity is the better measured direction; idle/hidden boundaries still release it. Warm first-frame latency includes awaited GPU work and does not prove a main-thread stall or its absence. Formal production typing/scrolling latency, subframe transition flicker and the maximum 4 Hz throttle rate remain **NOT TESTED**. There is no claim that the integrated app meets those criteria.
 
 ## F — corrected final validation
@@ -212,13 +215,19 @@ The exact corrected executable completed **701.347 seconds (11m41s)**. [Full rep
 
 The lower final RSS is not evidence of an equivalent footprint reduction; pages can become nonresident/compressed. The approximately 40.6 MiB remaining footprint is reported directly. A successful endurance trial does not clear the separate end-to-end strict image failure or approve a revised resource budget.
 
-Native window-recording observations and their capture limitations are appended below. Genuine independent articulation is established by the actual RealityKit pose renders and deterministic tests; historical recordings are not mislabeled as this corrected build.
+The corrected final executable also completed a separate native96 visual replay **after endurance**, excluded from resource-budget measurements. The [actual window-only recording](evidence/p04m-a2-final/corrected-live-3d.mp4) is **29.865s**, 1360×1204 H.264, 874 capture frames. [Actual-frame contact sheet](evidence/p04m-a2-final/corrected-motion-contact.png), [full-window frame](evidence/p04m-a2-final/corrected-live-still.png), [capture metadata](evidence/p04m-a2-final/recording-metadata.json). The jaw opens and closes and the eyelids close independently while the head remains recognizable. No model request, input submission or external action exists in this fixture. Capture frames are not renderer draw counts; the recorder samples the window independently.
+
+An initial legacy capture filter returned `LabWindowNotFound`. The first PID/path-guarded attempt then rejected the legitimate fixture because macOS reports its bundle under `/private/tmp`, while the tool compared the literal `/tmp` path. Diagnostic inspection identified that harness error. The final helper resolves symlinks, verifies the exact owned PID/canonical bundle path and selects its unique visible main window. Capture then succeeds. Failed logs remain alongside the successful log; these failures are not classified as an application focus or renderer defect. No production code or system privacy/focus preference was changed to obtain the recording.
+
+This replay verifies actual native articulation and presentation at 96px. It does not certify production composer/scroll/focus behavior, a minimum-size Gator layout, physical VoiceOver or subframe hybrid flicker. Those remain outside this isolated resource diagnosis.
 
 ## Acceptance budget and complete-application impact
 
 The existing approximately **40 MiB additional steady-memory goal is unchanged**. Fresh/warmed evidence is close to that goal but not consistently below it. Repeated activity incurs approximately **140–145 MiB additional physical footprint**, not just a large RSS number. Graphics charges can linger after commands complete; no guaranteed reclamation deadline is established.
 
 For explicit user review only, an engineering envelope of **45 MiB additional settled footprint and 160 MiB additional footprint during animation/its quiescence tail** would cover the currently observed class with some margin. It is **not approved**, not a guaranteed cap, and not certified for sustained 4 Hz gestures or simultaneous Gator work. The old 40 MiB budget is not silently changed.
+
+That envelope describes the current optimized prototype. The previous canonical USD path measured about **45.28 MiB additional idle footprint** in its matched host. Keeping canonical imported material identity may reintroduce loading-path residency; the proposed alternative is not promised to fit a 45 MiB settled envelope without its own measurement. A larger budget is a user decision, not a workaround adopted here.
 
 Complete Gator impact is **NOT TESTED** because there is no production integration. [Inference] These graphics charges would compete with backend, transcript and attachment memory during real work; independent-process numbers cannot simply be added to claim an integrated app total. Energy/battery impact cannot be inferred from CPU or memory counters.
 
@@ -258,7 +267,13 @@ python3 macos/mascot/final-diagnostic/summarize.py
 
 All Swift helpers use `-parse-as-library -swift-version 6 -strict-concurrency=complete -warnings-as-errors -O -target arm64-apple-macosx15.0`. Build logs, before/after failure diagnostics and [exact final executable commands/results](evidence/p04m-a2-final/focused-commands.json) are retained. The independent C sampler builds with `clang -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.0` and reads only its explicitly supplied fixture PID.
 
-## Changed files and remaining unknowns
+## Artifact, preservation, changed files and remaining unknowns
+
+The corrected isolated artifact is **`/tmp/Gator-Mascot-P04M-A2-Final-Diagnostic.app`**. It is a finite renderer lab, with **no production Gator integration**. Its plain launch defaults to the original-USD `direct96` reference comparison. Use `--experiment hybrid` with a fresh `--output` directory to inspect the optimized hybrid, or `--experiment native96` for direct optimized articulation. No mode constitutes resource acceptance or starts a Go owner.
+
+The original `/tmp/Gator-Mascot-P04M-A2-Gate2.app`, `/tmp/Gator-Mascot-P04M-A2-Renderer-Lab.app` and `/tmp/Gator-Native-Parity-P04.app` are preserved. Final hash verification and the precise source delta are recorded in `evidence/p04m-a2-final/preservation.json`.
+
+The final preservation check finds **11,201 of 11,202 protected existing files unchanged**, with only the isolated `gate2/NativeMesh.swift` correction differing. The three protected bundles are byte-identical, and the corrected bundle's runtime-source and asset hashes match the qualified revision. HEAD advanced externally to `3a3b437111daffb24ab15edcf80b2d67aae124f2`; this work issued no commit command and did not reset that history. Acceptance is bound to the executable/source hashes above.
 
 Existing-file change: **`macos/mascot/gate2/NativeMesh.swift`**, one culling assignment plus an explanatory comment. Engine, presenter, metrics, original validation code, A1 geometry and previous reports remain unchanged.
 

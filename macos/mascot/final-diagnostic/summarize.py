@@ -26,11 +26,12 @@ for directory in [Path('/tmp/gator-final-diag-r1'),Path('/tmp/gator-final-diag-r
                 cpu=(last['cpuSeconds']-first['cpuSeconds'])/(last['elapsed']-first['elapsed'])*100
             else:cpu=None
             fields=['rssBytes','footprintBytes','graphicsFootprintBytes','internalBytes','compressedBytes','defaultHeapInUseBytes','metalAllocatedBytes']
+            values={k:[r[k]for r in group if isinstance(r.get(k),(int,float))]for k in fields}
             phases[name]={'sampleCount':len(group),'firstTime':first['elapsed'],'lastTime':last['elapsed'],'cpuOneCorePercent':cpu,
                           'frames':last['frames']-first['frames'],'lastLive':last['live'],
-                          'medianMiB':{k:statistics.median(r.get(k,0)or 0 for r in group)/mib for k in fields},
-                          'minimumMiB':{k:min(r.get(k,0)or 0 for r in group)/mib for k in fields},
-                          'maximumMiB':{k:max(r.get(k,0)or 0 for r in group)/mib for k in fields}}
+                          'medianMiB':{k:statistics.median(v)/mib if v else None for k,v in values.items()},
+                          'minimumMiB':{k:min(v)/mib if v else None for k,v in values.items()},
+                          'maximumMiB':{k:max(v)/mib if v else None for k,v in values.items()}}
         data={'baselineMiB':{k:v/mib for k,v in base.items()},'phases':phases,
               'peakIncrementalFootprintMiB':(max(r['footprintBytes']for r in rows)-base['footprintBytes'])/mib,
               'peakLedgerFootprintMiB':max(r['physicalFootprintPeakBytes']for r in rows)/mib}

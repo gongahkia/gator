@@ -20,7 +20,7 @@
           "internalBytes": 16.046875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.024261474609375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 63.96875,
@@ -29,7 +29,7 @@
           "internalBytes": 15.65625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.713775634765625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 69.0625,
@@ -38,7 +38,7 @@
           "internalBytes": 16.046875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.030181884765625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "01-empty-renderer": {
@@ -1142,7 +1142,7 @@
           "internalBytes": 46.1875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.928985595703125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 101.390625,
@@ -1151,7 +1151,7 @@
           "internalBytes": 46.171875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.927581787109375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 101.40625,
@@ -1160,7 +1160,7 @@
           "internalBytes": 46.1875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.035430908203125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -1184,7 +1184,7 @@
           "internalBytes": 46.1875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.908203125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 101.40625,
@@ -1193,7 +1193,7 @@
           "internalBytes": 46.1875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.908203125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 101.40625,
@@ -1202,7 +1202,7 @@
           "internalBytes": 46.1875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.908203125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -1273,7 +1273,7 @@
           "internalBytes": 15.859375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.1149444580078125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 66.390625,
@@ -1282,7 +1282,7 @@
           "internalBytes": 15.703125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.999298095703125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 69.03125,
@@ -1291,7 +1291,7 @@
           "internalBytes": 15.875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.1160125732421875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "01-empty-renderer": {
@@ -2370,7 +2370,7 @@
           "internalBytes": 26.0625,
           "compressedBytes": 20.53125,
           "defaultHeapInUseBytes": 19.856826782226562,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 86.09375,
@@ -2379,7 +2379,7 @@
           "internalBytes": 25.90625,
           "compressedBytes": 20.53125,
           "defaultHeapInUseBytes": 19.855438232421875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 86.265625,
@@ -2388,7 +2388,7 @@
           "internalBytes": 26.078125,
           "compressedBytes": 20.546875,
           "defaultHeapInUseBytes": 19.963851928710938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -2411,7 +2411,7 @@
           "internalBytes": 25.921875,
           "compressedBytes": 20.515625,
           "defaultHeapInUseBytes": 19.836090087890625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 86.109375,
@@ -2420,7 +2420,7 @@
           "internalBytes": 25.921875,
           "compressedBytes": 20.515625,
           "defaultHeapInUseBytes": 19.836090087890625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 86.109375,
@@ -2429,7 +2429,7 @@
           "internalBytes": 25.921875,
           "compressedBytes": 20.515625,
           "defaultHeapInUseBytes": 19.836090087890625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -2498,7 +2498,7 @@
           "internalBytes": 16.25,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.0912628173828125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 63.875,
@@ -2507,7 +2507,7 @@
           "internalBytes": 15.78125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.9676361083984375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 69.046875,
@@ -2516,7 +2516,7 @@
           "internalBytes": 16.28125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.092742919921875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "01-empty-renderer": {
@@ -3620,7 +3620,7 @@
           "internalBytes": 18.71875,
           "compressedBytes": 28.109375,
           "defaultHeapInUseBytes": 20.028274536132812,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 71.828125,
@@ -3629,7 +3629,7 @@
           "internalBytes": 16.640625,
           "compressedBytes": 27.8125,
           "defaultHeapInUseBytes": 19.963943481445312,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 74.25,
@@ -3638,7 +3638,7 @@
           "internalBytes": 19.0625,
           "compressedBytes": 30.140625,
           "defaultHeapInUseBytes": 20.130264282226562,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -3662,7 +3662,7 @@
           "internalBytes": 19.046875,
           "compressedBytes": 27.78125,
           "defaultHeapInUseBytes": 19.944564819335938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 74.234375,
@@ -3671,7 +3671,7 @@
           "internalBytes": 19.046875,
           "compressedBytes": 27.78125,
           "defaultHeapInUseBytes": 19.944564819335938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 74.234375,
@@ -3680,7 +3680,7 @@
           "internalBytes": 19.046875,
           "compressedBytes": 27.78125,
           "defaultHeapInUseBytes": 19.944564819335938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -3757,7 +3757,7 @@
           "internalBytes": 14.890625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.219696044921875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": 281.546875
         },
         "minimumMiB": {
           "rssBytes": 60.484375,
@@ -3766,7 +3766,7 @@
           "internalBytes": 14.71875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 3.971466064453125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": 281.234375
         },
         "maximumMiB": {
           "rssBytes": 98.453125,
@@ -3927,7 +3927,7 @@
           "internalBytes": 46.203125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.458358764648438,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 99.328125,
@@ -3936,7 +3936,7 @@
           "internalBytes": 46.15625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.302642822265625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 99.34375,
@@ -3945,7 +3945,7 @@
           "internalBytes": 46.203125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.46728515625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -3970,7 +3970,7 @@
           "internalBytes": 46.15625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.28375244140625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 99.34375,
@@ -3979,7 +3979,7 @@
           "internalBytes": 46.15625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.28375244140625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 99.34375,
@@ -3988,7 +3988,7 @@
           "internalBytes": 46.15625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.28375244140625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -4042,7 +4042,7 @@
           "internalBytes": 16.40625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.99395751953125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 64.125,
@@ -4051,7 +4051,7 @@
           "internalBytes": 16.015625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.7014007568359375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 69.21875,
@@ -4060,7 +4060,7 @@
           "internalBytes": 16.40625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.99603271484375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "01-empty-renderer": {
@@ -5184,7 +5184,7 @@
           "internalBytes": 46.4375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.955001831054688,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 101.640625,
@@ -5193,7 +5193,7 @@
           "internalBytes": 46.4375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.953643798828125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 101.65625,
@@ -5202,7 +5202,7 @@
           "internalBytes": 46.453125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.06182861328125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -5227,7 +5227,7 @@
           "internalBytes": 46.4375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.934295654296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 101.640625,
@@ -5236,7 +5236,7 @@
           "internalBytes": 46.4375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.934295654296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 101.640625,
@@ -5245,7 +5245,7 @@
           "internalBytes": 46.4375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 19.934295654296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -5318,7 +5318,7 @@
           "internalBytes": 16.328125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.1808013916015625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 65.265625,
@@ -5327,7 +5327,7 @@
           "internalBytes": 16.296875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.9839935302734375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 70.90625,
@@ -5336,7 +5336,7 @@
           "internalBytes": 16.78125,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 5.2277984619140625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "01-empty-renderer": {
@@ -6440,7 +6440,7 @@
           "internalBytes": 30.8125,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.214813232421875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 86.53125,
@@ -6449,7 +6449,7 @@
           "internalBytes": 30.796875,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.213409423828125,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 86.546875,
@@ -6458,7 +6458,7 @@
           "internalBytes": 30.8125,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.321029663085938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -6482,7 +6482,7 @@
           "internalBytes": 30.796875,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.194061279296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 86.53125,
@@ -6491,7 +6491,7 @@
           "internalBytes": 30.796875,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.194061279296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 86.53125,
@@ -6500,7 +6500,7 @@
           "internalBytes": 30.796875,
           "compressedBytes": 15.890625,
           "defaultHeapInUseBytes": 20.194061279296875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
@@ -6571,7 +6571,7 @@
           "internalBytes": 15.9375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.9938812255859375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": 281.421875
         },
         "minimumMiB": {
           "rssBytes": 63.59375,
@@ -6580,7 +6580,7 @@
           "internalBytes": 15.546875,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 4.7135009765625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": 0.078125
         },
         "maximumMiB": {
           "rssBytes": 86.734375,
@@ -7009,7 +7009,7 @@
           "internalBytes": 47.390625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 21.041976928710938,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 104.75,
@@ -7018,7 +7018,7 @@
           "internalBytes": 47.375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.881439208984375,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 104.765625,
@@ -7027,7 +7027,7 @@
           "internalBytes": 47.390625,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 21.043365478515625,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       },
       "12-after-owner-task-and-runloop-return": {
@@ -7053,7 +7053,7 @@
           "internalBytes": 47.375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.8623046875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "minimumMiB": {
           "rssBytes": 104.75,
@@ -7062,7 +7062,7 @@
           "internalBytes": 47.375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.8623046875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         },
         "maximumMiB": {
           "rssBytes": 104.75,
@@ -7071,7 +7071,7 @@
           "internalBytes": 47.375,
           "compressedBytes": 0.0,
           "defaultHeapInUseBytes": 20.8623046875,
-          "metalAllocatedBytes": 0.0
+          "metalAllocatedBytes": null
         }
       }
     },
