@@ -1,0 +1,50 @@
+exit=0
+======================================================================
+GatorDiagnostic [72690]: 64-bit    Footprint: 57 MB (16384 bytes per page)
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+  28 MB        0 B          0 B         13    MALLOC_SMALL
+9376 KB        0 B          0 B        101    Owned physical footprint (unmapped) (graphics)
+6416 KB        0 B      2592 KB        146    IOAccelerator (graphics)
+5024 KB        0 B          0 B          2    MALLOC_LARGE
+2207 KB        0 B          0 B        893    __DATA_DIRTY
+1458 KB        0 B          0 B        995    __DATA
+ 864 KB        0 B          0 B         11    MALLOC metadata
+ 593 KB        0 B          0 B          1    page table
+ 480 KB        0 B          0 B         32    untagged (VM_ALLOCATE)
+ 397 KB        0 B          0 B        653    __AUTH
+ 384 KB        0 B          0 B         25    CoreAnimation
+ 355 KB        0 B          0 B       2637    unused dyld shared cache area
+ 336 KB        0 B        32 KB         22    stack
+ 336 KB        0 B          0 B          1    MALLOC_TINY
+ 208 KB        0 B          0 B          3    CoreUI image data
+ 208 KB        0 B          0 B         15    IOKit
+ 176 KB        0 B          0 B          3    IOSurface
+ 128 KB        0 B          0 B          1    Accelerate image backing stores
+ 128 KB        0 B          0 B       1049    __AUTH_CONST
+ 112 KB        0 B          0 B          3    IOAccelerator
+ 112 KB        0 B          0 B          2    __TPRO_CONST
+ 112 KB      16 KB          0 B       1056    __DATA_CONST
+  48 KB        0 B          0 B          1    Activity Tracing
+  48 KB        0 B          0 B          3    ColorSync
+  48 KB        0 B          0 B          3    CoreGraphics
+  32 KB        0 B          0 B          1    MALLOC_NANO
+  16 KB        0 B          0 B          1    tag 22
+  16 KB        0 B          0 B          1    os_alloc_once
+  16 KB        0 B          0 B          1    Foundation
+    0 B      11 MB          0 B         29    mapped file
+    0 B    3072 KB          0 B       1079    __TEXT
+    0 B      96 KB          0 B          6    __LINKEDIT
+    0 B        0 B          0 B          1    __FONT_DATA
+    0 B        0 B          0 B          1    __CTF
+    0 B        0 B          0 B         11    Owned physical footprint (unmapped)
+    ---        ---          ---        ---    ---
+  57 MB      14 MB      2624 KB       8804    TOTAL
+
+Auxiliary data:
+    phys_footprint: 57 MB
+    phys_footprint_peak: 157 MB
+
+

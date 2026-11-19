@@ -1,0 +1,249 @@
+{
+  "all96PixelTargetsReleased" : true,
+  "applicationStrongSubjectReferences" : 0,
+  "assertions" : 14,
+  "last16PixelTargetAlive" : true,
+  "live" : {
+    "engine" : 0,
+    "headlessTarget" : 1,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0
+  },
+  "samples" : [
+    {
+      "aliveTargetsByGeneration" : [
+        true
+      ],
+      "cycle" : 0,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        true
+      ],
+      "cycle" : 1,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        true
+      ],
+      "cycle" : 2,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 3,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 4,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 5,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 6,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 7,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 8,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 9,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 10,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 96
+    },
+    {
+      "aliveTargetsByGeneration" : [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "cycle" : 11,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedTask" : false,
+      "pixels" : 16
+    }
+  ],
+  "testInstrumentation" : "weak probes; mirror reads only private testTarget presence; never retains subject between samples"
+}

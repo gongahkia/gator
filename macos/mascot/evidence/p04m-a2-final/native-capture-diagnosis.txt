@@ -1,0 +1,3 @@
+fixture exited
+screenCapture= true
+dev.gator.mascot.gate2.validation /private/tmp/Gator-Mascot-P04M-A2-Final-Diagnostic.app /private/tmp/Gator-Mascot-P04M-A2-Final-Diagnostic.app/Contents/MacOS/Gate2Lab false

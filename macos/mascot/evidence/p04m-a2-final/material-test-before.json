@@ -1,0 +1,32 @@
+{
+  "failures" : [
+    "\/Gator_B\/Head_Pivot\/Round_Head\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Upper_Snout\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Mouth_Interior\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Jaw_Pivot\/Lower_Jaw\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Tongue\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Nostril_Left\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Tooth_Left\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Eye_Cushion\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Sclera\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Pupil\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Pupil\/Catchlight\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Closed_Eye_Line\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Upper_Lid\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Left\/Lower_Lid\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Nostril_Right\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Tooth_Right\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Eye_Cushion\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Sclera\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Pupil\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Pupil\/Catchlight\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Closed_Eye_Line\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Upper_Lid\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Eye_Right\/Lower_Lid\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Crown_Ridge_0\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Crown_Ridge_1\/Surface: imported back, native none",
+    "\/Gator_B\/Head_Pivot\/Crown_Ridge_2\/Surface: imported back, native none"
+  ],
+  "pairs" : 26,
+  "passed" : false
+}

@@ -1,0 +1,13 @@
+policies-corrected 00-before-RealityKit 76965
+policies-corrected 01-warmed-static-poster 76965
+policies-corrected policy-0-reuse-until-idle-active 76965
+policies-corrected policy-0-reuse-until-idle-returned-static 76965
+policies-corrected policy-1-release-between-gestures-active 76965
+policies-corrected policy-1-release-between-gestures-returned-static 76965
+policies-corrected policy-2-release-between-gestures-active 76965
+policies-corrected policy-2-release-between-gestures-returned-static 76965
+policies-corrected policy-3-reuse-until-idle-active 76965
+policies-corrected policy-3-reuse-until-idle-returned-static 76965
+policies-corrected 11-all-owned-references-released 76965
+policies-corrected 12-after-owner-task-and-runloop-return 76965
+policies-corrected DONE 79.29659402370453 {'engine': 0, 'headlessTarget': 0, 'immutableTemplate': 0, 'layer': 0, 'posterTexture': 0, 'RealityRenderer': 0, 'sceneRoot': 0, 'surface': 0}

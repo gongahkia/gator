@@ -1,0 +1,259 @@
+{
+  "assertions" : 7,
+  "created" : {
+    "engine" : 19,
+    "headlessTarget" : 1,
+    "immutableTemplate" : 1,
+    "layer" : 18,
+    "posterTexture" : 1,
+    "RealityRenderer" : 19,
+    "sceneRoot" : 19,
+    "surface" : 18
+  },
+  "decodeCount" : 1,
+  "done" : true,
+  "elapsed" : 79.296594023704529,
+  "events" : [
+    {
+      "elapsed" : 0.14548206329345703,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+
+      },
+      "phase" : "00-before-RealityKit"
+    },
+    {
+      "event" : "model-load",
+      "milliseconds" : 400.00391006469727
+    },
+    {
+      "event" : "engine-create",
+      "milliseconds" : 35.451054573059082
+    },
+    {
+      "elapsed" : 12.632302045822144,
+      "event" : "phase",
+      "frames" : 1,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "phase" : "01-warmed-static-poster"
+    },
+    {
+      "created" : {
+        "engine" : 2,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 2,
+        "sceneRoot" : 2,
+        "surface" : 1
+      },
+      "event" : "policy",
+      "frames" : 56,
+      "policy" : "policy-0-reuse-until-idle",
+      "resumeMilliseconds" : [
+        31.334996223449707,
+        4.3469667434692383,
+        5.1199197769165039,
+        6.3120126724243164,
+        6.3009262084960938,
+        3.8759708404541016,
+        2.9479265213012695,
+        5.4199695587158203
+      ]
+    },
+    {
+      "elapsed" : 25.833248019218445,
+      "event" : "phase",
+      "frames" : 57,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "policy-0-reuse-until-idle-returned-static"
+    },
+    {
+      "created" : {
+        "engine" : 10,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 9,
+        "posterTexture" : 1,
+        "RealityRenderer" : 10,
+        "sceneRoot" : 10,
+        "surface" : 9
+      },
+      "event" : "policy",
+      "frames" : 56,
+      "policy" : "policy-1-release-between-gestures",
+      "resumeMilliseconds" : [
+        24.363040924072266,
+        32.852053642272949,
+        22.886037826538086,
+        27.848958969116211,
+        29.612064361572266,
+        30.772924423217773,
+        22.606015205383301,
+        23.751020431518555
+      ]
+    },
+    {
+      "elapsed" : 40.054752945899963,
+      "event" : "phase",
+      "frames" : 113,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "policy-1-release-between-gestures-returned-static"
+    },
+    {
+      "created" : {
+        "engine" : 18,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 17,
+        "posterTexture" : 1,
+        "RealityRenderer" : 18,
+        "sceneRoot" : 18,
+        "surface" : 17
+      },
+      "event" : "policy",
+      "frames" : 56,
+      "policy" : "policy-2-release-between-gestures",
+      "resumeMilliseconds" : [
+        33.527016639709473,
+        29.554009437561035,
+        22.510051727294922,
+        35.58194637298584,
+        28.45299243927002,
+        22.834062576293945,
+        31.791925430297852,
+        24.621009826660156
+      ]
+    },
+    {
+      "elapsed" : 54.161033987998962,
+      "event" : "phase",
+      "frames" : 169,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "policy-2-release-between-gestures-returned-static"
+    },
+    {
+      "created" : {
+        "engine" : 19,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 18,
+        "posterTexture" : 1,
+        "RealityRenderer" : 19,
+        "sceneRoot" : 19,
+        "surface" : 18
+      },
+      "event" : "policy",
+      "frames" : 56,
+      "policy" : "policy-3-reuse-until-idle",
+      "resumeMilliseconds" : [
+        22.85003662109375,
+        3.956913948059082,
+        6.8110227584838867,
+        8.2410573959350586,
+        3.9789676666259766,
+        5.0939321517944336,
+        5.9570074081420898,
+        4.3580532073974609
+      ]
+    },
+    {
+      "elapsed" : 68.279214978218079,
+      "event" : "phase",
+      "frames" : 225,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "policy-3-reuse-until-idle-returned-static"
+    },
+    {
+      "elapsed" : 74.28234601020813,
+      "event" : "phase",
+      "frames" : 225,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "11-all-owned-references-released"
+    },
+    {
+      "event" : "final-after-task-release",
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 0,
+        "layer" : 0,
+        "posterTexture" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "ownedOperationTask" : false,
+      "ownedSamplerTask" : false
+    }
+  ],
+  "frames" : 225,
+  "live" : {
+    "engine" : 0,
+    "headlessTarget" : 0,
+    "immutableTemplate" : 0,
+    "layer" : 0,
+    "posterTexture" : 0,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0,
+    "surface" : 0
+  },
+  "mode" : "policies",
+  "phase" : "12-after-owner-task-and-runloop-return",
+  "pid" : 76965,
+  "policy" : "offscreen"
+}

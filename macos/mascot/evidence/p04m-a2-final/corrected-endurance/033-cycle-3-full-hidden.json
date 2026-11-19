@@ -1,0 +1,68 @@
+{
+  "configuration" : null,
+  "cpuPercentOneCore" : 1.073654319006478,
+  "decodeCount" : 1,
+  "drawableBytes" : 0,
+  "drawableDimensions" : [
+
+  ],
+  "frames" : 0,
+  "hasAnimationWork" : false,
+  "live" : {
+    "engine" : 0,
+    "immutableTemplate" : 1,
+    "layer" : 0,
+    "posterTexture" : 0,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0,
+    "surface" : 0
+  },
+  "pendingAnimationTask" : false,
+  "phase" : "cycle-3-full-hidden",
+  "resumeLastMilliseconds" : 24.241089820861816,
+  "samples" : [
+    {
+      "cpuSeconds" : 4.3384819999999999,
+      "defaultHeapAllocatedBytes" : 74563584,
+      "defaultHeapInUseBytes" : 24597456,
+      "elapsed" : 259.26207196712494,
+      "footprintBytes" : 59589520,
+      "metalAllocatedBytes" : 304087040,
+      "peakRSSBytes" : 113000448,
+      "rssBytes" : 92160000
+    },
+    {
+      "cpuSeconds" : 4.3390659999999999,
+      "defaultHeapAllocatedBytes" : 74563584,
+      "defaultHeapInUseBytes" : 24597568,
+      "elapsed" : 260.32802999019623,
+      "footprintBytes" : 59589520,
+      "metalAllocatedBytes" : 304087040,
+      "peakRSSBytes" : 113000448,
+      "rssBytes" : 92160000
+    },
+    {
+      "cpuSeconds" : 4.3397620000000003,
+      "defaultHeapAllocatedBytes" : 74563584,
+      "defaultHeapInUseBytes" : 24597376,
+      "elapsed" : 261.37966799736023,
+      "footprintBytes" : 59589520,
+      "metalAllocatedBytes" : 304087040,
+      "peakRSSBytes" : 113000448,
+      "rssBytes" : 92160000
+    },
+    {
+      "cpuSeconds" : 4.340293,
+      "defaultHeapAllocatedBytes" : 74563584,
+      "defaultHeapInUseBytes" : 24597504,
+      "elapsed" : 262.44592702388763,
+      "footprintBytes" : 59589520,
+      "metalAllocatedBytes" : 304087040,
+      "peakRSSBytes" : 113000448,
+      "rssBytes" : 92160000
+    }
+  ],
+  "sceneNodeCount" : 0,
+  "seconds" : 4.2464319467544556,
+  "templateNodeCount" : 57
+}

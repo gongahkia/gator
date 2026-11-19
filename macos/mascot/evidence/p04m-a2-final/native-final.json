@@ -1,0 +1,33 @@
+{
+  "bounds" : [
+    2.059999942779541,
+    1.9800000190734863,
+    2.1589999198913574
+  ],
+  "geometryCounts" : {
+    "meshes" : 26,
+    "triangles" : 14164,
+    "vertices" : 8609
+  },
+  "nodeAndPoseComparisons" : 342,
+  "rig" : {
+    "assertions" : 21,
+    "cycles" : 1000,
+    "independentParts" : [
+      "Jaw_Pivot",
+      "Eye_Left\/Pupil",
+      "Eye_Right\/Pupil",
+      "Eye_Left\/Upper_Lid",
+      "Eye_Right\/Upper_Lid",
+      "Eye_Left\/Lower_Lid",
+      "Eye_Right\/Lower_Lid"
+    ],
+    "jawPivot" : [
+      0,
+      -0.30000001192092896,
+      0.23999999463558197
+    ]
+  },
+  "sourceSHA256" : "356d1cabfba9562e34a62a43123eb850b6f389ff2d9efa63cf55e51852334ed3",
+  "windowsCreated" : 0
+}

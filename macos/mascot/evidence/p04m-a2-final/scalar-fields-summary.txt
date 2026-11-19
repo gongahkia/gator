@@ -1,0 +1,27 @@
+Historical decoded sample comparisons {'neutral': {'maxChannel8Bit': 68.0, 'meanChannel8Bit': 0.04397243923611111, 'opaqueRGBMean8Bit': 0.1408585331942996, 'changedPixels': 930, 'maxAt': [25, 36, 1], 'samplesAtMax': [[81, 126, 97, 255], [29, 58, 39, 255]], 'silhouetteDifferentPixels': 0, 'maxAlphaDelta': 0.0, 'linearPremultipliedRGB_RMSE': 0.0015492466960543617, 'visiblePixels': 3836, 'transparentPixels': 5380, 'visibleBounds': [10, 13, 85, 79], 'profileMetadataEqual': True}, 'articulated': {'maxChannel8Bit': 4.0, 'meanChannel8Bit': 0.026123046875, 'opaqueRGBMean8Bit': 0.07328767123287672, 'changedPixels': 792, 'maxAt': [56, 86, 0], 'samplesAtMax': [[38, 46, 30, 255], [34, 42, 27, 255]], 'silhouetteDifferentPixels': 0, 'maxAlphaDelta': 0.0, 'linearPremultipliedRGB_RMSE': 0.0005975249206160436, 'visiblePixels': 4380, 'transparentPixels': 4836, 'visibleBounds': [10, 13, 85, 86], 'profileMetadataEqual': True}}
+neutral native 68.0 930 [25, 36, 1]
+neutral native-culling-back 4.0 924 [30, 26, 0]
+neutral native-source-emission 4.0 924 [30, 26, 0]
+neutral native-source-program 4.0 924 [30, 26, 0]
+neutral native-source-roughness 4.0 924 [30, 26, 0]
+neutral native-source-specular 4.0 924 [30, 26, 0]
+neutral native-source-tint 4.0 924 [30, 26, 0]
+neutral native-usd-both 0.0 0 [0, 0, 0]
+neutral native-usd-materials 0.0 0 [0, 0, 0]
+neutral native-usd-meshes 68.0 928 [25, 36, 1]
+neutral usd 0.0 0 [0, 0, 0]
+repeat-variation neutral usd 0.0
+repeat-variation neutral native 0.0
+articulated native 4.0 792 [56, 86, 0]
+articulated native-culling-back 4.0 786 [56, 86, 0]
+articulated native-source-emission 4.0 786 [56, 86, 0]
+articulated native-source-program 4.0 786 [56, 86, 0]
+articulated native-source-roughness 4.0 786 [56, 86, 0]
+articulated native-source-specular 4.0 786 [56, 86, 0]
+articulated native-source-tint 4.0 786 [56, 86, 0]
+articulated native-usd-both 0.0 0 [0, 0, 0]
+articulated native-usd-materials 1.0 2 [61, 83, 0]
+articulated native-usd-meshes 4.0 794 [16, 73, 1]
+articulated usd 0.0 0 [0, 0, 0]
+repeat-variation articulated usd 0.0
+repeat-variation articulated native 0.0

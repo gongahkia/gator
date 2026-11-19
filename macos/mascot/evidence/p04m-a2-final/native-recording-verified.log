@@ -1,0 +1,10 @@
+fixturePID=86482 bundle=dev.gator.mascot.gate2.validation path=/private/tmp/Gator-Mascot-P04M-A2-Final-Diagnostic.app screenCapture=true
+candidate=45981 title= onScreen=false bundle=dev.gator.mascot.gate2.validation
+candidate=45979 title= onScreen=false bundle=dev.gator.mascot.gate2.validation
+candidate=45982 title=Gator Concept B — Gate 2 only onScreen=true bundle=dev.gator.mascot.gate2.validation
+candidate=45980 title= onScreen=false bundle=dev.gator.mascot.gate2.validation
+candidate=45985 title=Gator compact renderer fixture onScreen=false bundle=dev.gator.mascot.gate2.validation
+candidate=45978 title= onScreen=false bundle=dev.gator.mascot.gate2.validation
+candidate=45983 title= onScreen=false bundle=dev.gator.mascot.gate2.validation
+recording started
+recording finished; audio=false; desktop=false

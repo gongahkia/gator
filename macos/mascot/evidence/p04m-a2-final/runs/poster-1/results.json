@@ -1,0 +1,414 @@
+{
+  "assertions" : 7,
+  "created" : {
+    "engine" : 3,
+    "immutableTemplate" : 1,
+    "layer" : 3,
+    "posterTexture" : 3,
+    "RealityRenderer" : 3,
+    "sceneRoot" : 3,
+    "surface" : 3
+  },
+  "decodeCount" : 1,
+  "done" : true,
+  "elapsed" : 115.46006596088409,
+  "events" : [
+    {
+      "elapsed" : 0.15888798236846924,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+
+      },
+      "phase" : "00-before-RealityKit"
+    },
+    {
+      "elapsed" : 12.318505048751831,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+
+      },
+      "phase" : "01-empty-renderer"
+    },
+    {
+      "event" : "model-load",
+      "milliseconds" : 388.55898380279541
+    },
+    {
+      "elapsed" : 15.759021997451782,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+        "immutableTemplate" : 1
+      },
+      "phase" : "02-mesh-loaded"
+    },
+    {
+      "event" : "engine-create",
+      "milliseconds" : 23.108005523681641
+    },
+    {
+      "elapsed" : 18.784144043922424,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-03-before-first-render"
+    },
+    {
+      "elapsed" : 19.810258030891418,
+      "event" : "phase",
+      "frames" : 1,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-04-after-first-render"
+    },
+    {
+      "elapsed" : 22.938039064407349,
+      "event" : "phase",
+      "frames" : 5,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-05-after-first-animation"
+    },
+    {
+      "elapsed" : 28.223263025283813,
+      "event" : "phase",
+      "frames" : 65,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-07-GPU-completed"
+    },
+    {
+      "elapsed" : 34.236752986907959,
+      "event" : "phase",
+      "frames" : 67,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-08-static-idle"
+    },
+    {
+      "elapsed" : 40.269937992095947,
+      "event" : "phase",
+      "frames" : 67,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c0-09-drawables-released"
+    },
+    {
+      "elapsed" : 44.281712055206299,
+      "event" : "phase",
+      "frames" : 67,
+      "live" : {
+        "engine" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "c0-10-renderer-destroyed"
+    },
+    {
+      "event" : "engine-create",
+      "milliseconds" : 16.573905944824219
+    },
+    {
+      "elapsed" : 48.323109030723572,
+      "event" : "phase",
+      "frames" : 67,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-03-before-first-render"
+    },
+    {
+      "elapsed" : 49.338710069656372,
+      "event" : "phase",
+      "frames" : 68,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-04-after-first-render"
+    },
+    {
+      "elapsed" : 52.465370059013367,
+      "event" : "phase",
+      "frames" : 72,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-05-after-first-animation"
+    },
+    {
+      "elapsed" : 57.7829430103302,
+      "event" : "phase",
+      "frames" : 132,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-07-GPU-completed"
+    },
+    {
+      "elapsed" : 63.799255967140198,
+      "event" : "phase",
+      "frames" : 134,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-08-static-idle"
+    },
+    {
+      "elapsed" : 69.812613010406494,
+      "event" : "phase",
+      "frames" : 134,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c1-09-drawables-released"
+    },
+    {
+      "elapsed" : 73.860594987869263,
+      "event" : "phase",
+      "frames" : 134,
+      "live" : {
+        "engine" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "c1-10-renderer-destroyed"
+    },
+    {
+      "event" : "engine-create",
+      "milliseconds" : 14.193892478942871
+    },
+    {
+      "elapsed" : 77.90798807144165,
+      "event" : "phase",
+      "frames" : 134,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-03-before-first-render"
+    },
+    {
+      "elapsed" : 78.927495002746582,
+      "event" : "phase",
+      "frames" : 135,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-04-after-first-render"
+    },
+    {
+      "elapsed" : 82.055747985839844,
+      "event" : "phase",
+      "frames" : 139,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-05-after-first-animation"
+    },
+    {
+      "elapsed" : 87.369544982910156,
+      "event" : "phase",
+      "frames" : 199,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 0,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-07-GPU-completed"
+    },
+    {
+      "elapsed" : 93.392569065093994,
+      "event" : "phase",
+      "frames" : 201,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-08-static-idle"
+    },
+    {
+      "elapsed" : 99.39819598197937,
+      "event" : "phase",
+      "frames" : 201,
+      "live" : {
+        "engine" : 1,
+        "immutableTemplate" : 1,
+        "layer" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1,
+        "surface" : 1
+      },
+      "phase" : "c2-09-drawables-released"
+    },
+    {
+      "elapsed" : 103.4271160364151,
+      "event" : "phase",
+      "frames" : 201,
+      "live" : {
+        "engine" : 0,
+        "immutableTemplate" : 1,
+        "layer" : 0,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "c2-10-renderer-destroyed"
+    },
+    {
+      "elapsed" : 107.45368897914886,
+      "event" : "phase",
+      "frames" : 201,
+      "live" : {
+        "engine" : 0,
+        "immutableTemplate" : 0,
+        "layer" : 0,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "phase" : "11-all-owned-references-released"
+    },
+    {
+      "event" : "final-after-task-release",
+      "live" : {
+        "engine" : 0,
+        "immutableTemplate" : 0,
+        "layer" : 0,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0,
+        "surface" : 0
+      },
+      "ownedOperationTask" : false,
+      "ownedSamplerTask" : false
+    }
+  ],
+  "frames" : 201,
+  "live" : {
+    "engine" : 0,
+    "immutableTemplate" : 0,
+    "layer" : 0,
+    "posterTexture" : 1,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0,
+    "surface" : 0
+  },
+  "mode" : "memory",
+  "phase" : "12-after-owner-task-and-runloop-return",
+  "pid" : 74502,
+  "policy" : "poster"
+}

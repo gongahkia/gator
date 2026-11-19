@@ -1,0 +1,24 @@
+{
+  "head": "2822ba5d5552c290eae0ceedf34fe6048be2d25d",
+  "swiftFlags": "-O -swift-version 6 -strict-concurrency=complete -warnings-as-errors -target arm64-apple-macosx15.0",
+  "sourceFiles": {
+    "CheckImages.swift": "11ff2c8038d70f2c90fcdcf334c93f8abba54f369988facf026b16136a9198ac",
+    "Engine.swift": "c4f1a9c9ee846d2861fd9f08f3cebad5decd8aff47a128b38ccb55187cf33718",
+    "bake-mesh.py": "618b8aac2737cff2bc21314a5d2d7c5411c0fe433702f4c1fe0e3344c07677c7",
+    "InspectMaterials.swift": "b4125b00f51ef1de7b11925343669d77ad4a282f8e19efb43a94398cab68897a",
+    "RealtimeRenderer.swift": "de84403dd0a265b3a2e474fb25081b745dc9baa071179781412c106bdcab44e6",
+    "MascotRig.swift": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20",
+    "Presentation.swift": "7173b471104441a61717a5a9498b92ad990ca95137b388577fee5482d0126dcb",
+    "CheckLifecycle.swift": "ca6625df06a23f0a439f45d4d6e7564d03f5a917f95f3ca8a026d060661bb1b5",
+    "RecordWindow.swift": "20f279d7f61c7da6fe76f2ac439c02f0aac8f7dd922a2d4bacf23494ee7f0d85",
+    "build.sh": "1adc64654d9ded7bf645f66588aa126a68dfbc514744967f1deabd980efcba74",
+    "NativeMesh.swift": "628d6e545c591c043070f79583a7ed1a7e1204084f86b2707c1f10204fa6b10a",
+    "Metrics.swift": "43de910631576fde3cbd0156276bda50c1347fc2665fa56a1cd5db3127fe2cac",
+    "CheckNative.swift": "152ce1417299415799c85f5bf7f3a3d2ca0cb4c3a95e7ff20aed794c0c6e42ed",
+    "Gate2Lab.swift": "7a6e262015feb93db22b5b4c7ccce88d7548909f9d1381ea4d1e37bf148dea8d",
+    "DesktopControl.swift": "b1c42dbe868d230824d7f127f6e668c821b3c8873df15d3f491c9d3038cebbc0"
+  },
+  "binarySHA256": "2b51a8f7fe8b11ad35c07936dd3627645e27decf317fc3ad749934de42a2ebbb",
+  "USDZSHA256": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+  "meshCacheSHA256": "ca627304250fa060974d1d18e293c9baa85d9755d7086d261cd498eaf0ecc13f"
+}

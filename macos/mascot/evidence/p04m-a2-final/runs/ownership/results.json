@@ -1,0 +1,119 @@
+{
+  "assertions" : 10,
+  "created" : {
+    "engine" : 2,
+    "headlessTarget" : 2,
+    "immutableTemplate" : 1,
+    "posterTexture" : 1,
+    "presentation" : 1,
+    "RealityRenderer" : 2,
+    "sceneRoot" : 2
+  },
+  "decodeCount" : 1,
+  "done" : true,
+  "elapsed" : 5.4225339889526367,
+  "events" : [
+    {
+      "elapsed" : 0.23135888576507568,
+      "event" : "phase",
+      "frames" : 0,
+      "live" : {
+
+      },
+      "phase" : "00-before-RealityKit"
+    },
+    {
+      "event" : "model-load",
+      "milliseconds" : 505.00190258026123
+    },
+    {
+      "event" : "engine-create",
+      "milliseconds" : 200.36196708679199
+    },
+    {
+      "elapsed" : 5.2275298833847046,
+      "event" : "phase",
+      "frames" : 2,
+      "live" : {
+        "engine" : 1,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 1,
+        "sceneRoot" : 1
+      },
+      "phase" : "owned-wrapper-open"
+    },
+    {
+      "elapsed" : 5.2295548915863037,
+      "event" : "phase",
+      "frames" : 2,
+      "live" : {
+        "engine" : 1,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "phase" : "closed-wrapper-still-held-by-test"
+    },
+    {
+      "elapsed" : 5.2302320003509521,
+      "event" : "phase",
+      "frames" : 2,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 0,
+        "immutableTemplate" : 1,
+        "posterTexture" : 1,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "phase" : "wrapper-handle-released"
+    },
+    {
+      "elapsed" : 5.4194389581680298,
+      "event" : "phase",
+      "frames" : 9,
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 1,
+        "posterTexture" : 0,
+        "presentation" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "phase" : "all-subjects-released-before-test-task-return"
+    },
+    {
+      "event" : "final-after-task-release",
+      "live" : {
+        "engine" : 0,
+        "headlessTarget" : 1,
+        "immutableTemplate" : 0,
+        "posterTexture" : 0,
+        "presentation" : 0,
+        "RealityRenderer" : 0,
+        "sceneRoot" : 0
+      },
+      "ownedOperationTask" : false,
+      "ownedSamplerTask" : false
+    }
+  ],
+  "frames" : 9,
+  "live" : {
+    "engine" : 0,
+    "headlessTarget" : 1,
+    "immutableTemplate" : 0,
+    "posterTexture" : 0,
+    "presentation" : 0,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0
+  },
+  "mode" : "ownership",
+  "phase" : "12-after-owner-task-and-runloop-return",
+  "pid" : 72610,
+  "policy" : "offscreen"
+}

@@ -1,0 +1,10 @@
+{
+  "neutral": {
+    "exitCode": -5,
+    "comparison": "same final-v10 Engine; USD import versus native mesh; decoded NSBitmapImageRep sRGB colors"
+  },
+  "articulated": {
+    "exitCode": -5,
+    "comparison": "same final-v10 Engine; USD import versus native mesh; decoded NSBitmapImageRep sRGB colors"
+  }
+}

@@ -1,0 +1,1138 @@
+{
+  "images" : [
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-neutral-0.png",
+      "pose" : "neutral",
+      "repeat" : 0,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-neutral-1.png",
+      "pose" : "neutral",
+      "repeat" : 1,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-neutral-2.png",
+      "pose" : "neutral",
+      "repeat" : 2,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-neutral-3.png",
+      "pose" : "neutral",
+      "repeat" : 3,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-neutral-4.png",
+      "pose" : "neutral",
+      "repeat" : 4,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-articulated-0.png",
+      "pose" : "articulated",
+      "repeat" : 0,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-articulated-1.png",
+      "pose" : "articulated",
+      "repeat" : 1,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-articulated-2.png",
+      "pose" : "articulated",
+      "repeat" : 2,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-articulated-3.png",
+      "pose" : "articulated",
+      "repeat" : 3,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-articulated-4.png",
+      "pose" : "articulated",
+      "repeat" : 4,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-jaw-0.png",
+      "pose" : "jaw",
+      "repeat" : 0,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-jaw-1.png",
+      "pose" : "jaw",
+      "repeat" : 1,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-jaw-2.png",
+      "pose" : "jaw",
+      "repeat" : 2,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-jaw-3.png",
+      "pose" : "jaw",
+      "repeat" : 3,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-jaw-4.png",
+      "pose" : "jaw",
+      "repeat" : 4,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-lids-0.png",
+      "pose" : "lids",
+      "repeat" : 0,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-lids-1.png",
+      "pose" : "lids",
+      "repeat" : 1,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-lids-2.png",
+      "pose" : "lids",
+      "repeat" : 2,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-lids-3.png",
+      "pose" : "lids",
+      "repeat" : 3,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-lids-4.png",
+      "pose" : "lids",
+      "repeat" : 4,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-gaze-0.png",
+      "pose" : "gaze",
+      "repeat" : 0,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-gaze-1.png",
+      "pose" : "gaze",
+      "repeat" : 1,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-gaze-2.png",
+      "pose" : "gaze",
+      "repeat" : 2,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-gaze-3.png",
+      "pose" : "gaze",
+      "repeat" : 3,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "usd-gaze-4.png",
+      "pose" : "gaze",
+      "repeat" : 4,
+      "template" : "usd"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5676,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-neutral-0.png",
+      "pose" : "neutral",
+      "repeat" : 0,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5676,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-neutral-1.png",
+      "pose" : "neutral",
+      "repeat" : 1,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5676,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-neutral-2.png",
+      "pose" : "neutral",
+      "repeat" : 2,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5676,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-neutral-3.png",
+      "pose" : "neutral",
+      "repeat" : 3,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5676,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-neutral-4.png",
+      "pose" : "neutral",
+      "repeat" : 4,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6073,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-articulated-0.png",
+      "pose" : "articulated",
+      "repeat" : 0,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6073,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-articulated-1.png",
+      "pose" : "articulated",
+      "repeat" : 1,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6073,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-articulated-2.png",
+      "pose" : "articulated",
+      "repeat" : 2,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6073,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-articulated-3.png",
+      "pose" : "articulated",
+      "repeat" : 3,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6073,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-articulated-4.png",
+      "pose" : "articulated",
+      "repeat" : 4,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6350,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-jaw-0.png",
+      "pose" : "jaw",
+      "repeat" : 0,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6350,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-jaw-1.png",
+      "pose" : "jaw",
+      "repeat" : 1,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6350,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-jaw-2.png",
+      "pose" : "jaw",
+      "repeat" : 2,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6350,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-jaw-3.png",
+      "pose" : "jaw",
+      "repeat" : 3,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6350,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-jaw-4.png",
+      "pose" : "jaw",
+      "repeat" : 4,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-lids-0.png",
+      "pose" : "lids",
+      "repeat" : 0,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-lids-1.png",
+      "pose" : "lids",
+      "repeat" : 1,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-lids-2.png",
+      "pose" : "lids",
+      "repeat" : 2,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-lids-3.png",
+      "pose" : "lids",
+      "repeat" : 3,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-lids-4.png",
+      "pose" : "lids",
+      "repeat" : 4,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6391,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-gaze-0.png",
+      "pose" : "gaze",
+      "repeat" : 0,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6391,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-gaze-1.png",
+      "pose" : "gaze",
+      "repeat" : 1,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6391,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-gaze-2.png",
+      "pose" : "gaze",
+      "repeat" : 2,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6391,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-gaze-3.png",
+      "pose" : "gaze",
+      "repeat" : 3,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6391,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-gaze-4.png",
+      "pose" : "gaze",
+      "repeat" : 4,
+      "template" : "native"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-neutral-0.png",
+      "pose" : "neutral",
+      "repeat" : 0,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-neutral-1.png",
+      "pose" : "neutral",
+      "repeat" : 1,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-neutral-2.png",
+      "pose" : "neutral",
+      "repeat" : 2,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-neutral-3.png",
+      "pose" : "neutral",
+      "repeat" : 3,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-neutral-4.png",
+      "pose" : "neutral",
+      "repeat" : 4,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-articulated-0.png",
+      "pose" : "articulated",
+      "repeat" : 0,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-articulated-1.png",
+      "pose" : "articulated",
+      "repeat" : 1,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-articulated-2.png",
+      "pose" : "articulated",
+      "repeat" : 2,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-articulated-3.png",
+      "pose" : "articulated",
+      "repeat" : 3,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-articulated-4.png",
+      "pose" : "articulated",
+      "repeat" : 4,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6246,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-jaw-0.png",
+      "pose" : "jaw",
+      "repeat" : 0,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6246,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-jaw-1.png",
+      "pose" : "jaw",
+      "repeat" : 1,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6246,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-jaw-2.png",
+      "pose" : "jaw",
+      "repeat" : 2,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6246,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-jaw-3.png",
+      "pose" : "jaw",
+      "repeat" : 3,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6246,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-jaw-4.png",
+      "pose" : "jaw",
+      "repeat" : 4,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-lids-0.png",
+      "pose" : "lids",
+      "repeat" : 0,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-lids-1.png",
+      "pose" : "lids",
+      "repeat" : 1,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-lids-2.png",
+      "pose" : "lids",
+      "repeat" : 2,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-lids-3.png",
+      "pose" : "lids",
+      "repeat" : 3,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-lids-4.png",
+      "pose" : "lids",
+      "repeat" : 4,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-gaze-0.png",
+      "pose" : "gaze",
+      "repeat" : 0,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-gaze-1.png",
+      "pose" : "gaze",
+      "repeat" : 1,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-gaze-2.png",
+      "pose" : "gaze",
+      "repeat" : 2,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-gaze-3.png",
+      "pose" : "gaze",
+      "repeat" : 3,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-materials-gaze-4.png",
+      "pose" : "gaze",
+      "repeat" : 4,
+      "template" : "native-usd-materials"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5673,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-neutral-0.png",
+      "pose" : "neutral",
+      "repeat" : 0,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5673,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-neutral-1.png",
+      "pose" : "neutral",
+      "repeat" : 1,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5673,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-neutral-2.png",
+      "pose" : "neutral",
+      "repeat" : 2,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5673,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-neutral-3.png",
+      "pose" : "neutral",
+      "repeat" : 3,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5673,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-neutral-4.png",
+      "pose" : "neutral",
+      "repeat" : 4,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6081,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-articulated-0.png",
+      "pose" : "articulated",
+      "repeat" : 0,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6081,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-articulated-1.png",
+      "pose" : "articulated",
+      "repeat" : 1,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6081,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-articulated-2.png",
+      "pose" : "articulated",
+      "repeat" : 2,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6081,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-articulated-3.png",
+      "pose" : "articulated",
+      "repeat" : 3,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6081,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-articulated-4.png",
+      "pose" : "articulated",
+      "repeat" : 4,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6353,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-jaw-0.png",
+      "pose" : "jaw",
+      "repeat" : 0,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6353,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-jaw-1.png",
+      "pose" : "jaw",
+      "repeat" : 1,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6353,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-jaw-2.png",
+      "pose" : "jaw",
+      "repeat" : 2,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6353,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-jaw-3.png",
+      "pose" : "jaw",
+      "repeat" : 3,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6353,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-jaw-4.png",
+      "pose" : "jaw",
+      "repeat" : 4,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-lids-0.png",
+      "pose" : "lids",
+      "repeat" : 0,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-lids-1.png",
+      "pose" : "lids",
+      "repeat" : 1,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-lids-2.png",
+      "pose" : "lids",
+      "repeat" : 2,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-lids-3.png",
+      "pose" : "lids",
+      "repeat" : 3,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5380,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-lids-4.png",
+      "pose" : "lids",
+      "repeat" : 4,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6398,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-gaze-0.png",
+      "pose" : "gaze",
+      "repeat" : 0,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6398,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-gaze-1.png",
+      "pose" : "gaze",
+      "repeat" : 1,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6398,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-gaze-2.png",
+      "pose" : "gaze",
+      "repeat" : 2,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6398,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-gaze-3.png",
+      "pose" : "gaze",
+      "repeat" : 3,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6398,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-meshes-gaze-4.png",
+      "pose" : "gaze",
+      "repeat" : 4,
+      "template" : "native-usd-meshes"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-neutral-0.png",
+      "pose" : "neutral",
+      "repeat" : 0,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-neutral-1.png",
+      "pose" : "neutral",
+      "repeat" : 1,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-neutral-2.png",
+      "pose" : "neutral",
+      "repeat" : 2,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-neutral-3.png",
+      "pose" : "neutral",
+      "repeat" : 3,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5617,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-neutral-4.png",
+      "pose" : "neutral",
+      "repeat" : 4,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-articulated-0.png",
+      "pose" : "articulated",
+      "repeat" : 0,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-articulated-1.png",
+      "pose" : "articulated",
+      "repeat" : 1,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-articulated-2.png",
+      "pose" : "articulated",
+      "repeat" : 2,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-articulated-3.png",
+      "pose" : "articulated",
+      "repeat" : 3,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5982,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-articulated-4.png",
+      "pose" : "articulated",
+      "repeat" : 4,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-jaw-0.png",
+      "pose" : "jaw",
+      "repeat" : 0,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-jaw-1.png",
+      "pose" : "jaw",
+      "repeat" : 1,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-jaw-2.png",
+      "pose" : "jaw",
+      "repeat" : 2,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-jaw-3.png",
+      "pose" : "jaw",
+      "repeat" : 3,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6242,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-jaw-4.png",
+      "pose" : "jaw",
+      "repeat" : 4,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-lids-0.png",
+      "pose" : "lids",
+      "repeat" : 0,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-lids-1.png",
+      "pose" : "lids",
+      "repeat" : 1,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-lids-2.png",
+      "pose" : "lids",
+      "repeat" : 2,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-lids-3.png",
+      "pose" : "lids",
+      "repeat" : 3,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 5332,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-lids-4.png",
+      "pose" : "lids",
+      "repeat" : 4,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-gaze-0.png",
+      "pose" : "gaze",
+      "repeat" : 0,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-gaze-1.png",
+      "pose" : "gaze",
+      "repeat" : 1,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-gaze-2.png",
+      "pose" : "gaze",
+      "repeat" : 2,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-gaze-3.png",
+      "pose" : "gaze",
+      "repeat" : 3,
+      "template" : "native-usd-both"
+    },
+    {
+      "bitmapFormat" : 0,
+      "bytes" : 6405,
+      "colorSpace" : "NSDeviceRGBColorSpace",
+      "name" : "native-usd-both-gaze-4.png",
+      "pose" : "gaze",
+      "repeat" : 4,
+      "template" : "native-usd-both"
+    }
+  ],
+  "live" : {
+    "engine" : 0,
+    "headlessTarget" : 0,
+    "posterTexture" : 1,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0
+  },
+  "rendererSource" : "unchanged gate2\/Engine.swift",
+  "windowsCreated" : 0
+}

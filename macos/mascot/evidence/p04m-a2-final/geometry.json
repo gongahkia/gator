@@ -1,0 +1,839 @@
+{
+  "originalTransform" : "Transform(scale: SIMD3<Float>(1.0, 1.0, 1.0), rotation: simd_quatf(real: 1.0, imag: SIMD3<Float>(0.0, 0.0, 0.0)), translation: SIMD3<Float>(0.0, 0.0, 0.0))",
+  "parts" : [
+    {
+      "indexCounts" : [
+        7560,
+        7560
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        1369,
+        1369
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Round_Head\/Surface",
+      "positionCounts" : [
+        1369,
+        1369
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2916,
+        2916
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        864,
+        864
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Upper_Snout\/Surface",
+      "positionCounts" : [
+        864,
+        864
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Mouth_Interior\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Jaw_Pivot\/Lower_Jaw\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Tongue\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Nostril_Left\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Tooth_Left\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Eye_Cushion\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Sclera\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Pupil\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        336,
+        336
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        81,
+        81
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Pupil\/Catchlight\/Surface",
+      "positionCounts" : [
+        81,
+        81
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        336,
+        336
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        81,
+        81
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Closed_Eye_Line\/Surface",
+      "positionCounts" : [
+        81,
+        81
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        1152,
+        1152
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        225,
+        225
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Upper_Lid\/Surface",
+      "positionCounts" : [
+        225,
+        225
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        1152,
+        1152
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        225,
+        225
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Left\/Lower_Lid\/Surface",
+      "positionCounts" : [
+        225,
+        225
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Nostril_Right\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Tooth_Right\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Eye_Cushion\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Sclera\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        2280,
+        2280
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        441,
+        441
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Pupil\/Surface",
+      "positionCounts" : [
+        441,
+        441
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        336,
+        336
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        81,
+        81
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Pupil\/Catchlight\/Surface",
+      "positionCounts" : [
+        81,
+        81
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        336,
+        336
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        81,
+        81
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Closed_Eye_Line\/Surface",
+      "positionCounts" : [
+        81,
+        81
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        1152,
+        1152
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        225,
+        225
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Upper_Lid\/Surface",
+      "positionCounts" : [
+        225,
+        225
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        1152,
+        1152
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        225,
+        225
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Eye_Right\/Lower_Lid\/Surface",
+      "positionCounts" : [
+        225,
+        225
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Crown_Ridge_0\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Crown_Ridge_1\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    },
+    {
+      "indexCounts" : [
+        792,
+        792
+      ],
+      "indicesEqual" : true,
+      "maximumNormalDelta" : 0,
+      "maximumPositionDelta" : 0,
+      "nativeBuffers" : [
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ],
+      "normalCounts" : [
+        169,
+        169
+      ],
+      "path" : "\/Gator_B\/Head_Pivot\/Crown_Ridge_2\/Surface",
+      "positionCounts" : [
+        169,
+        169
+      ],
+      "sourceBuffers" : [
+        "\"normals\"",
+        "\"points\"",
+        "\"primvars:displayColor\"",
+        "\"vertexColor\"",
+        "indexTriangles",
+        "vertexNormal",
+        "vertexPosition"
+      ]
+    }
+  ],
+  "sourceRoot" : "",
+  "sourceRootTransform" : "Transform(scale: SIMD3<Float>(1.0, 1.0, 1.0), rotation: simd_quatf(real: 1.0, imag: SIMD3<Float>(0.0, 0.0, 0.0)), translation: SIMD3<Float>(0.0, 0.0, 0.0))"
+}

@@ -1,0 +1,40 @@
+{
+  "assertions" : 33,
+  "closedWrapperIntentionallyRetainedByTest" : true,
+  "created" : {
+    "engine" : 17,
+    "headlessTarget" : 21,
+    "posterTexture" : 1,
+    "RealityRenderer" : 17,
+    "sceneRoot" : 17
+  },
+  "frames" : 127,
+  "live" : {
+    "engine" : 1,
+    "headlessTarget" : 1,
+    "posterTexture" : 0,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0
+  },
+  "pendingTask" : false,
+  "rig" : {
+    "assertions" : 21,
+    "cycles" : 1000,
+    "independentParts" : [
+      "Jaw_Pivot",
+      "Eye_Left\/Pupil",
+      "Eye_Right\/Pupil",
+      "Eye_Left\/Upper_Lid",
+      "Eye_Right\/Upper_Lid",
+      "Eye_Left\/Lower_Lid",
+      "Eye_Right\/Lower_Lid"
+    ],
+    "jawPivot" : [
+      0,
+      -0.30000001192092896,
+      0.23999999463558197
+    ]
+  },
+  "subscriptionsCreated" : 0,
+  "windowsCreated" : 0
+}

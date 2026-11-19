@@ -1,0 +1,20 @@
+[
+  {
+    "pose": "neutral",
+    "command": [
+      "/tmp/gator-gate2-check-images",
+      "macos/mascot/evidence/p04m-a2-final/images-final/usd-neutral-0.png",
+      "macos/mascot/evidence/p04m-a2-final/images-final/native-neutral-0.png"
+    ],
+    "exitCode": -5
+  },
+  {
+    "pose": "articulated",
+    "command": [
+      "/tmp/gator-gate2-check-images",
+      "macos/mascot/evidence/p04m-a2-final/images-final/usd-articulated-0.png",
+      "macos/mascot/evidence/p04m-a2-final/images-final/native-articulated-0.png"
+    ],
+    "exitCode": -5
+  }
+]

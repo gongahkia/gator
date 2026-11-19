@@ -1,0 +1,877 @@
+{
+  "commonMaterialGeometryChecks": [
+    {
+      "pose": "neutral",
+      "commonMaterialComparison": {
+        "maxChannel8Bit": 0.0,
+        "meanChannel8Bit": 0.0,
+        "opaqueRGBMean8Bit": 0.0,
+        "changedPixels": 0,
+        "maxAt": [
+          0,
+          0,
+          0
+        ],
+        "samplesAtMax": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 0,
+        "maxAlphaDelta": 0.0,
+        "linearPremultipliedRGB_RMSE": 0.0,
+        "visiblePixels": 3836,
+        "transparentPixels": 5380,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      },
+      "alphaExact": true,
+      "boundsAndDimensionsExact": true,
+      "regions": {
+        "eyes-and-lids": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "snout": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "jaw": {
+          "maxDecoded8BitChannelDifference": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "pose": "articulated",
+      "commonMaterialComparison": {
+        "maxChannel8Bit": 1.0,
+        "meanChannel8Bit": 5.425347222222222e-05,
+        "opaqueRGBMean8Bit": 0.00015220700152207003,
+        "changedPixels": 2,
+        "maxAt": [
+          61,
+          83,
+          0
+        ],
+        "samplesAtMax": [
+          [
+            159,
+            180,
+            136,
+            255
+          ],
+          [
+            160,
+            180,
+            136,
+            255
+          ]
+        ],
+        "silhouetteDifferentPixels": 0,
+        "maxAlphaDelta": 0.0,
+        "linearPremultipliedRGB_RMSE": 3.7404793402109836e-05,
+        "visiblePixels": 4380,
+        "transparentPixels": 4836,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      },
+      "alphaExact": true,
+      "boundsAndDimensionsExact": true,
+      "regions": {
+        "eyes-and-lids": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "snout": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "jaw": {
+          "maxDecoded8BitChannelDifference": 1
+        }
+      },
+      "passed": true
+    },
+    {
+      "pose": "jaw",
+      "commonMaterialComparison": {
+        "maxChannel8Bit": 1.0,
+        "meanChannel8Bit": 5.425347222222222e-05,
+        "opaqueRGBMean8Bit": 0.00015220700152207003,
+        "changedPixels": 2,
+        "maxAt": [
+          61,
+          83,
+          0
+        ],
+        "samplesAtMax": [
+          [
+            159,
+            180,
+            136,
+            255
+          ],
+          [
+            160,
+            180,
+            136,
+            255
+          ]
+        ],
+        "silhouetteDifferentPixels": 0,
+        "maxAlphaDelta": 0.0,
+        "linearPremultipliedRGB_RMSE": 3.7404793402109836e-05,
+        "visiblePixels": 4380,
+        "transparentPixels": 4836,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      },
+      "alphaExact": true,
+      "boundsAndDimensionsExact": true,
+      "regions": {
+        "eyes-and-lids": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "snout": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "jaw": {
+          "maxDecoded8BitChannelDifference": 1
+        }
+      },
+      "passed": true
+    },
+    {
+      "pose": "lids",
+      "commonMaterialComparison": {
+        "maxChannel8Bit": 0.0,
+        "meanChannel8Bit": 0.0,
+        "opaqueRGBMean8Bit": 0.0,
+        "changedPixels": 0,
+        "maxAt": [
+          0,
+          0,
+          0
+        ],
+        "samplesAtMax": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 0,
+        "maxAlphaDelta": 0.0,
+        "linearPremultipliedRGB_RMSE": 0.0,
+        "visiblePixels": 3836,
+        "transparentPixels": 5380,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      },
+      "alphaExact": true,
+      "boundsAndDimensionsExact": true,
+      "regions": {
+        "eyes-and-lids": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "snout": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "jaw": {
+          "maxDecoded8BitChannelDifference": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "pose": "gaze",
+      "commonMaterialComparison": {
+        "maxChannel8Bit": 0.0,
+        "meanChannel8Bit": 0.0,
+        "opaqueRGBMean8Bit": 0.0,
+        "changedPixels": 0,
+        "maxAt": [
+          0,
+          0,
+          0
+        ],
+        "samplesAtMax": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 0,
+        "maxAlphaDelta": 0.0,
+        "linearPremultipliedRGB_RMSE": 0.0,
+        "visiblePixels": 3832,
+        "transparentPixels": 5384,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      },
+      "alphaExact": true,
+      "boundsAndDimensionsExact": true,
+      "regions": {
+        "eyes-and-lids": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "snout": {
+          "maxDecoded8BitChannelDifference": 0
+        },
+        "jaw": {
+          "maxDecoded8BitChannelDifference": 0
+        }
+      },
+      "passed": true
+    }
+  ],
+  "endToEndMaterialComparisons": [
+    {
+      "maxChannel8Bit": 4.0,
+      "meanChannel8Bit": 0.03762478298611111,
+      "opaqueRGBMean8Bit": 0.1205248522766771,
+      "changedPixels": 924,
+      "maxAt": [
+        30,
+        26,
+        0
+      ],
+      "samplesAtMax": [
+        [
+          187,
+          190,
+          189,
+          255
+        ],
+        [
+          183,
+          187,
+          185,
+          255
+        ]
+      ],
+      "silhouetteDifferentPixels": 0,
+      "maxAlphaDelta": 0.0,
+      "linearPremultipliedRGB_RMSE": 0.0008435498528174732,
+      "visiblePixels": 3836,
+      "transparentPixels": 5380,
+      "visibleBounds": [
+        10,
+        13,
+        85,
+        79
+      ],
+      "pose": "neutral",
+      "strictOneCodeParityPassed": false
+    },
+    {
+      "maxChannel8Bit": 4.0,
+      "meanChannel8Bit": 0.025797526041666668,
+      "opaqueRGBMean8Bit": 0.07237442922374429,
+      "changedPixels": 786,
+      "maxAt": [
+        56,
+        86,
+        0
+      ],
+      "samplesAtMax": [
+        [
+          38,
+          46,
+          30,
+          255
+        ],
+        [
+          34,
+          42,
+          27,
+          255
+        ]
+      ],
+      "silhouetteDifferentPixels": 0,
+      "maxAlphaDelta": 0.0,
+      "linearPremultipliedRGB_RMSE": 0.0005943037882901465,
+      "visiblePixels": 4380,
+      "transparentPixels": 4836,
+      "visibleBounds": [
+        10,
+        13,
+        85,
+        86
+      ],
+      "pose": "articulated",
+      "strictOneCodeParityPassed": false
+    },
+    {
+      "maxChannel8Bit": 4.0,
+      "meanChannel8Bit": 0.03770616319444445,
+      "opaqueRGBMean8Bit": 0.10578386605783865,
+      "changedPixels": 1000,
+      "maxAt": [
+        30,
+        26,
+        0
+      ],
+      "samplesAtMax": [
+        [
+          187,
+          190,
+          189,
+          255
+        ],
+        [
+          183,
+          187,
+          185,
+          255
+        ]
+      ],
+      "silhouetteDifferentPixels": 0,
+      "maxAlphaDelta": 0.0,
+      "linearPremultipliedRGB_RMSE": 0.000911713972072523,
+      "visiblePixels": 4380,
+      "transparentPixels": 4836,
+      "visibleBounds": [
+        10,
+        13,
+        85,
+        86
+      ],
+      "pose": "jaw",
+      "strictOneCodeParityPassed": false
+    },
+    {
+      "maxChannel8Bit": 2.0,
+      "meanChannel8Bit": 0.025716145833333332,
+      "opaqueRGBMean8Bit": 0.08237747653806048,
+      "changedPixels": 710,
+      "maxAt": [
+        15,
+        68,
+        1
+      ],
+      "samplesAtMax": [
+        [
+          1,
+          2,
+          1,
+          255
+        ],
+        [
+          0,
+          0,
+          0,
+          255
+        ]
+      ],
+      "silhouetteDifferentPixels": 0,
+      "maxAlphaDelta": 0.0,
+      "linearPremultipliedRGB_RMSE": 0.00048327112482760936,
+      "visiblePixels": 3836,
+      "transparentPixels": 5380,
+      "visibleBounds": [
+        10,
+        13,
+        85,
+        79
+      ],
+      "pose": "lids",
+      "strictOneCodeParityPassed": false
+    },
+    {
+      "maxChannel8Bit": 4.0,
+      "meanChannel8Bit": 0.04025607638888889,
+      "opaqueRGBMean8Bit": 0.1290883785664579,
+      "changedPixels": 987,
+      "maxAt": [
+        63,
+        26,
+        0
+      ],
+      "samplesAtMax": [
+        [
+          82,
+          94,
+          89,
+          255
+        ],
+        [
+          78,
+          91,
+          86,
+          255
+        ]
+      ],
+      "silhouetteDifferentPixels": 0,
+      "maxAlphaDelta": 0.0,
+      "linearPremultipliedRGB_RMSE": 0.000840779103860128,
+      "visiblePixels": 3832,
+      "transparentPixels": 5384,
+      "visibleBounds": [
+        10,
+        13,
+        85,
+        79
+      ],
+      "pose": "gaze",
+      "strictOneCodeParityPassed": false
+    }
+  ],
+  "negativeControls": [
+    {
+      "name": "negative-missing-eye",
+      "pose": "neutral",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 2.338595920138889,
+        "opaqueRGBMean8Bit": 6.737921445950643,
+        "changedPixels": 330,
+        "maxAt": [
+          30,
+          17,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            71,
+            115,
+            86,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 34,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.07149900185574536,
+        "visiblePixels": 3802,
+        "transparentPixels": 5414,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-jaw",
+      "pose": "neutral",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 1.4689398871527777,
+        "opaqueRGBMean8Bit": 4.395290232881473,
+        "changedPixels": 262,
+        "maxAt": [
+          16,
+          69,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            93,
+            108,
+            77,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 14,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.03565437146298324,
+        "visiblePixels": 3822,
+        "transparentPixels": 5394,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-eye",
+      "pose": "articulated",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 1.3644748263888888,
+        "opaqueRGBMean8Bit": 3.1681887366818873,
+        "changedPixels": 343,
+        "maxAt": [
+          30,
+          17,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            71,
+            115,
+            86,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 34,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.018237561257034456,
+        "visiblePixels": 4346,
+        "transparentPixels": 4870,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-jaw",
+      "pose": "articulated",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 10.697129991319445,
+        "opaqueRGBMean8Bit": 20.190943683409436,
+        "changedPixels": 566,
+        "maxAt": [
+          17,
+          72,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            157,
+            179,
+            134,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 506,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.09807029116157046,
+        "visiblePixels": 3874,
+        "transparentPixels": 5342,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-eye",
+      "pose": "jaw",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 2.338595920138889,
+        "opaqueRGBMean8Bit": 5.901065449010654,
+        "changedPixels": 330,
+        "maxAt": [
+          30,
+          17,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            71,
+            115,
+            86,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 34,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.07149900185574536,
+        "visiblePixels": 4346,
+        "transparentPixels": 4870,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-jaw",
+      "pose": "jaw",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 10.697129991319445,
+        "opaqueRGBMean8Bit": 20.190943683409436,
+        "changedPixels": 566,
+        "maxAt": [
+          17,
+          72,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            157,
+            179,
+            134,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 506,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.09807029116157046,
+        "visiblePixels": 3874,
+        "transparentPixels": 5342,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          86
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-eye",
+      "pose": "lids",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 1.3644748263888888,
+        "opaqueRGBMean8Bit": 3.6174834897462635,
+        "changedPixels": 343,
+        "maxAt": [
+          30,
+          17,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            71,
+            115,
+            86,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 34,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.018237561257034456,
+        "visiblePixels": 3802,
+        "transparentPixels": 5414,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-jaw",
+      "pose": "lids",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 1.4689398871527777,
+        "opaqueRGBMean8Bit": 4.395290232881473,
+        "changedPixels": 262,
+        "maxAt": [
+          16,
+          69,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            93,
+            108,
+            77,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 14,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.03565437146298324,
+        "visiblePixels": 3822,
+        "transparentPixels": 5394,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-eye",
+      "pose": "gaze",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 2.3836263020833335,
+        "opaqueRGBMean8Bit": 6.8893528183716075,
+        "changedPixels": 330,
+        "maxAt": [
+          28,
+          18,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            69,
+            112,
+            84,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 34,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.07228578368149852,
+        "visiblePixels": 3798,
+        "transparentPixels": 5418,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    },
+    {
+      "name": "negative-missing-jaw",
+      "pose": "gaze",
+      "rejected": true,
+      "metrics": {
+        "maxChannel8Bit": 255.0,
+        "meanChannel8Bit": 1.5725640190972223,
+        "opaqueRGBMean8Bit": 4.643441196938065,
+        "changedPixels": 268,
+        "maxAt": [
+          77,
+          68,
+          3
+        ],
+        "samplesAtMax": [
+          [
+            96,
+            112,
+            79,
+            255
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "silhouetteDifferentPixels": 18,
+        "maxAlphaDelta": 255.0,
+        "linearPremultipliedRGB_RMSE": 0.03767713541196335,
+        "visiblePixels": 3814,
+        "transparentPixels": 5402,
+        "visibleBounds": [
+          10,
+          13,
+          85,
+          79
+        ]
+      }
+    }
+  ],
+  "commonMaterialChecksPassed": true,
+  "allNegativeControlsRejected": true,
+  "endToEndStrictParityPassed": false,
+  "testScope": "Canonical-material checks isolate geometry. End-to-end native material parity remains a separate result; its failure is not turned into a pass."
+}

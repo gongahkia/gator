@@ -1,0 +1,23 @@
+{
+  "head": "2822ba5d5552c290eae0ceedf34fe6048be2d25d",
+  "flags": "-O -swift-version 6 -strict-concurrency=complete -warnings-as-errors -target arm64-apple-macosx15.0",
+  "sources": {
+    "Engine.swift": "c4f1a9c9ee846d2861fd9f08f3cebad5decd8aff47a128b38ccb55187cf33718",
+    "InspectGeometry.swift": "a870b20067c7487838e72cb24c52f1e6b520ae9f951fbd84b2192276f099590c",
+    "DiagnosticLab.swift": "ce79ffdf75a891bacf19d3501273c2f1d45c85dcca40cad39e5b6027ca59cf7d",
+    "MascotRig.swift": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20",
+    "Presentation.swift": "7173b471104441a61717a5a9498b92ad990ca95137b388577fee5482d0126dcb",
+    "build.sh": "9c02f2c83f075af16cbe56f561bfa2a88a3874c689a5836ab035711baa543162",
+    "InspectMaterialDetails.swift": "437c85a336db341881320cdaf3b9a38a42968af63a630eeefd3db5347d015653",
+    "RenderImages.swift": "f6b0125acc6c4e4b234948762ca44cf1e113246e2ede4e62e06ffbecb3280f57",
+    "CheckMaterialParity.swift": "ace75956e36f59bdc2d056f311be8ddf69718b07d57e84be6283df467e50119d",
+    "NativeMesh.swift": "628d6e545c591c043070f79583a7ed1a7e1204084f86b2707c1f10204fa6b10a",
+    "Metrics.swift": "43de910631576fde3cbd0156276bda50c1347fc2665fa56a1cd5db3127fe2cac",
+    "CheckReleasedSubjects.swift": "bc5fecc1756ecaff49d737f7c4e04885b9a6ddb87014958ca78d20fba14e70c5"
+  },
+  "assets": {
+    "Gator-B.usdz": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+    "B-native-meshes.json": "ca627304250fa060974d1d18e293c9baa85d9755d7086d261cd498eaf0ecc13f"
+  },
+  "executableSHA256": "467231cb66de914fc92cea4859e41417b9cd14daf9bf81270e60342cc6c85787"
+}

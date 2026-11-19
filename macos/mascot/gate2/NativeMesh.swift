@@ -60,7 +60,8 @@ struct NativeMeshArchive: Decodable, Sendable {
                     created.baseColor = .init(tint: try color(data.color))
                     created.emissiveColor = .init(color: try color(data.emission)); created.emissiveIntensity = 1
                     created.roughness = .init(scale: data.roughness); created.metallic = .init(scale: data.metallic)
-                    created.faceCulling = .none; materials[key] = created; material = created
+                    // match the canonical USD material's back-face policy for thin lids
+                    created.faceCulling = .back; materials[key] = created; material = created
                 }
                 let surface = ModelEntity(mesh: mesh, materials: [material]); surface.name = "Surface"
                 entity.addChild(surface)
