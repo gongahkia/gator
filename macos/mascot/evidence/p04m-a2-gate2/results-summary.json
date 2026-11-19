@@ -1,0 +1,196 @@
+{
+  "elapsedSeconds": 690.8350960016251,
+  "frames": 589,
+  "created": {
+    "engine": 82,
+    "immutableTemplate": 1,
+    "layer": 82,
+    "posterTexture": 22,
+    "RealityRenderer": 82,
+    "sceneRoot": 82,
+    "surface": 82
+  },
+  "liveAfterTeardown": {
+    "engine": 0,
+    "immutableTemplate": 0,
+    "layer": 0,
+    "posterTexture": 1,
+    "RealityRenderer": 0,
+    "sceneRoot": 0,
+    "surface": 0
+  },
+  "decodeCount": 1,
+  "phases": {
+    "static-idle": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.15970348810293383,
+      "rssIncrementMiBRange": [
+        19.984375,
+        40.671875
+      ],
+      "footprintIncrementMiBRange": [
+        37.250022888183594,
+        131.2343978881836
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "working": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.21873436858991668,
+      "rssIncrementMiBRange": [
+        20.59375,
+        41.28125
+      ],
+      "footprintIncrementMiBRange": [
+        37.765647888183594,
+        144.2500228881836
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "responding": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 7.389929057811835,
+      "rssIncrementMiBRange": [
+        20.0546875,
+        40.71875
+      ],
+      "footprintIncrementMiBRange": [
+        43.914085388183594,
+        144.2109603881836
+      ],
+      "framesDuringSamples": 280,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "compact": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.33979444250050367,
+      "rssIncrementMiBRange": [
+        20.125,
+        41.046875
+      ],
+      "footprintIncrementMiBRange": [
+        37.437522888183594,
+        144.0781478881836
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "settled-idle": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.17966691193550124,
+      "rssIncrementMiBRange": [
+        20.375,
+        41.171875
+      ],
+      "footprintIncrementMiBRange": [
+        37.203147888183594,
+        74.8125228881836
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "hidden": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.25049755113900624,
+      "rssIncrementMiBRange": [
+        19.234375,
+        40.71875
+      ],
+      "footprintIncrementMiBRange": [
+        37.218772888183594,
+        43.859397888183594
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    },
+    "reduced-motion": {
+      "phaseCount": 10,
+      "cpuOneCorePercentWeightedMean": 0.891833000039715,
+      "rssIncrementMiBRange": [
+        19.53125,
+        40.734375
+      ],
+      "footprintIncrementMiBRange": [
+        37.234397888183594,
+        43.890647888183594
+      ],
+      "framesDuringSamples": 0,
+      "maximumCheckpointRendererOwners": 0,
+      "pendingAnimationAtAnyCheckpoint": false
+    }
+  },
+  "checkpoints": {
+    "A0-host-no-RealityKit-initialization": {
+      "cpuPercentOneCore": 0.10839868295871047,
+      "medianRSSBytes": 82198528,
+      "medianFootprintBytes": 22299488,
+      "medianHeapBytes": 7525376,
+      "live": {},
+      "frames": 0
+    },
+    "initialized-static": {
+      "cpuPercentOneCore": 0.13471337594102584,
+      "medianRSSBytes": 120946688,
+      "medianFootprintBytes": 71402360,
+      "medianHeapBytes": 23424512,
+      "live": {
+        "engine": 0,
+        "immutableTemplate": 1,
+        "layer": 0,
+        "posterTexture": 1,
+        "RealityRenderer": 0,
+        "sceneRoot": 0,
+        "surface": 0
+      },
+      "frames": 0
+    },
+    "final-settled-idle": {
+      "cpuPercentOneCore": 0.1136264570125177,
+      "medianRSSBytes": 105840640,
+      "medianFootprintBytes": 62325624,
+      "medianHeapBytes": 27261600,
+      "live": {
+        "engine": 0,
+        "immutableTemplate": 1,
+        "layer": 0,
+        "posterTexture": 1,
+        "RealityRenderer": 0,
+        "sceneRoot": 0,
+        "surface": 0
+      },
+      "frames": 0
+    },
+    "final-all-destroyed": {
+      "cpuPercentOneCore": 0.09591413198555035,
+      "medianRSSBytes": 105840640,
+      "medianFootprintBytes": 62325624,
+      "medianHeapBytes": 27101952,
+      "live": {
+        "engine": 0,
+        "immutableTemplate": 0,
+        "layer": 0,
+        "posterTexture": 1,
+        "RealityRenderer": 0,
+        "sceneRoot": 0,
+        "surface": 0
+      },
+      "frames": 0
+    }
+  },
+  "boundedLastResumeSamples": {
+    "count": 64,
+    "medianMS": 29.806971549987793,
+    "p95MS": 47.183990478515625,
+    "maxMS": 54.895997047424316
+  },
+  "peakRSSMiB": 120.203125,
+  "controlledWindowClosures": 5
+}

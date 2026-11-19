@@ -168,3 +168,9 @@ open -n --env MTL_DEBUG_LAYER=1 \
 ```
 
 The `interactive` mode is a manual, isolated expression lab. `demo` accepts `--record-ready PATH`, which waits for the native recorder's readiness file. [Recorder source](validation/RecordWindow.swift) captures only this bundle's exact lab window. No system-wide preference or privacy setting is changed.
+
+## Gate 2 remediation addendum — 2026-11-19
+
+The historical results above remain tied to the original Renderer-Lab revision. The subsequent [Gate 2 remediation report](P04M-A2-GATE2-REMEDIATION.md) documents an isolated native mesh-loading path, direct drawable experiments and a hybrid finite-gesture presentation. The exact final renderer completed **690.835 seconds** with one asset decode, 82 renderer lifetimes, zero surviving renderer/scene/surface/layer owners after teardown and zero frames in its all-hidden sampling periods. Strict Swift 6 and focused lifecycle/rig tests pass. Actual final-build recording shows live jaw/eyelid articulation.
+
+**Gate 2 remains PARTIAL.** Final settled incremental RSS/physical footprint was 22.55/38.17 MiB, but some quiet phases and active physical-footprint intervals exceeded the 40 MiB goal. Strict PNG equality also failed; GPU energy and physical macOS 15 runtime remain NOT TESTED. Detailed attribution, revision-separated measurements, failed probes and limits are in the remediation report. The optimized isolated artifact is `/tmp/Gator-Mascot-P04M-A2-Gate2.app`; the original Renderer-Lab bundle and A1 assets are preserved. No production integration follows from these results.

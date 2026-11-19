@@ -1,0 +1,20 @@
+{
+  "head": "a8b96697a1f7bbf853303c51f386e3d1bd879db5",
+  "swiftFlags": "-O -swift-version 6 -strict-concurrency=complete -warnings-as-errors -target arm64-apple-macosx15.0",
+  "sourceFiles": {
+    "Engine.swift": "c4f1a9c9ee846d2861fd9f08f3cebad5decd8aff47a128b38ccb55187cf33718",
+    "bake-mesh.py": "618b8aac2737cff2bc21314a5d2d7c5411c0fe433702f4c1fe0e3344c07677c7",
+    "RealtimeRenderer.swift": "de84403dd0a265b3a2e474fb25081b745dc9baa071179781412c106bdcab44e6",
+    "MascotRig.swift": "97cb21e636dce1168f0eb985bb130f803606dc09e86007650efadd982682ce20",
+    "Presentation.swift": "7173b471104441a61717a5a9498b92ad990ca95137b388577fee5482d0126dcb",
+    "CheckLifecycle.swift": "ca6625df06a23f0a439f45d4d6e7564d03f5a917f95f3ca8a026d060661bb1b5",
+    "build.sh": "1adc64654d9ded7bf645f66588aa126a68dfbc514744967f1deabd980efcba74",
+    "NativeMesh.swift": "871c6ec65ac472e994927c27afeac71f74a652506637157d9bc602c63b886f61",
+    "Metrics.swift": "43de910631576fde3cbd0156276bda50c1347fc2665fa56a1cd5db3127fe2cac",
+    "CheckNative.swift": "152ce1417299415799c85f5bf7f3a3d2ca0cb4c3a95e7ff20aed794c0c6e42ed",
+    "Gate2Lab.swift": "7a6e262015feb93db22b5b4c7ccce88d7548909f9d1381ea4d1e37bf148dea8d"
+  },
+  "binarySHA256": "9887643419b6d54196512d9f140cc54f703d20d90a7e177ad5996c9448159015",
+  "USDZSHA256": "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+  "meshCacheSHA256": "ca627304250fa060974d1d18e293c9baa85d9755d7086d261cd498eaf0ecc13f"
+}

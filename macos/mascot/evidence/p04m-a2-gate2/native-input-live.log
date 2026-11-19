@@ -1,0 +1,7 @@
+controller=54401 frontName=Things frontBundle=com.culturedcode.ThingsMac front=90276 target=53936 window= focused=AXTextArea::
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=54402 frontName=Gator Gate 2 Lab frontBundle=dev.gator.mascot.gate2.validation front=53936 target=53936 window= focused=AXTextArea::
+set=0 focused=true
+controller=54403 frontName=Gator Gate 2 Lab frontBundle=dev.gator.mascot.gate2.validation front=53936 target=53936 window= focused=AXTextArea::
+typed_to=AXTextArea:: observed_value=true
+key=125 target=53936

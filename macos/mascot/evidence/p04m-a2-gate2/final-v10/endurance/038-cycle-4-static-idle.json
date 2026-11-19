@@ -1,0 +1,78 @@
+{
+  "configuration" : null,
+  "cpuPercentOneCore" : 0.15299426425158169,
+  "decodeCount" : 1,
+  "drawableBytes" : 0,
+  "drawableDimensions" : [
+
+  ],
+  "frames" : 0,
+  "hasAnimationWork" : false,
+  "live" : {
+    "engine" : 0,
+    "immutableTemplate" : 1,
+    "layer" : 0,
+    "posterTexture" : 0,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0,
+    "surface" : 0
+  },
+  "pendingAnimationTask" : false,
+  "phase" : "cycle-4-static-idle",
+  "resumeLastMilliseconds" : 23.529052734375,
+  "samples" : [
+    {
+      "cpuSeconds" : 4.5043490000000004,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 25054208,
+      "elapsed" : 289.66282105445862,
+      "footprintBytes" : 172983160,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 103153664
+    },
+    {
+      "cpuSeconds" : 4.5056519999999995,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 25054448,
+      "elapsed" : 290.68923604488373,
+      "footprintBytes" : 159908728,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 103153664
+    },
+    {
+      "cpuSeconds" : 4.5063240000000002,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 25054528,
+      "elapsed" : 291.70745503902435,
+      "footprintBytes" : 159908728,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 103153664
+    },
+    {
+      "cpuSeconds" : 4.5069160000000004,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 25054656,
+      "elapsed" : 292.71149504184723,
+      "footprintBytes" : 159908728,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 103153664
+    },
+    {
+      "cpuSeconds" : 4.5077439999999998,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 25043760,
+      "elapsed" : 293.7455530166626,
+      "footprintBytes" : 159892344,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 103071744
+    }
+  ],
+  "sceneNodeCount" : 0,
+  "seconds" : 5.1400619745254517,
+  "templateNodeCount" : 57
+}

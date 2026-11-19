@@ -1,0 +1,4 @@
+exit=66
+
+footprint: Unable to find pid for process matching '30104'
+footprint: Unable to find any processes matching the supplied process names or pids (try as root?)

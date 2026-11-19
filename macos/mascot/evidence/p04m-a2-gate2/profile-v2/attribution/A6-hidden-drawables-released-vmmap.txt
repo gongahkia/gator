@@ -1,0 +1,4 @@
+exit=255
+
+vmmap[30459]: vmmap cannot examine process 30104 (with name like '30104') because it no longer appears to be running.
+vmmap[30459]: [fatal] mach port for process 0 not valid

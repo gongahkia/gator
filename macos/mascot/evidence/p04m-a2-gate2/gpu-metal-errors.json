@@ -1,0 +1,9 @@
+{
+  "schemaColumns": [
+    "timestamp",
+    "cmdbuffer-id",
+    "error-code"
+  ],
+  "rowCount": 0,
+  "rows": []
+}

@@ -1,0 +1,131 @@
+{
+  "configuration" : {
+    "metalKit" : false,
+    "msaa" : false,
+    "offscreen" : false,
+    "pixels" : 256,
+    "points" : 112
+  },
+  "cpuPercentOneCore" : 1.8842868584484296,
+  "decodeCount" : 1,
+  "drawableBytes" : 264192,
+  "drawableDimensions" : [
+    256,
+    256
+  ],
+  "frames" : 40,
+  "hasAnimationWork" : false,
+  "live" : {
+    "engine" : 1,
+    "immutableTemplate" : 1,
+    "layer" : 1,
+    "RealityRenderer" : 1,
+    "sceneRoot" : 1,
+    "surface" : 1
+  },
+  "pendingAnimationTask" : false,
+  "phase" : "A3-or-A4-visible-active",
+  "samples" : [
+    {
+      "cpuSeconds" : 0.50261800000000001,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24784320,
+      "elapsed" : 52.168469905853271,
+      "footprintBytes" : 163283832,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118423552
+    },
+    {
+      "cpuSeconds" : 0.51568700000000001,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24781648,
+      "elapsed" : 53.308578014373779,
+      "footprintBytes" : 163283832,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118439936
+    },
+    {
+      "cpuSeconds" : 0.53890700000000002,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24788528,
+      "elapsed" : 54.494167923927307,
+      "footprintBytes" : 163283832,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118439936
+    },
+    {
+      "cpuSeconds" : 0.56439399999999995,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24788544,
+      "elapsed" : 55.659693956375122,
+      "footprintBytes" : 163300216,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118456320
+    },
+    {
+      "cpuSeconds" : 0.58819299999999997,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24790480,
+      "elapsed" : 56.839000940322876,
+      "footprintBytes" : 64340856,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118456320
+    },
+    {
+      "cpuSeconds" : 0.61695,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24797920,
+      "elapsed" : 57.985006928443909,
+      "footprintBytes" : 163447672,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118472704
+    },
+    {
+      "cpuSeconds" : 0.63608500000000001,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24797456,
+      "elapsed" : 59.171620011329651,
+      "footprintBytes" : 163464056,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118489088
+    },
+    {
+      "cpuSeconds" : 0.65481,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24797280,
+      "elapsed" : 60.322589993476868,
+      "footprintBytes" : 163464056,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118489088
+    },
+    {
+      "cpuSeconds" : 0.67188999999999999,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24804144,
+      "elapsed" : 61.447576999664307,
+      "footprintBytes" : 163464056,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118489088
+    },
+    {
+      "cpuSeconds" : 0.69047899999999995,
+      "defaultHeapAllocatedBytes" : 66289664,
+      "defaultHeapInUseBytes" : 24804416,
+      "elapsed" : 62.597564935684204,
+      "footprintBytes" : 163464056,
+      "metalAllocatedBytes" : 304496640,
+      "peakRSSBytes" : 119013376,
+      "rssBytes" : 118489088
+    }
+  ],
+  "seconds" : 11.593723058700562
+}

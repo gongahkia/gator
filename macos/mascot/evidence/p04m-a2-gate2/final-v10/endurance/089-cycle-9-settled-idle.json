@@ -1,0 +1,88 @@
+{
+  "configuration" : null,
+  "cpuPercentOneCore" : 0.12748238380970281,
+  "decodeCount" : 1,
+  "drawableBytes" : 0,
+  "drawableDimensions" : [
+
+  ],
+  "frames" : 0,
+  "hasAnimationWork" : false,
+  "live" : {
+    "engine" : 0,
+    "immutableTemplate" : 1,
+    "layer" : 0,
+    "posterTexture" : 1,
+    "RealityRenderer" : 0,
+    "sceneRoot" : 0,
+    "surface" : 0
+  },
+  "pendingAnimationTask" : false,
+  "phase" : "cycle-9-settled-idle",
+  "resumeLastMilliseconds" : 19.703030586242676,
+  "samples" : [
+    {
+      "cpuSeconds" : 11.295158000000001,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27394208,
+      "elapsed" : 619.37412202358246,
+      "footprintBytes" : 62391160,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105971712
+    },
+    {
+      "cpuSeconds" : 11.296151,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27366736,
+      "elapsed" : 620.44053399562836,
+      "footprintBytes" : 62358392,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105889792
+    },
+    {
+      "cpuSeconds" : 11.296794999999999,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27366816,
+      "elapsed" : 621.49886798858643,
+      "footprintBytes" : 62358392,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105889792
+    },
+    {
+      "cpuSeconds" : 11.297437,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27366944,
+      "elapsed" : 622.55120098590851,
+      "footprintBytes" : 62358392,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105889792
+    },
+    {
+      "cpuSeconds" : 11.298087000000001,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27366944,
+      "elapsed" : 623.6184229850769,
+      "footprintBytes" : 62358392,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105889792
+    },
+    {
+      "cpuSeconds" : 11.298954,
+      "defaultHeapAllocatedBytes" : 70303744,
+      "defaultHeapInUseBytes" : 27367216,
+      "elapsed" : 624.65983998775482,
+      "footprintBytes" : 62358392,
+      "metalAllocatedBytes" : 304201728,
+      "peakRSSBytes" : 126042112,
+      "rssBytes" : 105873408
+    }
+  ],
+  "sceneNodeCount" : 0,
+  "seconds" : 6.2887120246887207,
+  "templateNodeCount" : 57
+}

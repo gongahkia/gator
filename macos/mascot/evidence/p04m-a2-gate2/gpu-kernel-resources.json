@@ -1,0 +1,15 @@
+{
+  "rowCount": 0,
+  "schemaColumns": [
+    "timestamp",
+    "process",
+    "thread",
+    "resource-id",
+    "vidmem-bytes",
+    "sysmem-bytes",
+    "gpu",
+    "resource-type",
+    "event-type"
+  ],
+  "rows": []
+}
