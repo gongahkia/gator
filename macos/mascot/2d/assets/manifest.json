@@ -1,0 +1,106 @@
+{
+  "canonicalImportedMaterials" : 26,
+  "clips" : [
+    {
+      "duration" : 0,
+      "frames" : 1,
+      "state" : "neutral",
+      "staticFrame" : 0,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.29999999999999999,
+      "frames" : 8,
+      "state" : "blink",
+      "staticFrame" : 7,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.80000000000000004,
+      "frames" : 12,
+      "state" : "working",
+      "staticFrame" : 11,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.55000000000000004,
+      "frames" : 9,
+      "state" : "responding",
+      "staticFrame" : 8,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.65000000000000002,
+      "frames" : 11,
+      "state" : "completed",
+      "staticFrame" : 10,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.55000000000000004,
+      "frames" : 9,
+      "state" : "attention",
+      "staticFrame" : 8,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0.59999999999999998,
+      "frames" : 9,
+      "state" : "disconnected",
+      "staticFrame" : 8,
+      "style" : "rendered"
+    },
+    {
+      "duration" : 0,
+      "frames" : 1,
+      "state" : "neutral",
+      "staticFrame" : 0,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.29999999999999999,
+      "frames" : 8,
+      "state" : "blink",
+      "staticFrame" : 7,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.80000000000000004,
+      "frames" : 12,
+      "state" : "working",
+      "staticFrame" : 11,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.55000000000000004,
+      "frames" : 9,
+      "state" : "responding",
+      "staticFrame" : 8,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.65000000000000002,
+      "frames" : 11,
+      "state" : "completed",
+      "staticFrame" : 10,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.55000000000000004,
+      "frames" : 9,
+      "state" : "attention",
+      "staticFrame" : 8,
+      "style" : "classic"
+    },
+    {
+      "duration" : 0.59999999999999998,
+      "frames" : 9,
+      "state" : "disconnected",
+      "staticFrame" : 8,
+      "style" : "classic"
+    }
+  ],
+  "pixels" : 224,
+  "sourceUSDZSHA256" : "f85db8a1c80ec5f17d8de8102e77c3b4774357548ee26a582c689be32e4103ca",
+  "version" : 1
+}
