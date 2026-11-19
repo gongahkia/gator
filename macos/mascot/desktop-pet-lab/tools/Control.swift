@@ -2,11 +2,14 @@
 import AppKit
 import ApplicationServices
 import Foundation
+@main struct FixtureControl {
+@MainActor static func main() {
 let args = CommandLine.arguments
 if args.count == 2 && args[1] == "permissions" {
     print("AXTrusted=\(AXIsProcessTrusted()) screenCapture=\(CGPreflightScreenCaptureAccess()) postEvents=\(CGPreflightPostEventAccess())"); exit(0)
 }
-let pid = Int32(args[1])!, action = args[2]
+guard args.count>=3,let pid=Int32(args[1]) else{exit(2)}
+let action=args[2]
 guard let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, ["dev.gator.pet.b1.lab","dev.gator.pet.focus-fixture","dev.gator.pet.b1.gator-fixture"].contains(bundle) else { print("refuse_nonfixture"); exit(2) }
 guard NSRunningApplication(processIdentifier:pid)?.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/").resolvingSymlinksInPath().path) == true else { exit(2) }
 let app = AXUIElementCreateApplication(pid)
@@ -16,7 +19,7 @@ func str(_ e: AXUIElement, _ key: String) -> String {
     return attr(e,key) as? String ?? ""
 }
 func elements(_ e: AXUIElement, _ key: String = "AXChildren") -> [AXUIElement] { attr(e,key) as? [AXUIElement] ?? [] }
-func element(_ e: AXUIElement, _ key: String) -> AXUIElement? { guard let v=attr(e,key) else { return nil };return unsafeBitCast(v,to:AXUIElement.self) }
+func element(_ e: AXUIElement, _ key: String) -> AXUIElement? { guard let v=attr(e,key) else { return nil };return unsafeDowncast(v,to:AXUIElement.self) }
 func matches(_ e: AXUIElement, _ name: String) -> Bool {
     if name.contains("::") { let p=name.components(separatedBy:"::");return str(e,"AXRole")==p[0] && matches(e,p[1]) }
     return ["AXIdentifier","AXDescription","AXTitle","AXValue"].contains { str(e,$0)==name }
@@ -59,8 +62,8 @@ func dump(_ e: AXUIElement,_ depth: Int = 0) {
     print(String(repeating:" ",count:depth)+str(e,"AXRole")+" | "+str(e,"AXTitle")+" | "+str(e,"AXDescription")+" | "+String(str(e,"AXValue").prefix(220))+" | "+str(e,"AXIdentifier"))
     for c in elements(e) { dump(c,depth+1) }
 }
-func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgPoint,&p)};return p}
-func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgSize,&p)};return p}
+func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeDowncast(v,to:AXValue.self),.cgPoint,&p)};return p}
+func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeDowncast(v,to:AXValue.self),.cgSize,&p)};return p}
 switch action {
 case "quit":
     guard let running=NSRunningApplication(processIdentifier:pid) else{exit(2)}
@@ -123,4 +126,7 @@ case "frames":
 case "close":
     guard let w=window(args[3]),let e=element(w,"AXCloseButton") else{exit(2)};print("close=\(AXUIElementPerformAction(e,"AXPress" as CFString).rawValue)")
 default: exit(2)
+}
+
+}
 }

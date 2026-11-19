@@ -1,0 +1,16 @@
+{
+  "unexpectedSharedInput": true,
+  "failures": [
+    {
+      "status": "failed",
+      "failure": "model turn 1: request OpenAI stream: Post \"http://127.0.0.1:9/responses\": dial tcp 127.0.0.1:9: connect: connection refused"
+    },
+    {
+      "status": "failed",
+      "failure": "model turn 1: request OpenAI stream: Post \"http://127.0.0.1:9/responses\": dial tcp 127.0.0.1:9: connect: connection refused"
+    }
+  ],
+  "GatorExit": 0,
+  "petQuitCleanupConfirmed": true,
+  "note": "Presentation comparison only; not evidence of a clean no-task Gator interaction session."
+}

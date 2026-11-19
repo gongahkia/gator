@@ -9,6 +9,7 @@ import AppKit
         owner=PetPanelController(assets:URL(fileURLWithPath:args[1]));owner?.screen=PetScreens.read().first(where:{$0.builtIn}) ?? PetScreens.read().first
         task=Task{[weak self] in guard let self else{return};var results:[[String:Any]]=[]
             do{
+                guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else{throw CocoaError(.userCancelled)}
                 let start=ContinuousClock.now;owner?.show(.init(owner:"latency-fixture",style:.rendered,expression:.neutral,animate:false));try await readyImage()
                 results.append(["phase":"first-show-through-image-ready","milliseconds":milliseconds(start.duration(to:.now))])
                 for style in NativeMascotStyle.allCases{

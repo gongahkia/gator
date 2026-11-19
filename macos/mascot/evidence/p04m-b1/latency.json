@@ -1,0 +1,109 @@
+{
+  "OSReduceMotion" : false,
+  "results" : [
+    {
+      "milliseconds" : 41.104416000000001,
+      "phase" : "first-show-through-image-ready"
+    },
+    {
+      "milliseconds" : 9.0105830000000005,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.3887499999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.3374999999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.3095000000000001,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.2989170000000001,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.286208,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.290041,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.426334,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.286416,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 1.2807500000000001,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "rendered"
+    },
+    {
+      "milliseconds" : 2.6934589999999998,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 1.435875,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 2.0653329999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 1.4010830000000001,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 1.8743749999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 7.0865830000000001,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 2.9094169999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 3.1459579999999998,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 1.6603749999999999,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    },
+    {
+      "milliseconds" : 1.579,
+      "phase" : "gesture-decode-and-submit",
+      "style" : "classic"
+    }
+  ]
+}

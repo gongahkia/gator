@@ -1,0 +1,88 @@
+{"checks":63,"passed":true,"windows":0,"backendProcesses":0}
+{"checks":63,"passed":true,"windowsCreated":0,"backendProcesses":0}
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:6:1: error: statements are not allowed at the top level
+  4 | import Foundation
+  5 | let args = CommandLine.arguments
+  6 | if args.count == 2 && args[1] == "permissions" {
+    | `- error: statements are not allowed at the top level
+  7 |     print("AXTrusted=\(AXIsProcessTrusted()) screenCapture=\(CGPreflightScreenCaptureAccess()) postEvents=\(CGPreflightPostEventAccess())"); exit(0)
+  8 | }
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:10:1: error: statements are not allowed at the top level
+  8 | }
+  9 | let pid = Int32(args[1])!, action = args[2]
+ 10 | guard let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, ["dev.gator.pet.b1.lab","dev.gator.pet.focus-fixture","dev.gator.pet.b1.gator-fixture"].contains(bundle) else { print("refuse_nonfixture"); exit(2) }
+    | `- error: statements are not allowed at the top level
+ 11 | guard NSRunningApplication(processIdentifier:pid)?.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/").resolvingSymlinksInPath().path) == true else { exit(2) }
+ 12 | let app = AXUIElementCreateApplication(pid)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:11:1: error: statements are not allowed at the top level
+  9 | let pid = Int32(args[1])!, action = args[2]
+ 10 | guard let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, ["dev.gator.pet.b1.lab","dev.gator.pet.focus-fixture","dev.gator.pet.b1.gator-fixture"].contains(bundle) else { print("refuse_nonfixture"); exit(2) }
+ 11 | guard NSRunningApplication(processIdentifier:pid)?.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/").resolvingSymlinksInPath().path) == true else { exit(2) }
+    | `- error: statements are not allowed at the top level
+ 12 | let app = AXUIElementCreateApplication(pid)
+ 13 | func attr(_ e: AXUIElement, _ key: String) -> CFTypeRef? { var v: CFTypeRef?; AXUIElementCopyAttributeValue(e,key as CFString,&v); return v }
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:64:1: error: statements are not allowed at the top level
+ 62 | func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgPoint,&p)};return p}
+ 63 | func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgSize,&p)};return p}
+ 64 | switch action {
+    | `- error: statements are not allowed at the top level
+ 65 | case "quit":
+ 66 |     guard let running=NSRunningApplication(processIdentifier:pid) else{exit(2)}
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:12:5: error: let 'app' is not concurrency-safe because non-'Sendable' type 'AXUIElement' may have shared mutable state [#MutableGlobalVariable]
+ 10 | guard let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, ["dev.gator.pet.b1.lab","dev.gator.pet.focus-fixture","dev.gator.pet.b1.gator-fixture"].contains(bundle) else { print("refuse_nonfixture"); exit(2) }
+ 11 | guard NSRunningApplication(processIdentifier:pid)?.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/").resolvingSymlinksInPath().path) == true else { exit(2) }
+ 12 | let app = AXUIElementCreateApplication(pid)
+    |     `- error: let 'app' is not concurrency-safe because non-'Sendable' type 'AXUIElement' may have shared mutable state [#MutableGlobalVariable]
+ 13 | func attr(_ e: AXUIElement, _ key: String) -> CFTypeRef? { var v: CFTypeRef?; AXUIElementCopyAttributeValue(e,key as CFString,&v); return v }
+ 14 | func str(_ e: AXUIElement, _ key: String) -> String {
+
+ApplicationServices.AXUIElement:1:14: note: class 'AXUIElement' does not conform to the 'Sendable' protocol
+1 | public class AXUIElement : _CFObject {
+  |              `- note: class 'AXUIElement' does not conform to the 'Sendable' protocol
+2 | }
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:3:1: error: add '@preconcurrency' to treat 'Sendable'-related errors from module 'ApplicationServices' as warnings
+  1 | // acceptance-only controller; refuses production and unrelated applications.
+  2 | import AppKit
+  3 | import ApplicationServices
+    | `- error: add '@preconcurrency' to treat 'Sendable'-related errors from module 'ApplicationServices' as warnings
+  4 | import Foundation
+  5 | let args = CommandLine.arguments
+    :
+ 10 | guard let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier, ["dev.gator.pet.b1.lab","dev.gator.pet.focus-fixture","dev.gator.pet.b1.gator-fixture"].contains(bundle) else { print("refuse_nonfixture"); exit(2) }
+ 11 | guard NSRunningApplication(processIdentifier:pid)?.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/").resolvingSymlinksInPath().path) == true else { exit(2) }
+ 12 | let app = AXUIElementCreateApplication(pid)
+    |     |- note: add '@MainActor' to make let 'app' part of global actor 'MainActor'
+    |     `- note: disable concurrency-safety checks if accesses are protected by an external synchronization mechanism
+ 13 | func attr(_ e: AXUIElement, _ key: String) -> CFTypeRef? { var v: CFTypeRef?; AXUIElementCopyAttributeValue(e,key as CFString,&v); return v }
+ 14 | func str(_ e: AXUIElement, _ key: String) -> String {
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:19:116: error: 'unsafeBitCast' from 'AnyObject' to 'AXUIElement' can be replaced with 'unsafeDowncast'
+ 17 | }
+ 18 | func elements(_ e: AXUIElement, _ key: String = "AXChildren") -> [AXUIElement] { attr(e,key) as? [AXUIElement] ?? [] }
+ 19 | func element(_ e: AXUIElement, _ key: String) -> AXUIElement? { guard let v=attr(e,key) else { return nil };return unsafeBitCast(v,to:AXUIElement.self) }
+    |                                                                                                                    `- error: 'unsafeBitCast' from 'AnyObject' to 'AXUIElement' can be replaced with 'unsafeDowncast'
+ 20 | func matches(_ e: AXUIElement, _ name: String) -> Bool {
+ 21 |     if name.contains("::") { let p=name.components(separatedBy:"::");return str(e,"AXRole")==p[0] && matches(e,p[1]) }
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:62:110: error: 'unsafeBitCast' from 'AnyObject' to 'AXValue' can be replaced with 'unsafeDowncast'
+ 60 |     for c in elements(e) { dump(c,depth+1) }
+ 61 | }
+ 62 | func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgPoint,&p)};return p}
+    |                                                                                                              `- error: 'unsafeBitCast' from 'AnyObject' to 'AXValue' can be replaced with 'unsafeDowncast'
+ 63 | func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgSize,&p)};return p}
+ 64 | switch action {
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/Control.swift:63:100: error: 'unsafeBitCast' from 'AnyObject' to 'AXValue' can be replaced with 'unsafeDowncast'
+ 61 | }
+ 62 | func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgPoint,&p)};return p}
+ 63 | func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeBitCast(v,to:AXValue.self),.cgSize,&p)};return p}
+    |                                                                                                    `- error: 'unsafeBitCast' from 'AnyObject' to 'AXValue' can be replaced with 'unsafeDowncast'
+ 64 | switch action {
+ 65 | case "quit":
+
+[#MutableGlobalVariable]: <https://docs.swift.org/compiler/documentation/diagnostics/mutable-global-variable>

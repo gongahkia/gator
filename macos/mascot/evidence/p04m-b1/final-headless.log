@@ -1,0 +1,4 @@
+{"checks":63,"passed":true,"windows":0,"backendProcesses":0}
+{"checks":63,"passed":true,"windowsCreated":0,"backendProcesses":0}
+/tmp/gator-pet-b1-check.7yhhgt/FocusFixture.app/Contents/Info.plist: OK
+Verified headless checks and compiled native tools: /tmp/gator-pet-b1-check.7yhhgt

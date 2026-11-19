@@ -1,0 +1,35 @@
+{
+  "HEAD": "d904ef6f08e5717398e6c970260a1a06eef83fcd",
+  "sourceHashes": {
+    "macos/mascot/desktop-pet-lab/CheckLogic.swift": "9f9e68662139c93fbe2293ec9345781f58c1dced1be0b3e5a834e95ec6936345",
+    "macos/mascot/desktop-pet-lab/FocusFixture.swift": "39de2d2e02991e053c3c4ce5fc866b4f419a12a5b5c7d48418dfeae3d6665663",
+    "macos/mascot/desktop-pet-lab/Geometry.swift": "6986ce35454fb737dfc0f533649c7b2d4e326797a4ad4839a639d84dcc0f1892",
+    "macos/mascot/desktop-pet-lab/Lab.swift": "c0ed46ec15172d046f2a87db16bc01655ac2005c8c0d2c55b7f49710f0c28699",
+    "macos/mascot/desktop-pet-lab/Latency.swift": "6e46bf32b311d93e8db727df0d33ca2d475ffd7a49d8ff3669ddf46c3a7bc4f9",
+    "macos/mascot/desktop-pet-lab/Panel.swift": "f4044f9553831987eb1b182ea1f82067b93a4e99d833d527d25aa4f0a4f91265",
+    "macos/mascot/desktop-pet-lab/Screens.swift": "db9861131de6b68948e652dd588559784ae9a681136ba66860c686df4899e31d",
+    "macos/mascot/desktop-pet-lab/build.sh": "1d23a0eda7521ea5ec1076794c60549fa07c4778cb2ffec213f857c775c33be8",
+    "macos/mascot/desktop-pet-lab/tools/Capture.swift": "49c548d465cbeccf2bc50714db769cd7eded143e18a7f1be7d5dec591fcc0a57",
+    "macos/mascot/desktop-pet-lab/tools/Control.swift": "b4cc6dc1ca3e92983549c9835abab87a8f1e47c91a045131533c6a19b1971955",
+    "macos/mascot/desktop-pet-lab/tools/Pointer.swift": "380708a43bb30ec2ff23997367fb57e5c6f59c7e0ec2fcffa6f19786d1bcca51",
+    "macos/mascot/desktop-pet-lab/tools/acceptance.py": "6a5c0ed1aca1422087b42191a62e7f2097c8b8d7f964ab63c8cccd52c24adf4b",
+    "macos/mascot/desktop-pet-lab/tools/gator-visual.py": "c38b953b987f64972d02aec9e739bce7cf89ae879170a935274832891dd5e28a",
+    "macos/mascot/desktop-pet-lab/tools/scenarios.py": "747c5d7528e2e298be33579d03ae85c25cf2300375cae96f4e49c47a3dca0658",
+    "macos/mascot/desktop-pet-lab/tools/trial.py": "1b901236753cf2a38020dbdb4a068ebc7ef036a24158cbc4cef64a9ea507b403",
+    "macos/mascot/desktop-pet-lab/verify.sh": "1b4fbd9d6a9a2b81ff82d028e2c25d647da335e1533336727a9a305989192b37"
+  },
+  "reusedSourceHashes": {
+    "macos/Sources/GatorMac/NativeMascotModel.swift": "39c06e215aeb7d03860e52f4af31e75cbd324d834032430fc5a821929a03b4ee",
+    "macos/Sources/GatorMac/NativeMascotPlayback.swift": "22f1660e66f5418830971132c6d0a8168445632a4e945e50653a0fc0964743ea"
+  },
+  "bundlePath": "/tmp/Gator-Mascot-P04M-B1-Desktop-Pet-Lab.app",
+  "bundleBinarySHA256": "845e66c7f763629f384899e09ef57f9ac0e42b12bd18860629bd471301931842",
+  "measuredBinarySHA256": "845e66c7f763629f384899e09ef57f9ac0e42b12bd18860629bd471301931842",
+  "assets": {
+    "fileCount": 119,
+    "PNGCount": 118,
+    "bytes": 2019560,
+    "allBundledHashesMatch": true
+  },
+  "sameMeasuredBinary": true
+}

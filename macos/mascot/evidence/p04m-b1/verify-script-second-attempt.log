@@ -1,0 +1,33 @@
+{"checks":63,"passed":true,"windows":0,"backendProcesses":0}
+{"checks":63,"passed":true,"windowsCreated":0,"backendProcesses":0}
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/FocusFixture.swift:14:26: error: cannot find 'PetScreens' in scope
+12 |         let args=CommandLine.arguments;guard args.count==2,args[1].hasPrefix("/tmp/gator-") else{NSApp.terminate(nil);return}
+13 |         output=URL(fileURLWithPath:args[1]);try? FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+14 |         guard let screen=PetScreens.read().first(where:{$0.builtIn}) ?? PetScreens.read().first,let pet=PetGeometry.position(on:screen,placement:.reserved) else{NSApp.terminate(nil);return}
+   |                          `- error: cannot find 'PetScreens' in scope
+15 |         targetFrame=pet.insetBy(dx:-12,dy:-12)
+16 |         window=NSWindow(contentRect:CGRect(x:pet.midX-240,y:max(screen.usable.minY+20,pet.midY-180),width:480,height:340),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/FocusFixture.swift:14:73: error: cannot find 'PetScreens' in scope
+12 |         let args=CommandLine.arguments;guard args.count==2,args[1].hasPrefix("/tmp/gator-") else{NSApp.terminate(nil);return}
+13 |         output=URL(fileURLWithPath:args[1]);try? FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+14 |         guard let screen=PetScreens.read().first(where:{$0.builtIn}) ?? PetScreens.read().first,let pet=PetGeometry.position(on:screen,placement:.reserved) else{NSApp.terminate(nil);return}
+   |                                                                         `- error: cannot find 'PetScreens' in scope
+15 |         targetFrame=pet.insetBy(dx:-12,dy:-12)
+16 |         window=NSWindow(contentRect:CGRect(x:pet.midX-240,y:max(screen.usable.minY+20,pet.midY-180),width:480,height:340),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/FocusFixture.swift:14:105: error: cannot find 'PetGeometry' in scope
+12 |         let args=CommandLine.arguments;guard args.count==2,args[1].hasPrefix("/tmp/gator-") else{NSApp.terminate(nil);return}
+13 |         output=URL(fileURLWithPath:args[1]);try? FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+14 |         guard let screen=PetScreens.read().first(where:{$0.builtIn}) ?? PetScreens.read().first,let pet=PetGeometry.position(on:screen,placement:.reserved) else{NSApp.terminate(nil);return}
+   |                                                                                                         `- error: cannot find 'PetGeometry' in scope
+15 |         targetFrame=pet.insetBy(dx:-12,dy:-12)
+16 |         window=NSWindow(contentRect:CGRect(x:pet.midX-240,y:max(screen.usable.minY+20,pet.midY-180),width:480,height:340),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/FocusFixture.swift:14:147: error: cannot infer contextual base in reference to member 'reserved'
+12 |         let args=CommandLine.arguments;guard args.count==2,args[1].hasPrefix("/tmp/gator-") else{NSApp.terminate(nil);return}
+13 |         output=URL(fileURLWithPath:args[1]);try? FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+14 |         guard let screen=PetScreens.read().first(where:{$0.builtIn}) ?? PetScreens.read().first,let pet=PetGeometry.position(on:screen,placement:.reserved) else{NSApp.terminate(nil);return}
+   |                                                                                                                                                   `- error: cannot infer contextual base in reference to member 'reserved'
+15 |         targetFrame=pet.insetBy(dx:-12,dy:-12)
+16 |         window=NSWindow(contentRect:CGRect(x:pet.midX-240,y:max(screen.usable.minY+20,pet.midY-180),width:480,height:340),styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)

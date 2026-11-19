@@ -1,0 +1,146 @@
+{
+  "durationSeconds": 139.96736693382263,
+  "nativeAssertions": 66,
+  "CPUUnit": "percent of one core, whole lab process including measurement",
+  "baseline": {
+    "CPUPercent": 0.5738708847365123,
+    "footprint": 25658160,
+    "peakFootprint": 25789232,
+    "phase": "hidden-host-baseline",
+    "RSS": 97681408
+  },
+  "phases": [
+    {
+      "CPUPercent": 0.5738708847365123,
+      "footprint": 25658160,
+      "peakFootprint": 25789232,
+      "phase": "hidden-host-baseline",
+      "RSS": 97681408,
+      "totalRSSMiB": 93.15625,
+      "totalFootprintMiB": 24.469528198242188,
+      "deltaRSSMiB": 0.0,
+      "deltaFootprintMiB": 0.0
+    },
+    {
+      "CPUPercent": 0.18982490413209308,
+      "footprint": 25854768,
+      "peakFootprint": 25920304,
+      "phase": "visible-static",
+      "RSS": 91389952,
+      "totalRSSMiB": 87.15625,
+      "totalFootprintMiB": 24.657028198242188,
+      "deltaRSSMiB": -6.0,
+      "deltaFootprintMiB": 0.1875
+    },
+    {
+      "CPUPercent": 0.21356444872073227,
+      "footprint": 25822000,
+      "peakFootprint": 27542320,
+      "phase": "visible-idle-including-blink",
+      "RSS": 90898432,
+      "totalRSSMiB": 86.6875,
+      "totalFootprintMiB": 24.625778198242188,
+      "deltaRSSMiB": -6.46875,
+      "deltaFootprintMiB": 0.15625
+    },
+    {
+      "CPUPercent": 0.12344122648875124,
+      "footprint": 25920304,
+      "peakFootprint": 28476208,
+      "phase": "working-finite",
+      "RSS": 90947584,
+      "totalRSSMiB": 86.734375,
+      "totalFootprintMiB": 24.719528198242188,
+      "deltaRSSMiB": -6.421875,
+      "deltaFootprintMiB": 0.25
+    },
+    {
+      "CPUPercent": 1.2001837106145008,
+      "footprint": 27149128,
+      "peakFootprint": 29295432,
+      "phase": "rendered-responding",
+      "RSS": 87523328,
+      "totalRSSMiB": 83.46875,
+      "totalFootprintMiB": 25.89142608642578,
+      "deltaRSSMiB": -9.6875,
+      "deltaFootprintMiB": 1.4218978881835938
+    },
+    {
+      "CPUPercent": 0.9957902132998744,
+      "footprint": 27116360,
+      "peakFootprint": 29295432,
+      "phase": "classic-responding",
+      "RSS": 87359488,
+      "totalRSSMiB": 83.3125,
+      "totalFootprintMiB": 25.86017608642578,
+      "deltaRSSMiB": -9.84375,
+      "deltaFootprintMiB": 1.3906478881835938
+    },
+    {
+      "CPUPercent": 0.06404473427004777,
+      "footprint": 27132744,
+      "peakFootprint": 29295432,
+      "phase": "animation-disabled",
+      "RSS": 87392256,
+      "totalRSSMiB": 83.34375,
+      "totalFootprintMiB": 25.87580108642578,
+      "deltaRSSMiB": -9.8125,
+      "deltaFootprintMiB": 1.4062728881835938
+    },
+    {
+      "CPUPercent": 0.053437251984120804,
+      "footprint": 27083592,
+      "peakFootprint": 29295432,
+      "phase": "reduced-motion",
+      "RSS": 87343104,
+      "totalRSSMiB": 83.296875,
+      "totalFootprintMiB": 25.82892608642578,
+      "deltaRSSMiB": -9.859375,
+      "deltaFootprintMiB": 1.3593978881835938
+    },
+    {
+      "CPUPercent": 0.3483785603887351,
+      "footprint": 26444616,
+      "peakFootprint": 29295432,
+      "phase": "tucked-away",
+      "RSS": 90161152,
+      "totalRSSMiB": 85.984375,
+      "totalFootprintMiB": 25.21955108642578,
+      "deltaRSSMiB": -7.171875,
+      "deltaFootprintMiB": 0.7500228881835938
+    },
+    {
+      "CPUPercent": 0.9449806332283756,
+      "footprint": 26706760,
+      "peakFootprint": 29295432,
+      "phase": "pet-and-inchat",
+      "RSS": 90783744,
+      "totalRSSMiB": 86.578125,
+      "totalFootprintMiB": 25.46955108642578,
+      "deltaRSSMiB": -6.578125,
+      "deltaFootprintMiB": 1.0000228881835938
+    },
+    {
+      "CPUPercent": 0.9573329121590639,
+      "footprint": 26690376,
+      "peakFootprint": 29295432,
+      "phase": "inactive-pet",
+      "RSS": 90767360,
+      "totalRSSMiB": 86.5625,
+      "totalFootprintMiB": 25.45392608642578,
+      "deltaRSSMiB": -6.59375,
+      "deltaFootprintMiB": 0.9843978881835938
+    },
+    {
+      "CPUPercent": 0.13861014827385745,
+      "footprint": 26755912,
+      "peakFootprint": 29295432,
+      "phase": "all-pet-owners-released",
+      "RSS": 91324416,
+      "totalRSSMiB": 87.09375,
+      "totalFootprintMiB": 25.51642608642578,
+      "deltaRSSMiB": -6.0625,
+      "deltaFootprintMiB": 1.0468978881835938
+    }
+  ]
+}
