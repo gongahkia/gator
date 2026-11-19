@@ -1,0 +1,1811 @@
+{
+  "assertions" : 66,
+  "desktopEnabled" : false,
+  "done" : true,
+  "elapsed" : 141.00845396518707,
+  "events" : [
+    {
+      "elapsed" : 0.17088103294372559,
+      "event" : "phase",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "hidden-host-baseline"
+    },
+    {
+      "elapsed" : 12.756487965583801,
+      "event" : "show-without-activation",
+      "expression" : "neutral",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "hidden-host-baseline"
+    },
+    {
+      "elapsed" : 12.760102033615112,
+      "event" : "phase",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "visible-static"
+    },
+    {
+      "elapsed" : 23.268745064735413,
+      "event" : "fixture-signal",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "visible-static"
+    },
+    {
+      "elapsed" : 23.270527958869934,
+      "event" : "phase",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "visible-idle-including-blink"
+    },
+    {
+      "elapsed" : 38.032670021057129,
+      "event" : "fixture-signal",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "visible-idle-including-blink"
+    },
+    {
+      "elapsed" : 38.055858969688416,
+      "event" : "phase",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "working-finite"
+    },
+    {
+      "elapsed" : 46.499971032142639,
+      "event" : "phase",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 46.502061009407043,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 47.531890988349915,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 48.547176003456116,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 49.614520072937012,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 50.628744006156921,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 51.680186033248901,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 52.749703049659729,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 53.816897988319397,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 54.880136013031006,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 55.936915993690491,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 56.94130802154541,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 58.008077025413513,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "rendered-responding"
+    },
+    {
+      "elapsed" : 59.032003998756409,
+      "event" : "phase",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 59.034525036811829,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 60.078830003738403,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 61.130252003669739,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 62.200291991233826,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 63.26695704460144,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 64.337103009223938,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 65.40506899356842,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 66.474259972572327,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 67.485051989555359,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 68.550320982933044,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 69.609341979026794,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 70.675773024559021,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 71.749068975448608,
+      "event" : "fixture-signal",
+      "expression" : "attention",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "classic-responding"
+    },
+    {
+      "elapsed" : 71.75264298915863,
+      "event" : "phase",
+      "expression" : "attention",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "animation-disabled"
+    },
+    {
+      "elapsed" : 78.055551052093506,
+      "event" : "fixture-signal",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "animation-disabled"
+    },
+    {
+      "elapsed" : 78.059154033660889,
+      "event" : "phase",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "reduced-motion"
+    },
+    {
+      "elapsed" : 84.306463003158569,
+      "event" : "explicit-tuck",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "reduced-motion"
+    },
+    {
+      "elapsed" : 84.317291975021362,
+      "event" : "phase",
+      "expression" : "working",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 84.319359064102173,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 85.327244997024536,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 86.333503007888794,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 87.400642991065979,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 88.46734607219696,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 89.518226027488708,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 90.541800022125244,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 91.608916044235229,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 92.630149960517883,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 93.693359971046448,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 94.722954034805298,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 95.745965003967285,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 96.823711037635803,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 96.825952053070068,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "tucked-away"
+    },
+    {
+      "elapsed" : 96.829012036323547,
+      "event" : "phase",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 96.831434965133667,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 97.842836022377014,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 98.913735032081604,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 99.94116997718811,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 101.00371503829956,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 102.0315420627594,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 103.08919203281403,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 104.14917302131653,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 105.2179239988327,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 106.27541196346283,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "pet-and-inchat"
+    },
+    {
+      "elapsed" : 107.34401500225067,
+      "event" : "phase",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 107.3464390039444,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 108.40620505809784,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 109.45312297344208,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 110.49237298965454,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 111.54315996170044,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 112.5866140127182,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 113.65747106075287,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 114.72248804569244,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "inactive-pet"
+    },
+    {
+      "elapsed" : 115.75252199172974,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.76510500907898,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.76691496372223,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.76845502853394,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.77284395694733,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.7736279964447,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 115.77434003353119,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-0"
+    },
+    {
+      "elapsed" : 116.80411803722382,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.82283401489258,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.82465600967407,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.82619404792786,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.83007204532623,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.83150506019592,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 116.83280098438263,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-1"
+    },
+    {
+      "elapsed" : 117.85814297199249,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.8754860162735,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.87737500667572,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.87888300418854,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.88260400295258,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.88409996032715,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 117.88544106483459,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-2"
+    },
+    {
+      "elapsed" : 118.93859803676605,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.95969700813293,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.96175396442413,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.96345806121826,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.96533501148224,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.96684396266937,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 118.9682719707489,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-3"
+    },
+    {
+      "elapsed" : 120.01996695995331,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.04410398006439,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.04576504230499,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.04720199108124,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.04876601696014,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.05009305477142,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 120.05138003826141,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-4"
+    },
+    {
+      "elapsed" : 121.11238503456116,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.12875604629517,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.13082897663116,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.13260006904602,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.13615202903748,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.13778007030487,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 121.13934302330017,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-5"
+    },
+    {
+      "elapsed" : 122.15692496299744,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.1737060546875,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.17596006393433,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.17793405056,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.18238401412964,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.18413901329041,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 122.18571901321411,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-6"
+    },
+    {
+      "elapsed" : 123.25284695625305,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.27282404899597,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.27407205104828,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.27602100372314,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.27998304367065,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.28170502185822,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 123.28333699703217,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-7"
+    },
+    {
+      "elapsed" : 124.3526029586792,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.37650501728058,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.37872695922852,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.38054203987122,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.38276100158691,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.38452100753784,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 124.38612401485443,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-8"
+    },
+    {
+      "elapsed" : 125.42362606525421,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.4302099943161,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.43147599697113,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.43259000778198,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.4375159740448,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.43869996070862,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 125.4398820400238,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-9"
+    },
+    {
+      "elapsed" : 126.44476306438446,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.4561630487442,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.4597589969635,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.46247100830078,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.46923696994781,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.4714720249176,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 126.47342705726624,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-10"
+    },
+    {
+      "elapsed" : 127.4918919801712,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.50481498241425,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.50655806064606,
+      "event" : "explicit-enable",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.50811505317688,
+      "event" : "fixture-signal",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.51225399971008,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.51374101638794,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 127.51516902446747,
+      "event" : "show-without-activation",
+      "expression" : "responding",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 128.5803200006485,
+      "event" : "explicit-tuck",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "lifetime-11"
+    },
+    {
+      "elapsed" : 128.59234702587128,
+      "event" : "phase",
+      "expression" : "responding",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "all-pet-owners-released"
+    },
+    {
+      "applicationWindows" : [
+        52005,
+        52006,
+        4294967296,
+        8589934592,
+        12884901888,
+        52011,
+        52024
+      ],
+      "currentEventWindow" : 52024,
+      "event" : "after-owning-task-release-before-native-event",
+      "survivors" : [
+        "panel"
+      ]
+    },
+    {
+      "currentEventWindow" : 52005,
+      "event" : "after-native-event-turn",
+      "survivors" : [
+
+      ]
+    }
+  ],
+  "mode" : "Passive",
+  "panelLevel" : null,
+  "petFrame" : null,
+  "phase" : "all-pet-owners-released",
+  "pid" : 56026,
+  "placement" : "C · Offset on notch",
+  "screens" : [
+    {
+      "builtIn" : true,
+      "cameraGap" : 179,
+      "frame" : {
+        "height" : 956,
+        "width" : 1470,
+        "x" : 0,
+        "y" : 0
+      },
+      "id" : "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+      "quickAccess" : {
+        "height" : 246,
+        "width" : 420,
+        "x" : 525,
+        "y" : 710
+      },
+      "safeTop" : 32,
+      "scale" : 2,
+      "visible" : {
+        "height" : 923,
+        "width" : 1470,
+        "x" : 0,
+        "y" : 0
+      }
+    },
+    {
+      "builtIn" : false,
+      "cameraGap" : null,
+      "frame" : {
+        "height" : 1080,
+        "width" : 1920,
+        "x" : -714,
+        "y" : 956
+      },
+      "id" : "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+      "quickAccess" : null,
+      "safeTop" : 0,
+      "scale" : 1,
+      "visible" : {
+        "height" : 1050,
+        "width" : 1920,
+        "x" : -714,
+        "y" : 956
+      }
+    }
+  ],
+  "style" : "classic",
+  "summaries" : [
+    {
+      "CPUPercent" : 0.45313597773475195,
+      "footprint" : 30163760,
+      "peakFootprint" : 30343984,
+      "phase" : "hidden-host-baseline",
+      "RSS" : 97517568
+    },
+    {
+      "CPUPercent" : 0.24795360934411845,
+      "footprint" : 25314096,
+      "peakFootprint" : 30343984,
+      "phase" : "visible-static",
+      "RSS" : 92700672
+    },
+    {
+      "CPUPercent" : 0.24597371355018208,
+      "footprint" : 25264944,
+      "peakFootprint" : 30343984,
+      "phase" : "visible-idle-including-blink",
+      "RSS" : 92651520
+    },
+    {
+      "CPUPercent" : 0.10430779077948785,
+      "footprint" : 25346864,
+      "peakFootprint" : 30343984,
+      "phase" : "working-finite",
+      "RSS" : 92749824
+    },
+    {
+      "CPUPercent" : 1.8255685092927119,
+      "footprint" : 25379632,
+      "peakFootprint" : 30343984,
+      "phase" : "rendered-responding",
+      "RSS" : 92782592
+    },
+    {
+      "CPUPercent" : 1.6993231032704719,
+      "footprint" : 25396016,
+      "peakFootprint" : 30343984,
+      "phase" : "classic-responding",
+      "RSS" : 92798976
+    },
+    {
+      "CPUPercent" : 0.077618447527916828,
+      "footprint" : 25445168,
+      "peakFootprint" : 30343984,
+      "phase" : "animation-disabled",
+      "RSS" : 92848128
+    },
+    {
+      "CPUPercent" : 0.088816337050736993,
+      "footprint" : 25412400,
+      "peakFootprint" : 30343984,
+      "phase" : "reduced-motion",
+      "RSS" : 92815360
+    },
+    {
+      "CPUPercent" : 0.56697691744966139,
+      "footprint" : 25281328,
+      "peakFootprint" : 30343984,
+      "phase" : "tucked-away",
+      "RSS" : 92684288
+    },
+    {
+      "CPUPercent" : 2.923952907763363,
+      "footprint" : 25838384,
+      "peakFootprint" : 30343984,
+      "phase" : "pet-and-inchat",
+      "RSS" : 93306880
+    },
+    {
+      "CPUPercent" : 1.6503008629529365,
+      "footprint" : 25641776,
+      "peakFootprint" : 30343984,
+      "phase" : "inactive-pet",
+      "RSS" : 93110272
+    },
+    {
+      "CPUPercent" : 0.11114060632722365,
+      "footprint" : 25756464,
+      "peakFootprint" : 30343984,
+      "phase" : "all-pet-owners-released",
+      "RSS" : 93241344
+    }
+  ]
+}

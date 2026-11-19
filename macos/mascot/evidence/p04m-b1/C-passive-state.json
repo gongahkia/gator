@@ -1,0 +1,96 @@
+{
+  "assertions" : 0,
+  "desktopEnabled" : false,
+  "done" : true,
+  "elapsed" : 0.62336397171020508,
+  "events" : [
+    {
+      "elapsed" : 0.13050699234008789,
+      "event" : "show-without-activation",
+      "expression" : "neutral",
+      "frontUnchanged" : true,
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "interactive"
+    },
+    {
+      "elapsed" : 0.17616796493530273,
+      "event" : "fixture-signal",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : true,
+      "petKey" : false,
+      "petVisible" : true,
+      "phase" : "interactive"
+    },
+    {
+      "elapsed" : 0.43219900131225586,
+      "event" : "explicit-tuck",
+      "expression" : "neutral",
+      "labActive" : false,
+      "petEnabled" : false,
+      "petKey" : false,
+      "petVisible" : false,
+      "phase" : "interactive"
+    }
+  ],
+  "mode" : "Passive",
+  "panelLevel" : null,
+  "petFrame" : null,
+  "phase" : "interactive",
+  "pid" : 54123,
+  "placement" : "C · Offset on notch",
+  "screens" : [
+    {
+      "builtIn" : true,
+      "cameraGap" : 179,
+      "frame" : {
+        "height" : 956,
+        "width" : 1470,
+        "x" : 0,
+        "y" : 0
+      },
+      "id" : "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+      "quickAccess" : {
+        "height" : 246,
+        "width" : 420,
+        "x" : 525,
+        "y" : 710
+      },
+      "safeTop" : 32,
+      "scale" : 2,
+      "visible" : {
+        "height" : 923,
+        "width" : 1470,
+        "x" : 0,
+        "y" : 0
+      }
+    },
+    {
+      "builtIn" : false,
+      "cameraGap" : null,
+      "frame" : {
+        "height" : 1080,
+        "width" : 1920,
+        "x" : -714,
+        "y" : 956
+      },
+      "id" : "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+      "quickAccess" : null,
+      "safeTop" : 0,
+      "scale" : 1,
+      "visible" : {
+        "height" : 1050,
+        "width" : 1920,
+        "x" : -714,
+        "y" : 956
+      }
+    }
+  ],
+  "style" : "classic",
+  "summaries" : [
+
+  ]
+}

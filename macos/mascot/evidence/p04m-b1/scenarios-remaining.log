@@ -1,0 +1,29 @@
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=54117 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=47247 target=47247 window=peer focused=AXTextField::peer.input
+allowedPIDs=[54116, 47247] windows=[51530, 50334, 51528] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+allowedPIDs=[54116, 47247] windows=[50334, 51528] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=54125 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=47247 target=47247 window=peer focused=AXTextField::peer.input
+allowedPIDs=[54123, 47247] windows=[51542, 50334, 51540] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+allowedPIDs=[54123, 47247] windows=[50334, 51540] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=54137 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=47247 target=47247 window=peer focused=AXTextField::peer.input
+allowedPIDs=[54133, 47247] windows=[51553, 50334, 51551] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+probe refused: Error Domain=RefuseWrongFocusOrFixture Code=1 "(null)"
+Traceback (most recent call last):
+  File "/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/scenarios.py", line 27, in <module>
+    subprocess.run(["/tmp/gator-pet-pointer",str(p.pid),str(peer),"0.5","0.5","drag"],check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 692, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/tmp/gator-pet-pointer', '54133', '47247', '0.5', '0.5', 'drag']' returned non-zero exit status 1.

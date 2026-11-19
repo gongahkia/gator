@@ -1,0 +1,16 @@
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=53955 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=47247 target=47247 window=peer focused=AXTextField::peer.input
+panel=(699.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(735.0, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(699.0, 258.0, 72.0, 72.0)
+allowedPIDs=[53948, 47247] windows=[51497, 50334, 51495] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+started
+finished
+capture failed: Error Domain=RefusePrivateMenuCapture Code=1 "(null)"
+Traceback (most recent call last):
+  File "/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/scenarios.py", line 24, in <module>
+    subprocess.run([capture,str(root/(key+".png")),str(p.pid),str(peer),"--menu"],check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 692, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/tmp/gator-pet-capture', 'macos/mascot/evidence/p04m-b1/B-passive.png', '53948', '47247', '--menu']' returned non-zero exit status 1.

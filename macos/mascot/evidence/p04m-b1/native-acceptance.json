@@ -1,0 +1,599 @@
+{
+  "root": "/tmp/gator-pet-b1-native-n94fjjqj",
+  "results": [
+    {
+      "passiveClick": true,
+      "peerClicks": 1
+    },
+    {
+      "phase": "B-passive",
+      "exit": 0,
+      "state": {
+        "assertions": 0,
+        "desktopEnabled": false,
+        "done": true,
+        "elapsed": 22.05622696876526,
+        "events": [
+          {
+            "elapsed": 0.1446390151977539,
+            "event": "show-without-activation",
+            "expression": "neutral",
+            "frontUnchanged": true,
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.22232401371002197,
+            "event": "fixture-signal",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 3.4170589447021484,
+            "event": "fixture-signal",
+            "expression": "working",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 5.424754023551941,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 6.431818962097168,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 7.495213031768799,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 8.51590895652771,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 9.55414593219757,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 10.619773030281067,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 11.671085953712463,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 12.672026991844177,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 13.736786007881165,
+            "event": "fixture-signal",
+            "expression": "responding",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 14.788273930549622,
+            "event": "fixture-signal",
+            "expression": "completed",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 16.897645950317383,
+            "event": "fixture-signal",
+            "expression": "attention",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 18.974885940551758,
+            "event": "fixture-signal",
+            "expression": "disconnected",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 20.962873935699463,
+            "event": "space-changed",
+            "expression": "disconnected",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 21.742164969444275,
+            "event": "space-changed",
+            "expression": "disconnected",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 21.842013001441956,
+            "event": "explicit-tuck",
+            "expression": "disconnected",
+            "labActive": false,
+            "petEnabled": false,
+            "petKey": false,
+            "petVisible": false,
+            "phase": "interactive"
+          }
+        ],
+        "mode": "Passive",
+        "panelLevel": null,
+        "petFrame": null,
+        "phase": "interactive",
+        "pid": 55540,
+        "placement": "B \u00b7 Clear quick access",
+        "screens": [
+          {
+            "builtIn": true,
+            "cameraGap": 179,
+            "frame": {
+              "height": 956,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            },
+            "id": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+            "quickAccess": {
+              "height": 246,
+              "width": 420,
+              "x": 525,
+              "y": 710
+            },
+            "safeTop": 32,
+            "scale": 2,
+            "visible": {
+              "height": 923,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "builtIn": false,
+            "cameraGap": null,
+            "frame": {
+              "height": 1080,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            },
+            "id": "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+            "quickAccess": null,
+            "safeTop": 0,
+            "scale": 1,
+            "visible": {
+              "height": 1050,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            }
+          }
+        ],
+        "style": "rendered",
+        "summaries": []
+      }
+    },
+    {
+      "phase": "A-passive",
+      "exit": 0,
+      "state": {
+        "assertions": 0,
+        "desktopEnabled": false,
+        "done": true,
+        "elapsed": 0.6354570388793945,
+        "events": [
+          {
+            "elapsed": 0.12802696228027344,
+            "event": "show-without-activation",
+            "expression": "neutral",
+            "frontUnchanged": true,
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.41891801357269287,
+            "event": "explicit-tuck",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": false,
+            "petKey": false,
+            "petVisible": false,
+            "phase": "interactive"
+          }
+        ],
+        "mode": "Passive",
+        "panelLevel": null,
+        "petFrame": null,
+        "phase": "interactive",
+        "pid": 55730,
+        "placement": "A \u00b7 Below menu bar",
+        "screens": [
+          {
+            "builtIn": true,
+            "cameraGap": 179,
+            "frame": {
+              "height": 956,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            },
+            "id": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+            "quickAccess": {
+              "height": 246,
+              "width": 420,
+              "x": 525,
+              "y": 710
+            },
+            "safeTop": 32,
+            "scale": 2,
+            "visible": {
+              "height": 923,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "builtIn": false,
+            "cameraGap": null,
+            "frame": {
+              "height": 1080,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            },
+            "id": "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+            "quickAccess": null,
+            "safeTop": 0,
+            "scale": 1,
+            "visible": {
+              "height": 1050,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            }
+          }
+        ],
+        "style": "rendered",
+        "summaries": []
+      }
+    },
+    {
+      "phase": "C-passive",
+      "exit": 0,
+      "state": {
+        "assertions": 0,
+        "desktopEnabled": false,
+        "done": true,
+        "elapsed": 0.6310139894485474,
+        "events": [
+          {
+            "elapsed": 0.11974704265594482,
+            "event": "show-without-activation",
+            "expression": "neutral",
+            "frontUnchanged": true,
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.41509199142456055,
+            "event": "explicit-tuck",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": false,
+            "petKey": false,
+            "petVisible": false,
+            "phase": "interactive"
+          }
+        ],
+        "mode": "Passive",
+        "panelLevel": null,
+        "petFrame": null,
+        "phase": "interactive",
+        "pid": 55737,
+        "placement": "C \u00b7 Offset on notch",
+        "screens": [
+          {
+            "builtIn": true,
+            "cameraGap": 179,
+            "frame": {
+              "height": 956,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            },
+            "id": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+            "quickAccess": {
+              "height": 246,
+              "width": 420,
+              "x": 525,
+              "y": 710
+            },
+            "safeTop": 32,
+            "scale": 2,
+            "visible": {
+              "height": 923,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "builtIn": false,
+            "cameraGap": null,
+            "frame": {
+              "height": 1080,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            },
+            "id": "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+            "quickAccess": null,
+            "safeTop": 0,
+            "scale": 1,
+            "visible": {
+              "height": 1050,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            }
+          }
+        ],
+        "style": "classic",
+        "summaries": []
+      }
+    },
+    {
+      "dragBefore": {
+        "height": 72,
+        "width": 72,
+        "x": 699,
+        "y": 626
+      },
+      "dragAfter": {
+        "height": 72,
+        "width": 72,
+        "x": 705,
+        "y": 626
+      },
+      "dragEvents": [
+        {
+          "elapsed": 0.29424500465393066,
+          "event": "drag-without-activation",
+          "expression": "neutral",
+          "labActive": false,
+          "petEnabled": true,
+          "petKey": false,
+          "petVisible": true,
+          "phase": "interactive"
+        }
+      ]
+    },
+    {
+      "interactiveClick": true
+    },
+    {
+      "outsidePointerPosted": true
+    },
+    {
+      "phase": "B-interactive",
+      "exit": 0,
+      "state": {
+        "assertions": 0,
+        "desktopEnabled": false,
+        "done": true,
+        "elapsed": 0.9900120496749878,
+        "events": [
+          {
+            "elapsed": 0.11964404582977295,
+            "event": "show-without-activation",
+            "expression": "neutral",
+            "frontUnchanged": true,
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.29424500465393066,
+            "event": "drag-without-activation",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.591609001159668,
+            "event": "intentional-click-open-fixture",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": true,
+            "petKey": false,
+            "petVisible": true,
+            "phase": "interactive"
+          },
+          {
+            "elapsed": 0.7746710777282715,
+            "event": "explicit-tuck",
+            "expression": "neutral",
+            "labActive": false,
+            "petEnabled": false,
+            "petKey": false,
+            "petVisible": false,
+            "phase": "interactive"
+          }
+        ],
+        "mode": "Interactive",
+        "panelLevel": null,
+        "petFrame": null,
+        "phase": "interactive",
+        "pid": 55749,
+        "placement": "B \u00b7 Clear quick access",
+        "screens": [
+          {
+            "builtIn": true,
+            "cameraGap": 179,
+            "frame": {
+              "height": 956,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            },
+            "id": "37D8832A-2D66-02CA-B9F7-8F30A301B230",
+            "quickAccess": {
+              "height": 246,
+              "width": 420,
+              "x": 525,
+              "y": 710
+            },
+            "safeTop": 32,
+            "scale": 2,
+            "visible": {
+              "height": 923,
+              "width": 1470,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "builtIn": false,
+            "cameraGap": null,
+            "frame": {
+              "height": 1080,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            },
+            "id": "D740F3A3-1ADA-4479-85E1-A2BBAC64DDE0",
+            "quickAccess": null,
+            "safeTop": 0,
+            "scale": 1,
+            "visible": {
+              "height": 1050,
+              "width": 1920,
+              "x": -714,
+              "y": 956
+            }
+          }
+        ],
+        "style": "classic",
+        "summaries": []
+      }
+    }
+  ],
+  "processes": [
+    {
+      "pid": 55537,
+      "exit": null
+    },
+    {
+      "pid": 55540,
+      "exit": 0
+    },
+    {
+      "pid": 55546,
+      "exit": 0
+    },
+    {
+      "pid": 55730,
+      "exit": 0
+    },
+    {
+      "pid": 55737,
+      "exit": 0
+    },
+    {
+      "pid": 55749,
+      "exit": 0
+    }
+  ]
+}

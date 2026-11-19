@@ -1,0 +1,7 @@
+/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/Lab.swift:17:55: error: cannot convert value of type 'NSEvent.EventSubtype' to expected argument type 'Int16'
+ 15 |     override func sendEvent(_ event:NSEvent){
+ 16 |         super.sendEvent(event)
+ 17 |         if event.type == .applicationDefined && event.subtype == 177 {
+    |                                                       `- error: cannot convert value of type 'NSEvent.EventSubtype' to expected argument type 'Int16'
+ 18 |             let callback=nativeEventCompleted;nativeEventCompleted=nil
+ 19 |             DispatchQueue.main.async{callback?()}

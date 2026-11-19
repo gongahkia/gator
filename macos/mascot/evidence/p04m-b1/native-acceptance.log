@@ -1,0 +1,29 @@
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55247 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55238 target=55238 window=peer focused=AXTextField::peer.input
+own=55249 front=55238 post=true targetBundles=dev.gator.pet.b1.lab,dev.gator.pet.focus-fixture
+panel=(699.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(735.0, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(699.0, 258.0, 72.0, 72.0)
+SWIFT TASK CONTINUATION MISUSE: _createCheckedThrowingContinuation(_:) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.
+Traceback (most recent call last):
+  File "/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/acceptance.py", line 32, in <module>
+    run(capture,evidence/'top-center-B-final.png',p.pid,peer.pid)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/gongahkia/Desktop/coding/projects/gator/macos/mascot/desktop-pet-lab/tools/acceptance.py", line 16, in run
+    def run(*args):return subprocess.run(list(map(str,args)),check=True)
+                          ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 671, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1387, in communicate
+    self.wait()
+    ~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 1445, in wait
+    return self._wait(timeout=timeout)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 2357, in _wait
+    (pid, sts) = self._try_wait(0)
+                 ~~~~~~~~~~~~~~^^^
+  File "/opt/homebrew/Cellar/python@3.15/3.15.0_1/Frameworks/Python.framework/Versions/3.15/lib/python3.15/subprocess.py", line 2208, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+                 ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

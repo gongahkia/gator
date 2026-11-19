@@ -1,0 +1,16 @@
+{
+  "UTC": "2026-11-19T07:52:35.155386+00:00",
+  "HEAD": "b5991b5ac729945d783f69d5b28d433de39491f8",
+  "sources": {
+    "macos/mascot/desktop-pet-lab/Geometry.swift": "6986ce35454fb737dfc0f533649c7b2d4e326797a4ad4839a639d84dcc0f1892",
+    "macos/mascot/desktop-pet-lab/CheckLogic.swift": "9f9e68662139c93fbe2293ec9345781f58c1dced1be0b3e5a834e95ec6936345",
+    "macos/mascot/desktop-pet-lab/Panel.swift": "f4044f9553831987eb1b182ea1f82067b93a4e99d833d527d25aa4f0a4f91265",
+    "macos/mascot/desktop-pet-lab/Lab.swift": "f6b910023c6c1d083d1acc7bb1608dd6785976be889dc42e9287a2a515baf67e",
+    "macos/mascot/desktop-pet-lab/Screens.swift": "db9861131de6b68948e652dd588559784ae9a681136ba66860c686df4899e31d",
+    "macos/mascot/desktop-pet-lab/FocusFixture.swift": "13b1e01df36385ea90af3ec4dae6db040a61b5dbbbfd026c77a23099d2629630",
+    "macos/mascot/desktop-pet-lab/build.sh": "c56be4e97358c348931a736fec136440721262eb052b4f7dbb911520db571fc1",
+    "macos/Sources/GatorMac/NativeMascotModel.swift": "39c06e215aeb7d03860e52f4af31e75cbd324d834032430fc5a821929a03b4ee",
+    "macos/Sources/GatorMac/NativeMascotPlayback.swift": "22f1660e66f5418830971132c6d0a8168445632a4e945e50653a0fc0964743ea"
+  },
+  "binarySHA256": "ffa411d92219011cf4b9753e158addbe001145555939755ddc5cce54b96fb1bf"
+}

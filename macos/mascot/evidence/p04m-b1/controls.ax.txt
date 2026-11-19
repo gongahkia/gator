@@ -1,0 +1,27 @@
+AXWindow | Gator Desktop Pet Lab |  |  | controls
+ AXStaticText |  |  | ISOLATED PROTOTYPE · fixture signals only · no Go process or execution authority | 
+ AXCheckBox | Show Desktop Pet |  |  | lab.desktop
+ AXCheckBox | Show in-chat fixture |  |  | lab.inchat
+ AXCheckBox | Animate |  |  | lab.animate
+ AXButton | Tuck Away |  |  | 
+ AXPopUpButton |  |  | 3D-rendered | lab.style
+ AXPopUpButton |  |  | Passive | lab.mode
+ AXPopUpButton |  |  | B · Clear quick access | lab.placement
+ AXStaticText |  |  | Fixed display: | 
+ AXPopUpButton |  |  | 1: Built-in · 1470×956 | lab.display
+ AXCheckBox | Simulate Reduce Motion |  |  | lab.reduce
+ AXCheckBox | Simulate sleeping display |  |  | lab.sleep
+ AXButton | Idle |  |  | 
+ AXButton | Working |  |  | 
+ AXButton | Responding |  |  | 
+ AXButton | Completed |  |  | 
+ AXButton | Attention |  |  | 
+ AXButton | Disconnected |  |  | 
+ AXButton | Other owner |  |  | 
+ AXTextField |  |  |  | lab.input
+ AXStaticText |  |  | Passive passes all pointer events through. Interactive uses the entire 72×72 pt panel; click opens this fixture, drag does not activate it. Menu-bar Tuck Away remains available. Desktop preference is memory-only and defa | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator Desktop Pet Lab | 

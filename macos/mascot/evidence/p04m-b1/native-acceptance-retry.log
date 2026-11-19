@@ -1,0 +1,55 @@
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55543 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.input
+own=55545 front=55537 post=true targetBundles=dev.gator.pet.b1.lab,dev.gator.pet.focus-fixture
+panel=(699.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(735.0, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(699.0, 258.0, 72.0, 72.0)
+allowedPIDs=[55540, 55537] windows=[51871, 51857, 51869] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+controller=55722 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+press=0
+allowedPIDs=[55540, 55537] windows=[51871, 51857] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+press=0
+allowedPIDs=[55540, 55537] windows=[51857, 51869] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55731 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+allowedPIDs=[55730, 55537] windows=[51962, 51857, 51960] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+allowedPIDs=[55730, 55537] windows=[51857, 51960] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55738 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+allowedPIDs=[55737, 55537] windows=[51973, 51857, 51971] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+allowedPIDs=[55737, 55537] windows=[51857, 51971] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55750 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+own=55755 front=55537 post=true targetBundles=dev.gator.pet.b1.lab,dev.gator.pet.focus-fixture
+panel=(699.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(735.0, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(699.0, 258.0, 72.0, 72.0)
+allowedPIDs=[55749, 55537] windows=[51984, 51857, 51982] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55760 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+own=55761 front=55537 post=true targetBundles=dev.gator.pet.b1.lab,dev.gator.pet.focus-fixture
+panel=(705.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(741.0, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(705.0, 258.0, 72.0, 72.0)
+controller=55762 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55749 window=controls focused=AXWindow::controls
+activated=Optional(true) raised=0 main=0 focus=0 ready=true
+controller=55763 frontName=Inert Focus Fixture frontBundle=dev.gator.pet.focus-fixture front=55537 target=55537 window=peer focused=AXTextField::peer.secure
+own=55764 front=55537 post=true targetBundles=dev.gator.pet.b1.lab,dev.gator.pet.focus-fixture
+panel=(705.0, 258.0, 72.0, 72.0) peer=(495.0, 102.0, 480.0, 372.0) point=(700.68, 294.0)
+posted only within owned fixture; maximum pet hit rectangle=(705.0, 258.0, 72.0, 72.0)
+press=0
+allowedPIDs=[55749, 55537] windows=[51857, 51982] display=1 dimensions=1470x956 menuBar=false unrelatedWindows=false audio=false
+saved
+press=0
