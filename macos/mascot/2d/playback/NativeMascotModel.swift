@@ -55,7 +55,7 @@ struct NativeMascotStateMachine {
         if !sameOwner { expression = .neutral; revision = 0 }
         if !next.connected { expression = .disconnected }
         else if next.attention { expression = .attention }
-        else if sameOwner, next.working, next.publicTextRevision > (old?.publicTextRevision ?? 0) {
+        else if sameOwner, next.working, next.publicTextRevision > 0, next.publicTextRevision != old?.publicTextRevision {
             expression = .responding; revision += 1
         } else if next.working {
             // returning from a text pulse without more text must not loop its animation

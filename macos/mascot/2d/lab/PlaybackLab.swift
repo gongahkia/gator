@@ -16,6 +16,8 @@ import Darwin
     var samples: FileHandle!
     var task: Task<Void, Never>?
     var starts = 0
+    private var retired: [WeakCanvas] = []
+    private var animatedStyles: Set<String> = []
     var output: URL!
     var assets: URL!
     var phase = "starting"
@@ -41,8 +43,12 @@ import Darwin
             window.contentView = stack; window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
             task = Task { [weak self] in
                 guard let self else { return }
-                do { try await run(); try write(done: true) } catch { results.append(["error":String(describing:error)]); try? write(done: true) }
-                canvas?.detach(); second?.detach(); try? samples.close(); NSApp.terminate(nil)
+                do { try await run() } catch { results.append(["error":String(describing:error)]) }
+                canvas?.detach(); second?.detach(); canvas = nil; second = nil
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }; task = nil
+                    RunLoop.main.perform { [weak self] in MainActor.assumeIsolated { self?.finish() } }
+                }
             }
         } catch { print(error); NSApp.terminate(nil) }
     }
@@ -57,6 +63,7 @@ import Darwin
         var row = try metric(); row["cacheBytes"] = await canvas?.player.store.bytes ?? 0; row["activeFrameBytes"] = canvas?.player.activeFrameBytes ?? 0
         row["animationStarts"] = (canvas?.player.animationStarts ?? 0) + (second?.player.animationStarts ?? 0)
         row["activeAnimations"] = canvas?.player.layer.animationKeys()?.count ?? 0
+        row["retiredViewsAlive"] = retired.filter { $0.value != nil }.count
         var data = try JSONSerialization.data(withJSONObject: row); data.append(10); try samples.write(contentsOf:data); return row
     }
     func phase(_ name: String, seconds: Int, active: NativeMascotStyle? = nil) async throws {
@@ -77,7 +84,11 @@ import Darwin
         let began = Date()
         canvas?.request = NativeMascotRequest(owner:"fixture",style:style,expression:expression,revision:revision,animate:animate)
         await canvas?.player.settled()
-        results.append(["loadMilliseconds":Date().timeIntervalSince(began)*1000,"style":style.rawValue,"expression":expression.rawValue])
+        if animate, expression != .neutral, canvas?.player.current?.visible == true {
+            guard canvas?.player.layer.animation(forKey:"gator.expression") is CAKeyframeAnimation else { throw NSError(domain:"MissingLiveAnimation",code:1) }
+            animatedStyles.insert(style.rawValue); assertions += 1
+        }
+        results.append(["loadMilliseconds":Date().timeIntervalSince(began)*1000,"style":style.rawValue,"expression":expression.rawValue,"activeFrameBytes":canvas?.player.activeFrameBytes ?? 0])
     }
     func run() async throws {
         try await phase("host-baseline",seconds:12)
@@ -102,12 +113,20 @@ import Darwin
             try await phase("hidden-\(cycle)",seconds:3)
             guard canvas?.player.layer.animationKeys() == nil, await canvas?.player.store.bytes == 0 else { throw CocoaError(.validationMissingMandatoryProperty) }
             assertions += 1
-            let retired = WeakCanvas(canvas)
+            retired.append(WeakCanvas(canvas)); if let second { retired.append(WeakCanvas(second)) }
             canvas?.detach(); canvas?.removeFromSuperview(); canvas = nil; second?.detach(); second?.removeFromSuperview(); second = nil
-            guard retired.value == nil else { throw CocoaError(.validationMissingMandatoryProperty) }; assertions += 1
             window.makeKeyAndOrderFront(nil)
         }
         window.orderOut(nil); try await phase("all-released",seconds:15)
+    }
+    func finish() {
+        let alive = retired.filter { $0.value != nil }.count
+        if alive > 0 { results.append(["error":"Retired native views remain after owning task/run-loop teardown", "count":alive]) }
+        else { assertions += 1 }
+        if animatedStyles.count != 2 { results.append(["error":"Both styles need observed animations in an actual layer context", "observed":Array(animatedStyles)]) }
+        else { assertions += 1 }
+        results.append(["retiredViewsAliveAfterTask":alive,"owningTaskReleased":task == nil])
+        try? write(done:true); try? samples.close(); NSApp.terminate(nil)
     }
     func write(done: Bool = false) throws {
         try JSONSerialization.data(withJSONObject:["pid":ProcessInfo.processInfo.processIdentifier,"phase":phase,"done":done,"elapsed":Date().timeIntervalSince(start),"assertions":assertions,"results":results],options:[.prettyPrinted,.sortedKeys]).write(to:output.appendingPathComponent("results.json"),options:.atomic)

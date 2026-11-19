@@ -1,0 +1,1 @@
+Swift/ErrorType.swift:254: Fatal error: Error raised at top level: Error Domain=PlaybackCheck Code=44 "native finite keyframes: starts=1 bytes=1806336 keys=nil" UserInfo={NSLocalizedDescription=native finite keyframes: starts=1 bytes=1806336 keys=nil}

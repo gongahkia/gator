@@ -67,6 +67,7 @@ actor NativeMascotFrameStore {
     private var blinkTask: Task<Void, Never>?
     private var completion: MascotAnimationCompletion?
     private var lastGesture: ContinuousClock.Instant?
+    private var responseSeen = ""
     private let now: () -> ContinuousClock.Instant
     private let blinkDelay: Duration
     init(root: URL, blinkDelay: Duration = .seconds(11), now: @escaping () -> ContinuousClock.Instant = { .now }) {
@@ -75,9 +76,19 @@ actor NativeMascotFrameStore {
         layer.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull()]
     }
     deinit { task?.cancel(); blinkTask?.cancel() }
+    static func keyframes(_ frames: NativeMascotFrames) -> CAKeyframeAnimation {
+        let animation = CAKeyframeAnimation(keyPath: "contents")
+        animation.values = frames.images; animation.duration = frames.duration; animation.calculationMode = .discrete
+        animation.keyTimes = frames.images.indices.map { NSNumber(value: Double($0) / Double(frames.images.count - 1)) }
+        animation.isRemovedOnCompletion = true
+        return animation
+    }
     func configure(_ request: NativeMascotRequest) {
         guard current != request else { return }
         let old = current; current = request
+        if request.expression == .responding && (old == nil || !request.visible || !request.shown) {
+            responseSeen = request.owner + "/" + String(request.revision)
+        }
         if request.expression == .responding, old?.expression == .responding, old?.owner == request.owner, old?.style == request.style,
            old?.shown == request.shown, old?.visible == request.visible, old?.motionAllowed == request.motionAllowed,
            let lastGesture, lastGesture.duration(to: now()) < .milliseconds(650) { return }
@@ -92,7 +103,9 @@ actor NativeMascotFrameStore {
             layer.contents = nil; displayedStyle = nil
             task = Task { [store] in await store.clear(ticket: epoch) }; return
         }
-        let animate = request.motionAllowed && name != "neutral"
+        let responseKey = request.owner + "/" + String(request.revision)
+        let animate = request.motionAllowed && name != "neutral" && (name != "responding" || responseSeen != responseKey)
+        if name == "responding" { responseSeen = responseKey }
         if animate { lastGesture = now() }
         task = Task { [weak self, store] in
             do {
@@ -104,10 +117,7 @@ actor NativeMascotFrameStore {
                 guard let self, ticket == epoch, let final = frames.images.last else { return }
                 layer.contents = final; displayedStyle = request.style
                 if animate && frames.images.count > 1 {
-                    let animation = CAKeyframeAnimation(keyPath: "contents")
-                    animation.values = frames.images; animation.duration = frames.duration; animation.calculationMode = .discrete
-                    animation.keyTimes = frames.images.indices.map { NSNumber(value: Double($0) / Double(frames.images.count - 1)) }
-                    animation.isRemovedOnCompletion = true
+                    let animation = Self.keyframes(frames)
                     let callback = MascotAnimationCompletion(player: self, ticket: epoch); animation.delegate = callback; completion = callback
                     activeFrameBytes = frames.bytes; animationStarts += 1; layer.add(animation, forKey: "gator.expression")
                 } else {
