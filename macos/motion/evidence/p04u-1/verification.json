@@ -108,5 +108,25 @@
     "seconds": 7.249884415999986,
     "exit": 0,
     "note": "Only test-owned weak probes explicitly cleared after their unchanged assertions; production source and bundle unchanged."
+  },
+  {
+    "name": "swift-full-final-strict",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors"
+    ],
+    "startedUTC": "2026-11-20T08:27:30.250454+00:00",
+    "seconds": 146.4095792080043,
+    "exit": 0,
+    "note": "Complete final test sources after weak-probe cleanup, strict Swift 6 with warnings as errors."
   }
 ]

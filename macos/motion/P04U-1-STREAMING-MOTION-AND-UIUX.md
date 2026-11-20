@@ -25,6 +25,23 @@ Read the P04E-1, R, R2 reports and their open conditions; Tranche08 and native U
 
 Assessment of remaining surfaces: retained prose/code/list selection remains on the native block renderer; composer input, IME and keyboard shortcuts are unchanged; emoji/GIF and desktop presence retain their preferences/assets; task/plan/recovery/exact reviews retain their literal evidence and controls; model/workspace/catalog controls retain existing ownership and flows; notch, menus and window sizing remain unchanged. Their physical interaction, minimum-window and accessibility variants are NOT TESTED here. Pending-review layout/CPU debt remains P1 investigation; provider/runtime/queue work stays in its separate tranches. P11 remains the final whole-product audit.
 
+### Surface review and remaining P11 items
+
+| Area | Current-source assessment | Evidence / remaining acceptance |
+|---|---|---|
+| Conversation and history | Native lazy rows, block Markdown and structured details retained; active prose tail isolated from history. | Deterministic renderer/content tests and 400/780 pt component images. Long-history actual scrolling NOT TESTED. |
+| Status and welcome | Conditional welcome, exact-review waiting and single work status implemented above. | Pure projection tests; native component layout/contrast. Actual pending-review CPU remains unresolved. |
+| Selection and code | Existing native selectable content retained; full confirmed Copy Response action added. | Private pasteboard exact-byte test; code/Markdown regressions. Physical live selection NOT TESTED. |
+| Composer and focus | Existing AppKit editor, submission guards, IME path and focus requests unchanged. New pulse/probe cannot become first responder. | Existing input tests plus new nonfocusable-probe assertions. Actual typing, IME and transition focus NOT TESTED. |
+| Reading and Find | Existing context anchors, search target/reveal and explicit Jump preserved. Per-activity imperative follow removed. | Policy, old Find/reading regressions and no-anchor-write tests; actual follow behavior remains a P11/native acceptance item. |
+| Emoji/GIF and desktop | Current public-selected-owner presence, finite GIF assets, independent controls and Tuck Away preserved. | Existing presence/desktop suite; two packaged GIFs match prior accepted bundle hashes. Actual overlay/window behavior NOT TESTED. |
+| Review, task, plan and recovery | Their evidence, decision buttons, digests, tokens and presentation ownership untouched; motion suppressed for active review/inspection. | Existing exact-identity tests and real-Go negative navigation/shutdown regression. Historical approval provenance remains INVALID, not “fixed.” |
+| Model/provider, workspace and catalog | Existing menus/actions/search/rename and owner handoffs retained. Readiness guidance corrected to existing native provider setup. | Full current suite including P01–P04 integrations. Fresh native picker/setup/catalog interactions NOT TESTED. |
+| Menu bar, notch and resizing | Existing window/menu/notch ownership and size conventions retained. Compact transcript uses the same bounded presenter. | Existing geometry tests, 380/540/780 pt component sizing; minimum-window controls and physical monitor behavior NOT TESTED. |
+| Appearance/accessibility | System semantic colors/type retained; Reduce Motion disables both new effects; no per-character announcement. | Native light/dark and increased-contrast color resolution. Physical VoiceOver/IME/larger-text acceptance NOT TESTED. |
+
+No new P0 was reproduced. The existing P1 layout/guarded-Quit debt and pending-review resource uncertainty remain open. The principal new acceptance risks for P11 are live selection stability and native follow anchoring under actual input, full-app streaming cost beside a local model, and physical accessibility. These are unverified conditions, not newly proven product failures.
+
 ## Chosen reveal strategy
 
 Compared strict character reveal, word reveal and adaptive micro-batching using the same cursor and datasets. [Reproducible benchmark](lab/RevealBenchmark.swift), [results](evidence/p04u-1/reveal-strategies.json).
