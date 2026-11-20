@@ -74,8 +74,10 @@ actor NativeMascotFrameStore {
     private(set) var activeFrameBytes = 0
     private var task: Task<Void, Never>?
     private var completion: MascotAnimationCompletion?
-    init(root: URL) {
+    private let installAnimation: @MainActor (CALayer, CAKeyframeAnimation) -> Void
+    init(root: URL, installAnimation: @escaping @MainActor (CALayer, CAKeyframeAnimation) -> Void = { $0.add($1, forKey: "gator.expression") }) {
         store = NativeMascotFrameStore(root: root)
+        self.installAnimation = installAnimation
         layer.contentsGravity = .resizeAspect; layer.isOpaque = false
         layer.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull()]
     }
@@ -109,10 +111,8 @@ actor NativeMascotFrameStore {
                 guard let self, ticket == epoch else { return }
                 layer.contents = frames.images.last
                 let animation = Self.keyframes(frames)
-                // decoding crosses an actor hop; start at delivery, not an older implicit transaction.
-                animation.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil)
                 let callback = MascotAnimationCompletion(player: self, ticket: epoch); animation.delegate = callback; completion = callback
-                activeFrameBytes = frames.bytes; animationStarts += 1; layer.add(animation, forKey: "gator.expression")
+                activeFrameBytes = frames.bytes; animationStarts += 1; installAnimation(layer, animation)
             } catch {
                 guard let self, ticket == epoch else { return }
                 layer.contents = nil; activeFrameBytes = 0; await store.clear(ticket: epoch)

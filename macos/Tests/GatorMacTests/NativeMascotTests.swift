@@ -155,10 +155,15 @@ private var presenceRoot: URL {
     let frames = try await NativeMascotFrameStore(root: presenceRoot).load(name: "completed", ticket: 1)
     let animation = NativeMascotPlayer.keyframes(frames)
     #expect(animation.repeatCount == 0 && animation.values?.count == 12 && animation.keyTimes?.first == 0 && animation.keyTimes?.last == 1)
-    let player = NativeMascotPlayer(root: presenceRoot)
+    var installed: CAKeyframeAnimation?
+    let player = NativeMascotPlayer(root: presenceRoot, installAnimation: { layer, animation in
+        installed = animation; layer.add(animation, forKey: "gator.expression")
+    })
     player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
     player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1)); await player.settled()
-    #expect(player.animationStarts == 1 && player.activeFrameBytes > 0 && player.layer.animationKeys() != nil)
+    // unattached headless layers can discard their animations at transaction commit.
+    #expect(player.animationStarts == 1 && player.activeFrameBytes > 0)
+    #expect(installed?.values?.count == 12 && installed?.repeatCount == 0 && abs((installed?.duration ?? 0) - 0.72) < 0.001)
     player.stop(); await player.settled()
     #expect(player.layer.animationKeys() == nil && player.layer.contents == nil && player.activeFrameBytes == 0)
     #expect(await player.store.bytes == 0)
@@ -221,4 +226,23 @@ private var presenceRoot: URL {
     }
     let build = try String(contentsOf: root.appendingPathComponent("scripts/build-dev-app.sh"), encoding: .utf8)
     #expect(!build.contains("mascot/2d/assets") && build.contains("Resources/Presence"))
+}
+
+@Test @MainActor func presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() async {
+    for change in ["reduce", "off", "state", "hide", "animation"] {
+        let player = NativeMascotPlayer(root: presenceRoot)
+        player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
+        var request = NativeMascotRequest(owner: "A", mode: .reactions, expression: .completed, revision: 1)
+        player.configure(request); await player.settled(); #expect(player.activeFrameBytes > 0)
+        switch change {
+        case "reduce": request.reduceMotion = true
+        case "off": request.mode = .off
+        case "state": request.expression = .working
+        case "hide": request.visible = false
+        default: request.animate = false
+        }
+        player.configure(request); await player.settled()
+        #expect(player.layer.animationKeys() == nil && player.activeFrameBytes == 0 && player.layer.contents == nil)
+        #expect(await player.store.bytes == 0)
+    }
 }
