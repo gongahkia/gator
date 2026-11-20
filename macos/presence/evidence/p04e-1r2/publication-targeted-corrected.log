@@ -1,0 +1,62 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Emitting module GatorCoreTests
+[4/5] Compiling GatorCoreTests NativeSnapshotPublicationTests.swift
+[5/36] Compiling GatorCoreTests NativeCatalogTests.swift
+[6/36] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[7/36] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[8/36] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[9/36] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[10/36] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[11/36] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[12/36] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[13/36] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[14/36] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[15/36] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[16/36] Compiling GatorCoreTests NativePerformanceTests.swift
+[17/36] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[18/36] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[19/36] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[20/36] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[21/36] Compiling GatorCoreTests ManagedSessionTests.swift
+[22/36] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[23/36] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[24/36] Compiling GatorCoreTests ApplicationStateTests.swift
+[25/36] Compiling GatorCoreTests BridgeProtocolTests.swift
+[26/36] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[27/36] Compiling GatorCoreTests GoIntegrationTests.swift
+[28/36] Compiling GatorCoreTests NativeProviderTests.swift
+[29/36] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[30/36] Compiling GatorCoreTests NativeRecoveryTests.swift
+[31/36] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[32/36] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[33/36] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[34/36] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[35/36] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[35/37] Write Objects.LinkFileList
+[36/37] Linking GatorNativePackageTests
+Build complete! (7.38s)
+Test Suite 'Selected tests' started at 2026-11-20 14:17:33.300.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 14:17:33.301.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 14:17:33.301.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 14:17:33.301.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.021 seconds.
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.008 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() started.
+✔ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() passed after 0.007 seconds.
+◇ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() started.
+✔ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() passed after 0.007 seconds.
+◇ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() started.
+✔ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() passed after 2.534 seconds.
+✔ Test run with 6 tests in 0 suites passed after 2.580 seconds.

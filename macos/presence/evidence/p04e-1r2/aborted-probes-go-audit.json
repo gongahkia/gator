@@ -1,0 +1,52 @@
+[
+  {
+    "cycle": 20,
+    "commandTypes": [
+      "dialogue_host",
+      "focus_session",
+      "native_provider",
+      "native_provider",
+      "native_catalog",
+      "navigate",
+      "focus_session",
+      "exit",
+      "dialogue_host",
+      "focus_session",
+      "exit"
+    ],
+    "approvalCommands": [],
+    "interactions": [],
+    "exits": [
+      {
+        "direction": "exit",
+        "status": 0,
+        "epoch": 1795155143.080174,
+        "wrapperPID": 32863
+      },
+      {
+        "direction": "exit",
+        "status": 0,
+        "epoch": 1795155142.967409,
+        "wrapperPID": 34291
+      }
+    ]
+  },
+  {
+    "cycle": 21,
+    "commandTypes": [
+      "dialogue_host",
+      "focus_session",
+      "exit"
+    ],
+    "approvalCommands": [],
+    "interactions": [],
+    "exits": [
+      {
+        "direction": "exit",
+        "status": 0,
+        "epoch": 1795155142.314213,
+        "wrapperPID": 33710
+      }
+    ]
+  }
+]

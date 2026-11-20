@@ -1,0 +1,535 @@
+{
+  "root": "/tmp/gator-native-test-presence-r2-cadence-9rx1pb88",
+  "runtime": "/tmp/Gator-Native-P04E1R2-Diagnostic.app/Contents/Resources/gator-runtime",
+  "fixtureSetup": "explicit submit of inert Review mascot; no decision command",
+  "states": [
+    {
+      "time": 174935.374697041,
+      "changedTopLevelKeys": [
+        "commands",
+        "messages",
+        "pending_approval"
+      ],
+      "loading_frame": 0,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.413556625,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.495027958,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.576396,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.657459458,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.738287625,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.820975833,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.902660625,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174935.984149833,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174936.064654833,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174936.146086291,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174936.226735833,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174936.307171666,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "0s"
+    },
+    {
+      "time": 174936.388833666,
+      "changedTopLevelKeys": [
+        "elapsed",
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.46916575,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.550887416,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.63192725,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.712285875,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.792746208,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.874306958,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174936.955449875,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174937.036681208,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174937.117138,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174937.19803625,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174937.278806958,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "1s"
+    },
+    {
+      "time": 174937.359888666,
+      "changedTopLevelKeys": [
+        "elapsed",
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.440836875,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.521720416,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.602949708,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.684055875,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.765021958,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.846054458,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174937.926790291,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.007737416,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.089144541,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.169461125,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.250872208,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.332053125,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "2s"
+    },
+    {
+      "time": 174938.411979291,
+      "changedTopLevelKeys": [
+        "elapsed",
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.493244708,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.576126583,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.655464916,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.736540125,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.817566666,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.897800375,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174938.97913175,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174939.060480791,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174939.140929833,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174939.22204325,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174939.303547666,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "3s"
+    },
+    {
+      "time": 174939.383864666,
+      "changedTopLevelKeys": [
+        "elapsed",
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.465211791,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.546299666,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.627824083,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.708037708,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 4,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.789215541,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 5,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.870382208,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 6,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174939.951390791,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 7,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174940.03247275,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 8,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174940.113710333,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 9,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174940.195209,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 0,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174940.276347708,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 1,
+      "elapsed": "4s"
+    },
+    {
+      "time": 174940.3569885,
+      "changedTopLevelKeys": [
+        "elapsed",
+        "loading_frame"
+      ],
+      "loading_frame": 2,
+      "elapsed": "5s"
+    },
+    {
+      "time": 174940.438236875,
+      "changedTopLevelKeys": [
+        "loading_frame"
+      ],
+      "loading_frame": 3,
+      "elapsed": "5s"
+    }
+  ],
+  "changedKeyCounts": {
+    "commands": 1,
+    "messages": 1,
+    "pending_approval": 1,
+    "loading_frame": 63,
+    "elapsed": 5
+  },
+  "exit": 0,
+  "pendingDuration": 5.063539833994582
+}

@@ -1,0 +1,17 @@
+{
+  "UTC": "2026-11-20T06:39:11.627320+00:00",
+  "rows": [
+    {
+      "probe": 20,
+      "requestJournals": [],
+      "workManifests": 0,
+      "survivingRecordedAppOrProviderPIDs": []
+    },
+    {
+      "probe": 21,
+      "requestJournals": [],
+      "workManifests": 0,
+      "survivingRecordedAppOrProviderPIDs": []
+    }
+  ]
+}

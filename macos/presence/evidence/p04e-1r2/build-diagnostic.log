@@ -1,0 +1,16 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/9] Compiling GatorMac AppDelegate.swift
+[4/9] Compiling GatorMac NativeAcceptanceDiagnostics.swift
+[5/9] Emitting module GatorMac
+[6/9] Compiling GatorMac GatorApp.swift
+[7/10] Compiling GatorMac NotchQuickAccess.swift
+[7/10] Write Objects.LinkFileList
+[8/10] Linking GatorMac
+[9/10] Applying GatorMac
+Build complete! (2.31s)
+/tmp/gator-native-app.fdNFxW/Gator.app/Contents/Info.plist: OK
+Built /tmp/Gator-Native-P04E1R2-Diagnostic.app
+Launch: open '/tmp/Gator-Native-P04E1R2-Diagnostic.app'

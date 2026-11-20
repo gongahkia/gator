@@ -1,0 +1,29 @@
+{
+  "identity": {
+    "conversation": "work-20261120T053257-b72e5518f9c76e9e",
+    "interaction": 1,
+    "messageIndex": 1,
+    "tokenSHA256": "8a7c797660b4d302e65df89eda19fa73d8be2c18109f6a837039eaad828cc74c",
+    "reviewSHA256": "ab10413373c2ed76e8654cc718ffc5adf12e05398c2506d5ab9c8317d79458ec"
+  },
+  "durable": {
+    "version": 1,
+    "status": "pending",
+    "interaction": {
+      "id": 1,
+      "kind": "web_access",
+      "preview": {
+        "scope": "sites",
+        "origins": [
+          "https://mascot.example.invalid"
+        ],
+        "reason": "Local mascot layout fixture. No fetch is implemented. Do not approve.",
+        "search_provider": "unavailable: no search provider configured",
+        "max_requests": 32,
+        "max_searches": 8,
+        "lifetime": "This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes."
+      }
+    }
+  },
+  "fileSHA256": "4fe65970e8c5e4149a5752d79657f33f081ed3c0f3d8b144db71f064c65151c3"
+}

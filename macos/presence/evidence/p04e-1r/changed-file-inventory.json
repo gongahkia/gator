@@ -1,0 +1,14 @@
+{
+  "macos/presence/P04E-1R-ACCEPTANCE-CLOSURE.md": "e3f5201a73e9eadbee764356af1563810b884e6341d8fa210b80ecccc6f512f1",
+  "macos/Tests/GatorCoreTests/PresenceApprovalClosureTests.swift": "26790af296f1f7b736e5a315389e04d8741769ac6874217bc661a72c1d7a75e2",
+  "macos/presence/acceptance/fixture.py": "ad864485b0af113b370b603e20b98e3f1593a0f5506da81794a8775087cc29f7",
+  "macos/presence/acceptance/CheckCPUUnits.c": "a5a9bd7f7e14607c6bbe7a52f634e4026976109bb005c2282f2e4ceaeee37a5f",
+  "macos/presence/acceptance/RecordFixture.swift": "702164648c142a8059d725e26bc76bb9e2e27bbc32e93f83817e3a0498bdf7f8",
+  "macos/presence/acceptance/audit-history.py": "0ded15f1e55878328130c2e1c6b50d38a536e08eb48c19814595f44b0e604974",
+  "macos/presence/acceptance/Batch.py": "1d32babb7d2c95af69e89cca91d27d4ff9335105a1eb80b942c7f5007372fd1c",
+  "macos/presence/acceptance/Controller.swift": "c0829402f0214adad90afe3a100a1e8c2b53c8f8c9bc5a8022d91a9796329a9c",
+  "macos/presence/acceptance/summarize.py": "60a78d439bc7a1b192c86a703c0360c52fa3031f0d068743d30aa3c2b95bfc81",
+  "macos/presence/acceptance/sample.c": "397ac6d3610a73e319ace48d4df5df68b0039a311843fbe2e98577acf1a8b02b",
+  "macos/presence/acceptance/verify.py": "75dd15662c87c0fcbeea0ebd972fbdc19097be7dfa36aa90ddbef26e9489212b",
+  "macos/presence/acceptance/Driver.py": "8149bdea330cf0c31f7566f4761ca62569c627aa4d25a0f924b54997a67b50e6"
+}

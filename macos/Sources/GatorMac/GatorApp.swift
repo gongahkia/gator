@@ -102,6 +102,9 @@ private struct NativeConversationContent: View {
 extension AppDelegate {
     func startPresentation(_ sessions: ManagedSessionCoordinator, openWindow: @escaping () -> Void) async {
         application = sessions
+        #if DEBUG
+        if acceptanceDiagnostics == nil { acceptanceDiagnostics = NativeAcceptanceDiagnostics(sessions) }
+        #endif
         openConversationWindow = openWindow
         if quickAccess == nil { quickAccess = NotchQuickAccess(sessions: sessions, openWindow: openWindow) }
         if desktopPet == nil {

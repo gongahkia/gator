@@ -1,0 +1,44 @@
+{
+  "UTC": "2026-11-20T05:49:13.387052+00:00",
+  "checks": [
+    {
+      "cycle": 3,
+      "kind": "pid",
+      "pid": 24368,
+      "surviving": false
+    },
+    {
+      "cycle": 3,
+      "kind": "providerPID",
+      "pid": 24360,
+      "surviving": false
+    },
+    {
+      "cycle": 4,
+      "kind": "pid",
+      "pid": 24456,
+      "surviving": false
+    },
+    {
+      "cycle": 4,
+      "kind": "providerPID",
+      "pid": 24448,
+      "surviving": false
+    },
+    {
+      "cycle": 5,
+      "kind": "pid",
+      "pid": 25302,
+      "surviving": false
+    },
+    {
+      "cycle": 5,
+      "kind": "providerPID",
+      "pid": 25294,
+      "surviving": false
+    }
+  ],
+  "GoChildChecks": "native-summary.json",
+  "noForceStopCountedAsQuit": true,
+  "remainingDesktopAcceptance": "unverified by explicit user direction"
+}

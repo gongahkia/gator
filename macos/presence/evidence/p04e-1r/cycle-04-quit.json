@@ -1,0 +1,11 @@
+{
+  "exit": 0,
+  "identityBeforeQuit": {
+    "conversation": "work-20261120T041440-8f944745bcba4cc8",
+    "interaction": 1,
+    "messageIndex": 1,
+    "tokenSHA256": "b0c331132e73bec4a3f2470b6b0fb749828d16568b63614a97df21b1ad2c7f41",
+    "reviewSHA256": "ab10413373c2ed76e8654cc718ffc5adf12e05398c2506d5ab9c8317d79458ec"
+  },
+  "providerPID": 24448
+}

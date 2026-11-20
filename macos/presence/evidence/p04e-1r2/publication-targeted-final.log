@@ -1,0 +1,14 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Emitting module GatorCoreTests
+[4/5] Compiling GatorCoreTests NativeSnapshotPublicationTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorCoreTests/NativeSnapshotPublicationTests.swift:61:34: error: argument passed to call that takes no arguments
+59 |     #expect(!application.isCurrentReview(old))
+60 |     await application.respondToApproval(old, approved: true)
+61 |     #expect(await transport.sent("approval").isEmpty)
+   |                                  `- error: argument passed to call that takes no arguments
+62 |     fields["unknown_future_result"] = .object(["request_id": .string("exact-new-result")])
+63 |     application.receive(.state(BridgeSnapshot(.object(fields))), generation: application.generation)
+error: fatalError

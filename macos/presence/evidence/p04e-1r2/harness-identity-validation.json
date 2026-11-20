@@ -1,0 +1,112 @@
+{
+  "controllerPID": 45056,
+  "hostPID": 45055,
+  "headlessHost": true,
+  "GoOwners": 0,
+  "desktopInput": false,
+  "cases": [
+    {
+      "case": "startup-readiness",
+      "result": {
+        "action": "state",
+        "binarySHA256": "1a100790b6072f78d607b7f8fe4d69c2d62262417bf08e7c2f647d655eabfc45",
+        "bundle": "dev.gator.presence.r2.identity",
+        "capture": [],
+        "controllerPID": 45056,
+        "elapsed": 0.02007293701171875,
+        "executable": "/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac",
+        "focusedElement": {},
+        "focusedWindow": {},
+        "frontPID": 1649,
+        "ok": true,
+        "pid": 45055,
+        "preflightID": "38966C4F-1202-407B-9AE6-F9006585309F",
+        "started": 1795156694.3280811,
+        "window": "conversation",
+        "windows": []
+      }
+    },
+    {
+      "case": "valid",
+      "result": {
+        "action": "state",
+        "binarySHA256": "1a100790b6072f78d607b7f8fe4d69c2d62262417bf08e7c2f647d655eabfc45",
+        "bundle": "dev.gator.presence.r2.identity",
+        "capture": [],
+        "controllerPID": 45056,
+        "elapsed": 0.0022879838943481445,
+        "executable": "/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac",
+        "focusedElement": {},
+        "focusedWindow": {},
+        "frontPID": 1649,
+        "ok": true,
+        "pid": 45055,
+        "preflightID": "A793ABE0-8FE8-4A55-B414-945FEE9C7608",
+        "started": 1795156694.348691,
+        "window": "conversation",
+        "windows": []
+      }
+    },
+    {
+      "case": "wrong-bundle",
+      "result": {
+        "controllerPID": 45056,
+        "elapsed": 0.00019991397857666016,
+        "error": "refuse nonfixture: PID/bundle/executable mismatch; actualBundle=dev.gator.presence.r2.identity actualExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac expectedExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac manifest=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/wrong-bundle.json",
+        "ok": false,
+        "started": 1795156694.3511782
+      }
+    },
+    {
+      "case": "wrong-executable",
+      "result": {
+        "controllerPID": 45056,
+        "elapsed": 0.00024700164794921875,
+        "error": "refuse nonfixture: PID/bundle/executable mismatch; actualBundle=dev.gator.presence.r2.identity actualExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac expectedExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Other.app/Contents/MacOS/GatorMac manifest=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/wrong-executable.json",
+        "ok": false,
+        "started": 1795156694.3515449
+      }
+    },
+    {
+      "case": "wrong-hash",
+      "result": {
+        "controllerPID": 45056,
+        "elapsed": 0.0002340078353881836,
+        "error": "refuse nonfixture: executable digest mismatch",
+        "ok": false,
+        "started": 1795156694.351917
+      }
+    },
+    {
+      "case": "wrong-manifest-pid",
+      "result": {
+        "controllerPID": 45056,
+        "elapsed": 0.00010311603546142578,
+        "error": "refuse nonfixture: PID/bundle/executable mismatch; actualBundle=dev.gator.presence.r2.identity actualExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac expectedExecutable=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac manifest=/tmp/gator-native-test-presence-r2-identity-m08fu5w7/wrong-manifest-pid.json",
+        "ok": false,
+        "started": 1795156694.352274
+      }
+    },
+    {
+      "case": "valid-after-refusals",
+      "result": {
+        "action": "state",
+        "binarySHA256": "1a100790b6072f78d607b7f8fe4d69c2d62262417bf08e7c2f647d655eabfc45",
+        "bundle": "dev.gator.presence.r2.identity",
+        "capture": [],
+        "controllerPID": 45056,
+        "elapsed": 0.001326918601989746,
+        "executable": "/tmp/gator-native-test-presence-r2-identity-m08fu5w7/Identity.app/Contents/MacOS/GatorMac",
+        "focusedElement": {},
+        "focusedWindow": {},
+        "frontPID": 1649,
+        "ok": true,
+        "pid": 45055,
+        "preflightID": "C577FD66-F042-422D-818D-5B1F44A1C4F9",
+        "started": 1795156694.352519,
+        "window": "conversation",
+        "windows": []
+      }
+    }
+  ]
+}

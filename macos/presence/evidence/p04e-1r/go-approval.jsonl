@@ -1,0 +1,25 @@
+{"Time":"2026-11-20T13:35:34.595824+08:00","Action":"start","Package":"github.com/gongahkia/gator/internal/workapp"}
+{"Time":"2026-11-20T13:35:34.599884+08:00","Action":"start","Package":"github.com/gongahkia/gator/internal/workrun"}
+{"Time":"2026-11-20T13:35:35.300419+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workapp","Output":"testing: warning: no tests to run\n"}
+{"Time":"2026-11-20T13:35:35.300894+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workapp","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.3015+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workapp","Output":"ok  \tgithub.com/gongahkia/gator/internal/workapp\t0.701s [no tests to run]\n"}
+{"Time":"2026-11-20T13:35:35.3027+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workapp","Elapsed":0.707}
+{"Time":"2026-11-20T13:35:35.896928+08:00","Action":"run","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestReadInteractionRecordsValidatesAndScopesRetainedDecisions"}
+{"Time":"2026-11-20T13:35:35.896985+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestReadInteractionRecordsValidatesAndScopesRetainedDecisions","Output":"=== RUN   TestReadInteractionRecordsValidatesAndScopesRetainedDecisions\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.899663+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestReadInteractionRecordsValidatesAndScopesRetainedDecisions","Output":"--- PASS: TestReadInteractionRecordsValidatesAndScopesRetainedDecisions (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.899675+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestReadInteractionRecordsValidatesAndScopesRetainedDecisions","Elapsed":0}
+{"Time":"2026-11-20T13:35:35.899694+08:00","Action":"run","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestSurvivesRetainedActionPreview"}
+{"Time":"2026-11-20T13:35:35.8997+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestSurvivesRetainedActionPreview","Output":"=== RUN   TestInteractionDigestSurvivesRetainedActionPreview\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.899946+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestSurvivesRetainedActionPreview","Output":"--- PASS: TestInteractionDigestSurvivesRetainedActionPreview (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.899955+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestSurvivesRetainedActionPreview","Elapsed":0}
+{"Time":"2026-11-20T13:35:35.899961+08:00","Action":"run","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestPreservesLargeJSONNumber"}
+{"Time":"2026-11-20T13:35:35.899966+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestPreservesLargeJSONNumber","Output":"=== RUN   TestInteractionDigestPreservesLargeJSONNumber\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.901009+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestPreservesLargeJSONNumber","Output":"--- PASS: TestInteractionDigestPreservesLargeJSONNumber (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.901014+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionDigestPreservesLargeJSONNumber","Elapsed":0}
+{"Time":"2026-11-20T13:35:35.901018+08:00","Action":"run","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionRunLockReportsActiveThenStopped"}
+{"Time":"2026-11-20T13:35:35.901021+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionRunLockReportsActiveThenStopped","Output":"=== RUN   TestInteractionRunLockReportsActiveThenStopped\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.902226+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionRunLockReportsActiveThenStopped","Output":"--- PASS: TestInteractionRunLockReportsActiveThenStopped (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.902233+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workrun","Test":"TestInteractionRunLockReportsActiveThenStopped","Elapsed":0}
+{"Time":"2026-11-20T13:35:35.902369+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-11-20T13:35:35.903158+08:00","Action":"output","Package":"github.com/gongahkia/gator/internal/workrun","Output":"ok  \tgithub.com/gongahkia/gator/internal/workrun\t1.303s\n"}
+{"Time":"2026-11-20T13:35:35.906309+08:00","Action":"pass","Package":"github.com/gongahkia/gator/internal/workrun","Elapsed":1.306}

@@ -1,0 +1,93 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[2/7] Write swift-version--58304C5D6DBC2206.txt
+[4/9] Emitting module GatorCore
+[5/9] Compiling GatorCore BridgeProtocol.swift
+[6/18] Compiling GatorCore NativeTaskReview.swift
+[7/18] Compiling GatorCore NativeWorkspaceSelection.swift
+[8/18] Compiling GatorCore NativeRecovery.swift
+[9/18] Compiling GatorCore NativeCatalogProtocol.swift
+[10/18] Compiling GatorCore ManagedSessionCoordinator.swift
+[11/18] Compiling GatorCore GatorApplicationState.swift
+[12/18] Compiling GatorCore GoBridgeConnection.swift
+[13/18] Compiling GatorCore NativeProviderProtocol.swift
+[14/18] Compiling GatorCore NativePlanExecution.swift
+[15/61] Compiling GatorMac NativeMascotView.swift
+[16/62] Compiling GatorMac PlanReviewContent.swift
+[17/62] Compiling GatorMac GatorApp.swift
+[18/62] Compiling GatorMac RecoveryInspectorContent.swift
+[19/62] Emitting module GatorMac
+[20/62] Compiling GatorMac ApprovalReviewView.swift
+[21/62] Compiling GatorMac AttachmentSelectionView.swift
+[22/62] Compiling GatorMac TaskInspectorView.swift
+[23/62] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[24/62] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[25/62] Compiling GatorCoreTests NativeMessageContentTests.swift
+[26/62] Compiling GatorCoreTests NativePerformanceTests.swift
+[27/62] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[30/62] Compiling GatorMac ComposerView.swift
+[31/62] Compiling GatorMac ConversationView.swift
+[32/62] Emitting module GatorCoreTests
+[33/66] Compiling GatorMac RecentConversationsMenu.swift
+[34/66] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[35/66] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[36/66] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[37/66] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[38/66] Compiling GatorCoreTests ApplicationStateTests.swift
+[39/66] Compiling GatorCoreTests BridgeProtocolTests.swift
+[40/66] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[41/66] Compiling GatorCoreTests GoIntegrationTests.swift
+[42/66] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[43/66] Compiling GatorCoreTests ManagedSessionTests.swift
+[44/66] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[45/66] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[46/66] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[47/66] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[48/66] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[49/66] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[50/66] Compiling GatorCoreTests NativeProviderTests.swift
+[51/66] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[52/66] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[53/66] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[54/66] Compiling GatorCoreTests NativeCatalogTests.swift
+[55/66] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[56/66] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[57/66] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[58/66] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[59/66] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[60/66] Compiling GatorCoreTests resource_bundle_accessor.swift
+[62/67] Write Objects.LinkFileList
+[63/67] Linking GatorMac
+[64/67] Applying GatorMac
+[66/75] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[67/75] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[68/76] Compiling GatorMacTests NotchGeometryTests.swift
+[69/76] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[70/76] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[71/76] Compiling GatorMacTests NativeMascotTests.swift
+[72/76] Emitting module GatorMacTests
+[73/76] Compiling GatorMacTests NativeDesktopPetTests.swift
+[74/76] Compiling GatorMacTests NativeInputTests.swift
+[75/78] Emitting module GatorNativePackageTests
+[76/78] Compiling GatorNativePackageTests runner.swift
+[76/78] Write Objects.LinkFileList
+[77/78] Linking GatorNativePackageTests
+Build complete! (18.90s)
+Test Suite 'Selected tests' started at 2026-11-20 14:15:18.658.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 14:15:18.660.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 14:15:18.660.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 14:15:18.660.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✘ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() recorded an issue at NativeSnapshotPublicationTests.swift:22:5: Expectation failed: (invalidations.withLock { $0 } → 1) == 0
+✘ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() recorded an issue at NativeSnapshotPublicationTests.swift:23:5: Expectation failed: (callbacks → 100) == 0
+✘ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() recorded an issue at NativeSnapshotPublicationTests.swift:24:5: Expectation failed: (application.snapshot → BridgeSnapshot(value: GatorCore.JSONValue.object(["recent_conversations": GatorCore.JSONValue.array([GatorCore.JSONValue.object(["id": GatorCore.JSONValue.string("two"), "title": GatorCore.JSONValue.string("Two")])]), "primary": GatorCore.JSONValue.bool(true), "cancelling": GatorCore.JSONValue.bool(false), "messages": GatorCore.JSONValue.array([]), "model": GatorCore.JSONValue.string("model"), "loading_frame": GatorCore.JSONValue.number(100), "conversation_id": GatorCore.JSONValue.string("one"), "title": GatorCore.JSONValue.string("One"), "queued": GatorCore.JSONValue.number(0), "source": GatorCore.JSONValue.string("/fixture"), "mode": GatorCore.JSONValue.string("chat"), "provider": GatorCore.JSONValue.string("fixture"), "recent_id": GatorCore.JSONValue.string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), "running": GatorCore.JSONValue.bool(false), "composer": GatorCore.JSONValue.object(["models": GatorCore.JSONValue.array([GatorCore.JSONValue.object(["provider": GatorCore.JSONValue.string("fixture"), "model": GatorCore.JSONValue.string("other")])]), "id": GatorCore.JSONValue.string("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), "effort": GatorCore.JSONValue.string("standard"), "readiness": GatorCore.JSONValue.object(["state": GatorCore.JSONValue.string("configured")])])]))) == (initial → BridgeSnapshot(value: GatorCore.JSONValue.object(["recent_conversations": GatorCore.JSONValue.array([GatorCore.JSONValue.object(["id": GatorCore.JSONValue.string("two"), "title": GatorCore.JSONValue.string("Two")])]), "primary": GatorCore.JSONValue.bool(true), "cancelling": GatorCore.JSONValue.bool(false), "messages": GatorCore.JSONValue.array([]), "model": GatorCore.JSONValue.string("model"), "loading_frame": GatorCore.JSONValue.number(0), "conversation_id": GatorCore.JSONValue.string("one"), "title": GatorCore.JSONValue.string("One"), "queued": GatorCore.JSONValue.number(0), "source": GatorCore.JSONValue.string("/fixture"), "mode": GatorCore.JSONValue.string("chat"), "provider": GatorCore.JSONValue.string("fixture"), "recent_id": GatorCore.JSONValue.string("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), "running": GatorCore.JSONValue.bool(false), "composer": GatorCore.JSONValue.object(["models": GatorCore.JSONValue.array([GatorCore.JSONValue.object(["provider": GatorCore.JSONValue.string("fixture"), "model": GatorCore.JSONValue.string("other")])]), "id": GatorCore.JSONValue.string("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), "effort": GatorCore.JSONValue.string("standard"), "readiness": GatorCore.JSONValue.object(["state": GatorCore.JSONValue.string("configured")])])])))
+✘ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() failed after 0.013 seconds with 3 issues.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+✘ Test run with 2 tests in 0 suites failed after 0.013 seconds with 3 issues.

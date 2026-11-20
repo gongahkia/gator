@@ -1,0 +1,170 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/25] Compiling GatorCore NativeRecovery.swift
+[3/25] Compiling GatorCore NativeRecoveryPreparation.swift
+[4/25] Compiling GatorCore NativeTaskReview.swift
+[5/25] Compiling GatorCore NativeTranscriptSearch.swift
+[6/25] Compiling GatorCore NativeProviderProtocol.swift
+[7/25] Compiling GatorCore NativeProviderSetup.swift
+[8/27] Compiling GatorCore NativeCatalogProtocol.swift
+[9/27] Compiling GatorCore NativeConversationCatalog.swift
+[10/27] Compiling GatorCore NativeDraftAttachments.swift
+[11/27] Compiling GatorCore NativeUploadStore.swift
+[12/27] Compiling GatorCore NativeWorkspaceSelection.swift
+[13/27] Compiling GatorCore GoBridgeConnection.swift
+[14/27] Compiling GatorCore ManagedSessionCoordinator.swift
+[15/27] Compiling GatorCore ManagedSessionProtocol.swift
+[16/27] Emitting module GatorCore
+[17/27] Compiling GatorCore NativeDraftStore.swift
+[18/27] Compiling GatorCore NativeMessageContent.swift
+[19/27] Compiling GatorCore NativePlanExecution.swift
+[20/27] Compiling GatorCore BridgePipeIO.swift
+[21/27] Compiling GatorCore BridgeProtocol.swift
+[22/27] Compiling GatorCore GatorApplicationState.swift
+[23/93] Compiling GatorMac NativeMascotPreferences.swift
+[24/93] Compiling GatorMac NativeMascotView.swift
+[25/93] Compiling GatorMac NativeMessageBody.swift
+[26/93] Compiling GatorMac NativeProviderSecretEntry.swift
+[27/97] Compiling GatorMac NativeAcceptanceDiagnostics.swift
+[28/97] Compiling GatorMac NativeAccessibilityStatus.swift
+[29/97] Compiling GatorMac NativeAttachmentActions.swift
+[30/97] Compiling GatorMac NativeComposer.swift
+[31/97] Compiling GatorMac NativeComposerPresentation.swift
+[32/97] Compiling GatorMac NativeReadingPositions.swift
+[33/97] Compiling GatorMac NativeStatusMessage.swift
+[34/97] Compiling GatorMac NativeTranscriptFind.swift
+[35/97] Compiling GatorMac NativeWindowConfiguration.swift
+[36/97] Compiling GatorMac NativeDesktopPet.swift
+[37/97] Compiling GatorMac NativeDropInput.swift
+[38/97] Compiling GatorMac NativeErrorDisclosure.swift
+[39/97] Compiling GatorMac NativeMascotModel.swift
+[40/97] Compiling GatorMac NativeMascotPlayback.swift
+[41/97] Compiling GatorMac NativeWorkspacePicker.swift
+[42/97] Compiling GatorMac NotchQuickAccess.swift
+[43/97] Compiling GatorMac PlanReviewContent.swift
+[44/97] Compiling GatorMac ProviderSetupView.swift
+[45/97] Emitting module GatorMac
+[46/97] Compiling GatorMac AppDelegate.swift
+[47/97] Compiling GatorMac ApprovalReviewView.swift
+[48/97] Compiling GatorMac AttachmentSelectionView.swift
+[49/97] Compiling GatorMac ComposerView.swift
+[50/97] Compiling GatorMac ConversationCatalogView.swift
+[68/101] Compiling GatorMac ConversationView.swift
+[69/101] Compiling GatorMac ExactDecisionButton.swift
+[70/101] Compiling GatorMac ExactReviewContent.swift
+[71/101] Compiling GatorMac GatorApp.swift
+[72/101] Compiling GatorMac MenuBarVisibilityToggle.swift
+[78/101] Emitting module GatorCoreTests
+[84/101] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[85/101] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[86/101] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[87/101] Compiling GatorCoreTests resource_bundle_accessor.swift
+[96/101] Write Objects.LinkFileList
+[97/101] Linking GatorMac
+[98/101] Applying GatorMac
+[100/109] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[101/109] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[102/109] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[103/109] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[104/110] Compiling GatorMacTests NotchGeometryTests.swift
+[105/110] Compiling GatorMacTests NativeInputTests.swift
+[106/110] Compiling GatorMacTests NativeDesktopPetTests.swift
+[107/110] Compiling GatorMacTests NativeMascotTests.swift
+[108/110] Emitting module GatorMacTests
+[109/112] Compiling GatorNativePackageTests runner.swift
+[110/112] Emitting module GatorNativePackageTests
+[110/112] Write Objects.LinkFileList
+[111/112] Linking GatorNativePackageTests
+Build complete! (16.04s)
+Test Suite 'Selected tests' started at 2026-11-20 14:25:41.595.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 14:25:41.595.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 14:25:41.596.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 14:25:41.596.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.020 seconds.
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.007 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() started.
+✔ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() passed after 0.007 seconds.
+◇ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() started.
+✔ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() passed after 0.007 seconds.
+◇ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() started.
+P04E1R2_HEADLESS_PENDING owner=work-20261120T062541-676e642cc4924366 generation=F6DF92B3-420E-4568-840C-34178B727A42 interaction=1 callbacks=0 durablePendingUnchanged=true shutdown=true nativeDesktopCycle=false
+✔ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() passed after 0.560 seconds.
+◇ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() started.
+✔ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() passed after 1.898 seconds.
+◇ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() started.
+✔ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() passed after 0.001 seconds.
+◇ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() started.
+✔ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() passed after 0.001 seconds.
+◇ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() started.
+✔ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() passed after 0.031 seconds.
+◇ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() started.
+✔ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() passed after 0.003 seconds.
+◇ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() started.
+✔ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() passed after 0.004 seconds.
+◇ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() started.
+✔ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() passed after 0.002 seconds.
+◇ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() started.
+✔ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() passed after 0.001 seconds.
+◇ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() started.
+✔ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() passed after 0.001 seconds.
+◇ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() started.
+✔ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() passed after 0.001 seconds.
+◇ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() started.
+✔ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() passed after 0.001 seconds.
+◇ Test desktopPetRepeatedTuckReleasesItsPresentation() started.
+✔ Test desktopPetRepeatedTuckReleasesItsPresentation() passed after 0.018 seconds.
+◇ Test desktopPetSleepAndWakeRespectThePersistedEnableState() started.
+✔ Test desktopPetSleepAndWakeRespectThePersistedEnableState() passed after 0.001 seconds.
+◇ Test desktopPresenceOffStopsOverlayWithoutReenablingOrClearingVisibilityChoices() started.
+✔ Test desktopPresenceOffStopsOverlayWithoutReenablingOrClearingVisibilityChoices() passed after 0.004 seconds.
+◇ Test mascotStatePrecedenceAndOwnerReplacement() started.
+✔ Test mascotStatePrecedenceAndOwnerReplacement() passed after 0.001 seconds.
+◇ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() started.
+✔ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() passed after 0.001 seconds.
+◇ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() started.
+✔ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() passed after 0.001 seconds.
+◇ Test mascotCompletionRequiresCanonicalFinishedOutcome() started.
+✔ Test mascotCompletionRequiresCanonicalFinishedOutcome() passed after 0.001 seconds.
+◇ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() started.
+✔ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() passed after 0.001 seconds.
+◇ Test mascotCollapseDoesNotMutateReadingAnchors() started.
+✔ Test mascotCollapseDoesNotMutateReadingAnchors() passed after 0.001 seconds.
+◇ Test presenceModesAndEmojiAreNativeAndDoNotOfferLegacyArt() started.
+✔ Test presenceModesAndEmojiAreNativeAndDoNotOfferLegacyArt() passed after 0.001 seconds.
+◇ Test presenceMigrationPreservesOffAnimationTuckAndObsoleteStyle() started.
+✔ Test presenceMigrationPreservesOffAnimationTuckAndObsoleteStyle() passed after 0.001 seconds.
+◇ Test presenceUsesLatestConfirmedFailureInsteadOfOlderSuccess() started.
+✔ Test presenceUsesLatestConfirmedFailureInsteadOfOlderSuccess() passed after 0.001 seconds.
+◇ Test presenceReactionRevisionRequiresNewSelectedOwnerEvidence() started.
+✔ Test presenceReactionRevisionRequiresNewSelectedOwnerEvidence() passed after 0.001 seconds.
+◇ Test presenceSmallStableSlotsPreserveExactReadingAnchors() started.
+✔ Test presenceSmallStableSlotsPreserveExactReadingAnchors() passed after 0.001 seconds.
+◇ Test presenceGIFBoundsCacheAndAlpha() started.
+✔ Test presenceGIFBoundsCacheAndAlpha() passed after 0.003 seconds.
+◇ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() started.
+✔ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() passed after 0.001 seconds.
+◇ Test presenceStaticReduceMotionAndOffNeverDecodeAnAsset() started.
+✔ Test presenceStaticReduceMotionAndOffNeverDecodeAnAsset() passed after 0.001 seconds.
+◇ Test presenceOwnerSwitchStateChangeAndStaleDecodeCannotReplay() started.
+✔ Test presenceOwnerSwitchStateChangeAndStaleDecodeCannotReplay() passed after 0.001 seconds.
+◇ Test presenceMissingAndEmptyGIFsKeepNativeEmojiFallback() started.
+✔ Test presenceMissingAndEmptyGIFsKeepNativeEmojiFallback() passed after 0.001 seconds.
+◇ Test presenceRepeatedLifetimesAndCanvasNeverTakeFocus() started.
+✔ Test presenceRepeatedLifetimesAndCanvasNeverTakeFocus() passed after 0.022 seconds.
+◇ Test presenceProductionHasNoOldArtLoadingOrExecutionCapability() started.
+✔ Test presenceProductionHasNoOldArtLoadingOrExecutionCapability() passed after 0.005 seconds.
+◇ Test presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() started.
+✔ Test presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() passed after 0.002 seconds.
+◇ Test presenceWritingRequiresAnActivePublicTextEntryAndEndsWhenGoClosesIt() started.
+✔ Test presenceWritingRequiresAnActivePublicTextEntryAndEndsWhenGoClosesIt() passed after 0.001 seconds.
+✔ Test run with 40 tests in 0 suites passed after 2.614 seconds.

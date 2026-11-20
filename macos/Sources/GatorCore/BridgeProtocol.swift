@@ -35,6 +35,27 @@ public enum JSONValue: Codable, Sendable, Hashable {
     }
 }
 
+private extension JSONValue {
+    func identicalNativeContent(to other: JSONValue) -> Bool {
+        switch (self, other) {
+        case (.string(let left), .string(let right)): return left.utf8.elementsEqual(right.utf8)
+        case (.number(let left), .number(let right)): return left == right
+        case (.bool(let left), .bool(let right)): return left == right
+        case (.null, .null): return true
+        case (.array(let left), .array(let right)):
+            return left.count == right.count && zip(left, right).allSatisfy { $0.identicalNativeContent(to: $1) }
+        case (.object(let left), .object(let right)):
+            guard left.count == right.count else { return false }
+            return left.allSatisfy { key, value in
+                guard let index = right.index(forKey: key) else { return false }
+                let entry = right[index]
+                return key.utf8.elementsEqual(entry.key.utf8) && value.identicalNativeContent(to: entry.value)
+            }
+        default: return false
+        }
+    }
+}
+
 public struct BridgeMessage: Identifiable, Sendable, Equatable {
     public let id: String
     public let value: JSONValue
@@ -49,6 +70,13 @@ public struct BridgeMessage: Identifiable, Sendable, Equatable {
 public struct BridgeSnapshot: Sendable, Equatable {
     public let value: JSONValue
     public init(_ value: JSONValue) { self.value = value }
+    // terminal spinner frames carry no native state; all other fields, including
+    // unknown future fields, remain part of the publication boundary.
+    func hasSameNativeContent(as other: BridgeSnapshot) -> Bool {
+        guard case .object(var left) = value, case .object(var right) = other.value else { return value.identicalNativeContent(to: other.value) }
+        left.removeValue(forKey: "loading_frame"); right.removeValue(forKey: "loading_frame")
+        return JSONValue.object(left).identicalNativeContent(to: .object(right))
+    }
     public var conversationID: String { value["conversation_id"].string }
     public var context: String {
         if !conversationID.isEmpty { return "conversation:" + conversationID }

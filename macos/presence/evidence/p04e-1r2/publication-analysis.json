@@ -1,0 +1,10 @@
+{
+  "pendingDurationSeconds": 5.063539833994582,
+  "statesObserved": 64,
+  "spinnerOnlyStates": 58,
+  "otherStates": 6,
+  "potentialPublicationReductionOnThisCapturedSequence": 0.90625,
+  "qualification": "Headless source/event analysis; not a native CPU or layout-stall measurement",
+  "beforeSyntheticCallbacks": 100,
+  "afterSyntheticCallbacks": 0
+}

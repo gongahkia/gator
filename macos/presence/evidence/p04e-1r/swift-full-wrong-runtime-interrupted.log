@@ -1,0 +1,120 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.16s)
+Test Suite 'All tests' started at 2026-11-20 13:34:15.698.
+Test Suite 'All tests' passed at 2026-11-20 13:34:15.699.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test ackIsNotAdmissionAndLateAcceptancePreservesNewDraft() started.
+✔ Test ackIsNotAdmissionAndLateAcceptancePreservesNewDraft() passed after 0.048 seconds.
+◇ Test sharedPresentationReferencesUseOneOwnerAndSnapshotsReplace() started.
+✔ Test sharedPresentationReferencesUseOneOwnerAndSnapshotsReplace() passed after 0.020 seconds.
+◇ Test navigationAndStopRespectBusyOwner() started.
+✔ Test navigationAndStopRespectBusyOwner() passed after 0.008 seconds.
+◇ Test settingsRequireMatchingActualResultAndReadinessIsConfigurationOnly() started.
+✔ Test settingsRequireMatchingActualResultAndReadinessIsConfigurationOnly() passed after 0.043 seconds.
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.020 seconds.
+◇ Test disconnectPersistsUncertainIdentityAndExplicitRetryUsesOriginal() started.
+✔ Test disconnectPersistsUncertainIdentityAndExplicitRetryUsesOriginal() passed after 0.104 seconds.
+◇ Test reconnectReplacesOwnerWithoutResendingAdmissionOrApproval() started.
+✔ Test reconnectReplacesOwnerWithoutResendingAdmissionOrApproval() passed after 0.024 seconds.
+◇ Test exactApprovalDispatchWaitsForGoAndMissingDetailsCannotApprove() started.
+✔ Test exactApprovalDispatchWaitsForGoAndMissingDetailsCannotApprove() passed after 0.020 seconds.
+◇ Test rejectedAdmissionAndSettingsKeepDraftAndActualValues() started.
+✔ Test rejectedAdmissionAndSettingsKeepDraftAndActualValues() passed after 0.022 seconds.
+◇ Test unreadableDraftStorageDisablesEditingButStillAllowsSafeQuit() started.
+✔ Test unreadableDraftStorageDisablesEditingButStillAllowsSafeQuit() passed after 0.011 seconds.
+◇ Test framingHandlesSplitUTF8AndCoalescedFrames() started.
+✔ Test framingHandlesSplitUTF8AndCoalescedFrames() passed after 0.001 seconds.
+◇ Test framingRejectsMalformedOversizedUnsupportedAndPartialEOF() started.
+✔ Test framingRejectsMalformedOversizedUnsupportedAndPartialEOF() passed after 0.001 seconds.
+◇ Test outboundSubmissionUsesAdmissionContractAndBoundedText() started.
+✔ Test outboundSubmissionUsesAdmissionContractAndBoundedText() passed after 0.001 seconds.
+◇ Test structuredNumbersAndContentRemainLiteralData() started.
+✔ Test structuredNumbersAndContentRemainLiteralData() passed after 0.001 seconds.
+◇ Test retainedDialogueIsVisibleWithoutChangingApprovalMessageIndexes() started.
+✔ Test retainedDialogueIsVisibleWithoutChangingApprovalMessageIndexes() passed after 0.002 seconds.
+◇ Test safetyCleanExitReapsDirectOwnerAndFinishesAllIO() started.
+✔ Test safetyCleanExitReapsDirectOwnerAndFinishesAllIO() passed after 0.781 seconds.
+◇ Test safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+◇ Test case passing 1 argument mode → "stdout" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=stdout elapsed=0.303028 seconds
+◇ Test case passing 1 argument mode → "stderr" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=stderr elapsed=0.303569458 seconds
+◇ Test case passing 1 argument mode → "both" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=both elapsed=0.303148625 seconds
+✔ Test safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) with 3 test cases passed after 1.992 seconds.
+◇ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() started.
+✔ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() passed after 0.670 seconds.
+◇ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() started.
+✔ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() passed after 0.437 seconds.
+◇ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() started.
+✔ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() passed after 0.435 seconds.
+◇ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() started.
+✔ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() passed after 0.329 seconds.
+◇ Test safetyIndependentOwnersCanShutDownConcurrently() started.
+✔ Test safetyIndependentOwnersCanShutDownConcurrently() passed after 1.253 seconds.
+◇ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() started.
+✔ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() passed after 0.879 seconds.
+◇ Test subprocessAcknowledgementExitAndCleanup() started.
+✔ Test subprocessAcknowledgementExitAndCleanup() passed after 0.457 seconds.
+◇ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() started.
+✔ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() passed after 5.539 seconds.
+◇ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() started.
+✔ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() passed after 0.205 seconds.
+◇ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() started.
+✔ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() passed after 0.214 seconds.
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+Managed fixture issue: 
+Managed fixture dialogue: [
+  {
+    "created_at" : "2026-11-20T05:34:29.491743Z",
+    "id" : "a9f3c9be6acd4bf54204c084d0069955831bd57b1ea41c40229f15a799f1e038",
+    "response" : "I am here. Your original venue comparison is still working.",
+    "sequence" : 1,
+    "state" : "answered",
+    "text" : "Hello while working",
+    "updated_at" : "2026-11-20T05:34:29.526852Z"
+  },
+  {
+    "created_at" : "2026-11-20T05:34:29.555684Z",
+    "id" : "7a42748002b2fa4a465d12f3942c96c7b2f3149ddce83da6fe5ac7ff0d5c8c22",
+    "response" : "I've started that as independent work. You can keep talking here.",
+    "sequence" : 2,
+    "state" : "delegated",
+    "task_chat" : "work-20261120T053429-f8ad2b5e504c4bd8",
+    "text" : "Read separate brief",
+    "updated_at" : "2026-11-20T05:34:29.676501Z"
+  },
+  {
+    "created_at" : "2026-11-20T05:34:29.771562Z",
+    "id" : "c7407e559d2695c81f0b4c7d6574d7c504e115a6a53cbe392251ddcc01cf8969",
+    "response" : "I passed that correction to the running task.",
+    "sequence" : 3,
+    "state" : "guided",
+    "text" : "Keep the venues under $2,000",
+    "updated_at" : "2026-11-20T05:34:29.810265Z"
+  }
+]
+Managed fixture peers: [
+  {
+    "can_correct_action" : false,
+    "can_guide" : true,
+    "can_review_inputs" : true,
+    "can_revise_plan" : false,
+    "can_stop" : true,
+    "conversation_id" : "work-20261120T053429-f8ad2b5e504c4bd8",
+    "run_id" : "work-20261120T053429-e7b293995ad8",
+    "state" : "running",
+    "turn_id" : "7a42748002b2fa4a465d12f3942c96c7b2f3149ddce83da6fe5ac7ff0d5c8c22"
+  }
+]
+Managed fixture trace: {"kind":"route","message":"Hello while working","tasks":[{"id":"23a4eff886a77c756cb66471e2e4d58b","title":"Compare venues for the trip","state":"running","can_guide":false,"can_stop":true,"can_review_inputs":false,"can_revise_plan":false,"can_correct_action":false}]}
+{"kind":"work","name":"main","objective":"Compare venues for the trip"}
+{"kind":"route","message":"Read separate brief","tasks":[{"id":"23a4eff886a77c756cb66471e2e4d58b","title":"Compare venues for the trip","state":"running","can_guide":true,"can_stop":true,"can_review_inputs":true,"can_revise_plan":false,"can_correct_action":false}]}
+{"kind":"work","name":"child","objective":"Read separate brief"}
+{"kind":"route","message":"Keep the venues under $2,000","tasks":[{"id":"23a4eff886a77c756cb66471e2e4d58b","title":"Compare venues for the trip","state":"running","can_guide":true,"can_stop":true,"can_review_inputs":true,"can_revise_plan":false,"can_correct_action":false},{"id":"work-20261120T053429-f8ad2b5e504c4bd8","title":"

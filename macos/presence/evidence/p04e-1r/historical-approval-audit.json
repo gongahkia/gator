@@ -1,0 +1,146 @@
+{
+  "verdict": "HISTORICAL NEGATIVE TEST INVALID",
+  "source": "UNKNOWN: old AX/keyboard logs have no per-event timestamp/source-PID linkage",
+  "knownNativePID": 12492,
+  "bundle": "dev.gator.presence.finalcheck",
+  "wrapperPID": 12626,
+  "conversation": "work-20261120T033452-ec96d92e176b4efc",
+  "run": "work-20261120T033715-9b901523bfc5",
+  "commands": [
+    {
+      "line": 865,
+      "frame": {
+        "direction": "command",
+        "type": "approval",
+        "frameKeys": [
+          "approval_token",
+          "nonce",
+          "interaction_id",
+          "version",
+          "type",
+          "approved"
+        ],
+        "interaction": 1,
+        "tokenSHA256": "d48c90d90c8abf913427ac564bacc4833dd31aca73c7e05f1023a3535add8a94",
+        "approved": true
+      }
+    }
+  ],
+  "durableInteraction": {
+    "version": 1,
+    "status": "resolved",
+    "interaction": {
+      "id": 1,
+      "kind": "web_access",
+      "preview": {
+        "scope": "sites",
+        "origins": [
+          "https://mascot.example.invalid"
+        ],
+        "reason": "Local mascot layout fixture. No fetch is implemented. Do not approve.",
+        "search_provider": "unavailable: no search provider configured",
+        "max_requests": 32,
+        "max_searches": 8,
+        "lifetime": "This task only, including its connected researchers. Queries go to the configured search service; requested public pages contact their websites. Search may incur provider charges. No saved login, private-network access or external writes."
+      }
+    },
+    "approved": true
+  },
+  "GoAcceptedDecision": true,
+  "retainedOutcome": "completed",
+  "replayTools": [
+    {
+      "role": "agent",
+      "name": null,
+      "toolCalls": [
+        {
+          "id": "mascot-inert-review",
+          "name": "web_access",
+          "arguments": {
+            "action": "request",
+            "scope": "sites",
+            "origins": [
+              "https://mascot.example.invalid"
+            ],
+            "reason": "Local mascot layout fixture. No fetch is implemented. Do not approve."
+          }
+        }
+      ],
+      "content": null
+    },
+    {
+      "role": "tool",
+      "name": "web_access",
+      "toolCalls": null,
+      "content": "{\"lifetime\":\"this task only; closing or completing it ends the grant\",\"max_requests\":32,\"max_searches\":8,\"origins\":[\"https://mascot.example.invalid\"],\"public_web\":false,\"remaining_requests\":32,\"remaining_searches\":8,\"requests_used\":0,\"scope_reviews_remaining\":3,\"search_provider\":\"unavailable: no search provider configured\",\"searches_used\":0}"
+    }
+  ],
+  "research": {
+    "public_web": false,
+    "origins": [
+      "https://mascot.example.invalid"
+    ],
+    "search_provider": "unavailable: no search provider configured",
+    "requests": 0,
+    "searches": 0,
+    "max_requests": 32,
+    "max_searches": 8,
+    "scope_reviews": 1
+  },
+  "actionsRecorded": [],
+  "capturedContract": {
+    "version": 1,
+    "artifacts": null,
+    "max_artifact_bytes": 33554432,
+    "max_total_bytes": 134217728,
+    "external_actions": "forbid"
+  },
+  "capturedSandbox": {
+    "mode": "strict",
+    "network": "deny"
+  },
+  "capturedConnectors": null,
+  "hashes": {
+    "interaction": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/state/gator/interactions/work-20261120T033715-9b901523bfc5/1.json",
+      "SHA256": "41c2ef9047bcbff6dc1466521bc9113fc0163ac537b4bc271d17b128389b75e9"
+    },
+    "revision": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/state/gator/conversations/work-20261120T033452-ec96d92e176b4efc/revisions/work-20261120T033715-9b901523bfc5.json",
+      "SHA256": "3e30a9ea3841b259491f997aedfb9d99482b513e45178dc66f346c00fa759fda"
+    },
+    "trace": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/state/gator/traces/work-20261120T033715-9b901523bfc5/trace.json",
+      "SHA256": "9880295d687574000b5efbbbffe0b1008b2df8985389b76035196f357012bdd1"
+    },
+    "manifest": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/state/gator/workspaces/bac79099c6189eaf335d5b4ca6f7ed57/work-20261120T033715-9b901523bfc5/manifest.json",
+      "SHA256": "3c46861ea0e7a44e99cf89d1682c1b0bb7e129c164f06636f062795bfd26f60d"
+    },
+    "requests": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/state/gator/conversations/work-20261120T033452-ec96d92e176b4efc/requests.json",
+      "SHA256": "2fc72e0bf1f9e035fb8b3a582dd82c5a376a0bbb619b795324d9913f1750ea9f"
+    },
+    "bridge": {
+      "path": "/tmp/gator-native-test-presence-_5yzro2z/bridge-12626.jsonl",
+      "SHA256": "285a47bf8dd568e5fe18fa064863d14073ba3e2ef907a5a232db6b6b6ef37a6a"
+    }
+  },
+  "toolSpans": [
+    {
+      "id": "4c6621bd543381a5",
+      "parent": "efda30a2f7ee4c25",
+      "name": "tool/web_access",
+      "start": "2026-11-20T11:37:15.194506+08:00",
+      "end": "2026-11-20T11:38:12.855883+08:00",
+      "step": 1
+    }
+  ],
+  "limitations": [
+    "No key/mouse/AX-source provenance at the decision time",
+    "A native approval command and accepted Go decision are verified; the user/control that triggered it is not",
+    "No web dispatch is recorded (request/search counters zero); this does not negate the accepted grant",
+    "No external-write tool appears in replay; captured contract forbids external actions; no connector configured",
+    "Historical zero-effect claims are evidence about effects only"
+  ]
+}

@@ -1,0 +1,732 @@
+
+> @gator/application-host@0.1.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: host streams Go state and closes its child on exit
+ok 1 - host streams Go state and closes its child on exit
+  ---
+  duration_ms: 47.475292
+  ...
+# Subtest: restart preparation waits for the canonical application and never forces a busy child to exit
+ok 2 - restart preparation waits for the canonical application and never forces a busy child to exit
+  ---
+  duration_ms: 47.767416
+  ...
+# Subtest: code preview binds sealed candidate bytes and keeps diagnostics private
+ok 3 - code preview binds sealed candidate bytes and keeps diagnostics private
+  ---
+  duration_ms: 19.230042
+  ...
+# Subtest: wrong conversation, run, candidate and caller paths cannot select code
+ok 4 - wrong conversation, run, candidate and caller paths cannot select code
+  ---
+  duration_ms: 16.053
+  ...
+# Subtest: candidate and manifest tampering fail closed
+ok 5 - candidate and manifest tampering fail closed
+  ---
+  duration_ms: 31.110208
+  ...
+# Subtest: linked code bytes are rejected
+ok 6 - linked code bytes are rejected
+  ---
+  duration_ms: 22.656625
+  ...
+# Subtest: authority is rechecked after reading code
+ok 7 - authority is rechecked after reading code
+  ---
+  duration_ms: 46.871625
+  ...
+# Subtest: large Unicode diffs return an explicitly partial bounded preview
+ok 8 - large Unicode diffs return an explicitly partial bounded preview
+  ---
+  duration_ms: 15.970083
+  ...
+# Subtest: plan-first intent survives an empty draft restart and follows retention controls
+ok 9 - plan-first intent survives an empty draft restart and follows retention controls
+  ---
+  duration_ms: 69.253792
+  ...
+# Subtest: old drafts remain readable and malformed review intent never silently becomes direct work
+ok 10 - old drafts remain readable and malformed review intent never silently becomes direct work
+  ---
+  duration_ms: 11.896584
+  ...
+# Subtest: update reply drafts retain their referent independently of text across restart
+ok 11 - update reply drafts retain their referent independently of text across restart
+  ---
+  duration_ms: 8.6285
+  ...
+# Subtest: pending draft failures remain visible to update and shutdown preparation
+ok 12 - pending draft failures remain visible to update and shutdown preparation
+  ---
+  duration_ms: 12.933041
+  ...
+# Subtest: drafts survive restart, stay scoped, and save serially with private permissions
+ok 13 - drafts survive restart, stay scoped, and save serially with private permissions
+  ---
+  duration_ms: 19.043333
+  ...
+# Subtest: expired drafts are removed and disabling clears retained text
+ok 14 - expired drafts are removed and disabling clears retained text
+  ---
+  duration_ms: 103.922083
+  ...
+# Subtest: draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+ok 15 - draft requests reject arbitrary fields, large text, and malformed stores recover explicitly
+  ---
+  duration_ms: 77.889291
+  ...
+# Subtest: ordinary Work and terminal host need no tmux, Onibi, phone or external catalog
+ok 16 - ordinary Work and terminal host need no tmux, Onibi, phone or external catalog
+  ---
+  duration_ms: 6278.564917
+  ...
+# Subtest: export replaces only an explicitly reviewed unchanged destination and consumes its grant
+ok 17 - export replaces only an explicitly reviewed unchanged destination and consumes its grant
+  ---
+  duration_ms: 47.220208
+  ...
+# Subtest: export preserves private storage and refuses linked or changed file identities
+ok 18 - export preserves private storage and refuses linked or changed file identities
+  ---
+  duration_ms: 24.51625
+  ...
+# Subtest: line comparison separates inserts, removals, unchanged context and blank lines
+ok 19 - line comparison separates inserts, removals, unchanged context and blank lines
+  ---
+  duration_ms: 2.843791
+  ...
+# Subtest: large or numerous changes are explicitly partial and bounded
+ok 20 - large or numerous changes are explicitly partial and bounded
+  ---
+  duration_ms: 5.939125
+  ...
+# Subtest: Office comparisons show entered content without claiming layout or formula recalculation
+ok 21 - Office comparisons show entered content without claiming layout or formula recalculation
+  ---
+  duration_ms: 27.1965
+  ...
+# Subtest: comparison is read-only, scoped to exact file versions and verifies retained bytes
+ok 22 - comparison is read-only, scoped to exact file versions and verifies retained bytes
+  ---
+  duration_ms: 52.802959
+  ...
+# Subtest: line changes reconstruct each later version without losing repeated or blank lines
+ok 23 - line changes reconstruct each later version without losing repeated or blank lines
+  ---
+  duration_ms: 59.332417
+  ...
+# Subtest: files retain full contents, recover drafts, reject stale saves and restore without touching the original
+ok 24 - files retain full contents, recover drafts, reject stale saves and restore without touching the original
+  ---
+  duration_ms: 139.471375
+  ...
+# Subtest: file sources require exact current conversation membership and reject paths, links and bad digests
+ok 25 - file sources require exact current conversation membership and reject paths, links and bad digests
+  ---
+  duration_ms: 161.148083
+  ...
+# Subtest: CSV edits preserve quoting and CRLF, while invalid JSON cannot replace saved content
+ok 26 - CSV edits preserve quoting and CRLF, while invalid JSON cannot replace saved content
+  ---
+  duration_ms: 32.020833
+  ...
+# Subtest: a stale editor can discard its changes without deleting another editor's draft
+ok 27 - a stale editor can discard its changes without deleting another editor's draft
+  ---
+  duration_ms: 83.243333
+  ...
+# Subtest: output working versions keep their identity after restoring a profile into another folder
+ok 28 - output working versions keep their identity after restoring a profile into another folder
+  ---
+  duration_ms: 28.389792
+  ...
+# Subtest: saving recovers an abandoned process lock but respects an active editor
+ok 29 - saving recovers an abandoned process lock but respects an active editor
+  ---
+  duration_ms: 175.164666
+  ...
+# Subtest: native helpers preserve literal argv, bound output and support cancellation
+ok 30 - native helpers preserve literal argv, bound output and support cancellation
+  ---
+  duration_ms: 188.730834
+  ...
+# Subtest: native playback carries language and rate without exposing reply text in arguments
+ok 31 - native playback carries language and rate without exposing reply text in arguments
+  ---
+  duration_ms: 1.5195
+  ...
+# Subtest: cancelling voice enumeration prevents native playback
+ok 32 - cancelling voice enumeration prevents native playback
+  ---
+  duration_ms: 0.339417
+  ...
+# Subtest: explicit system voices use installed names and keep speech text out of arguments
+ok 33 - explicit system voices use installed names and keep speech text out of arguments
+  ---
+  duration_ms: 1.447541
+  ...
+# Subtest: local voice model downloads can be cancelled and manual reading stops with its chat
+ok 34 - local voice model downloads can be cancelled and manual reading stops with its chat
+  ---
+  duration_ms: 3.040042
+  ...
+# Subtest: dictation captures the provider route and cannot deliver into another conversation
+ok 35 - dictation captures the provider route and cannot deliver into another conversation
+  ---
+  duration_ms: 0.437333
+  ...
+# Subtest: spoken output ignores retained history, speaks only new replies and aborts on close
+ok 36 - spoken output ignores retained history, speaks only new replies and aborts on close
+  ---
+  duration_ms: 0.188541
+  ...
+# Subtest: spoken output stops on chat switch, preference disable and explicit playback cancellation
+ok 37 - spoken output stops on chat switch, preference disable and explicit playback cancellation
+  ---
+  duration_ms: 0.252166
+  ...
+# Subtest: PDF preview renders actual distinct page images and rejects nonexistent pages
+not ok 38 - PDF preview renders actual distinct page images and rejects nonexistent pages
+  ---
+  duration_ms: 44.197666
+  location: '/Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/native.test.mjs:138:1'
+  failureType: 'testCodeFailure'
+  error: 'Promise.withResolvers is not a function'
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    <instance_members_initializer> (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21892:25)
+    new PDFDocumentLoadingTask (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21890:1)
+    getDocument (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/node_modules/pdfjs-dist/legacy/build/pdf.mjs:21745:16)
+    renderPDF (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/src/pdf.mjs:13:19)
+    async TestContext.<anonymous> (file:///Users/gongahkia/Desktop/coding/projects/gator/app-host/tests/native.test.mjs:140:17)
+    async Test.run (node:internal/test_runner/test:797:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+  ...
+# Subtest: Word text and table edits round-trip without changing styles or embedded graphics
+ok 39 - Word text and table edits round-trip without changing styles or embedded graphics
+  ---
+  duration_ms: 11.52825
+  ...
+# Subtest: Excel preserves native cells and charts, edits formulas and clears stale results
+ok 40 - Excel preserves native cells and charts, edits formulas and clears stale results
+  ---
+  duration_ms: 7.002584
+  ...
+# Subtest: PowerPoint respects slide relationship IDs and retains masters and media through text edits
+ok 41 - PowerPoint respects slide relationship IDs and retains masters and media through text edits
+  ---
+  duration_ms: 5.946792
+  ...
+# Subtest: PowerPoint line breaks and tabs export valid DrawingML runs and preserve their formatting
+ok 42 - PowerPoint line breaks and tabs export valid DrawingML runs and preserve their formatting
+  ---
+  duration_ms: 10.331583
+  ...
+# Subtest: PowerPoint automatic fields are retained rather than silently converted to manual text
+ok 43 - PowerPoint automatic fields are retained rather than silently converted to manual text
+  ---
+  duration_ms: 1.784666
+  ...
+# Subtest: Office packages reject custom entities, signed packages and invalid shapes before edits
+ok 44 - Office packages reject custom entities, signed packages and invalid shapes before edits
+  ---
+  duration_ms: 3.886583
+  ...
+# Subtest: pasted images are bounded bytes and become independent private uploads
+ok 45 - pasted images are bounded bytes and become independent private uploads
+  ---
+  duration_ms: 58.802125
+  ...
+# Subtest: terminal preferences accept bounded display changes and complete imports without authority fields
+ok 46 - terminal preferences accept bounded display changes and complete imports without authority fields
+  ---
+  duration_ms: 3.883
+  ...
+# Subtest: commitment controls accept only current identities, never replacement policy or execution
+ok 47 - commitment controls accept only current identities, never replacement policy or execution
+  ---
+  duration_ms: 0.6575
+  ...
+# Subtest: goal controls carry only the original goal and reviewed status identity
+ok 48 - goal controls carry only the original goal and reviewed status identity
+  ---
+  duration_ms: 0.404083
+  ...
+# Subtest: specialist controls accept bounded actions without renderer-supplied authority
+ok 49 - specialist controls accept bounded actions without renderer-supplied authority
+  ---
+  duration_ms: 0.431375
+  ...
+# Subtest: update receipts and replies accept identities but never renderer-supplied authority
+ok 50 - update receipts and replies accept identities but never renderer-supplied authority
+  ---
+  duration_ms: 0.494833
+  ...
+# Subtest: update feedback requires a bounded nonce and independent reviewed version
+ok 51 - update feedback requires a bounded nonce and independent reviewed version
+  ---
+  duration_ms: 0.144125
+  ...
+# Subtest: update item actions accept a bounded outcome nonce without feedback or replacement authority
+ok 52 - update item actions accept a bounded outcome nonce without feedback or replacement authority
+  ---
+  duration_ms: 0.20725
+  ...
+# Subtest: composer choices carry only bounded identities and canonical work effort
+ok 53 - composer choices carry only bounded identities and canonical work effort
+  ---
+  duration_ms: 0.217209
+  ...
+# Subtest: renderer cannot launch processes, acknowledge handoffs, or inject transport fields
+ok 54 - renderer cannot launch processes, acknowledge handoffs, or inject transport fields
+  ---
+  duration_ms: 0.422208
+  ...
+# Subtest: answer context navigation admits exact run IDs without generalizing navigation arguments
+ok 55 - answer context navigation admits exact run IDs without generalizing navigation arguments
+  ---
+  duration_ms: 0.188208
+  ...
+# Subtest: panel actions require a view identity and bounded typed values
+ok 56 - panel actions require a view identity and bounded typed values
+  ---
+  duration_ms: 0.581583
+  ...
+# Subtest: app resources stay inside the compiled assets and links stay web-only
+ok 57 - app resources stay inside the compiled assets and links stay web-only
+  ---
+  duration_ms: 0.2305
+  ...
+# Subtest: conversation organization carries only a reviewed row and bounded title
+ok 58 - conversation organization carries only a reviewed row and bounded title
+  ---
+  duration_ms: 0.255583
+  ...
+# Subtest: queue actions bind to a message or active run and accept bounded text only
+ok 59 - queue actions bind to a message or active run and accept bounded text only
+  ---
+  duration_ms: 1.056916
+  ...
+# Subtest: recent conversation selection requires the exact projected list and a bounded identity
+ok 60 - recent conversation selection requires the exact projected list and a bounded identity
+  ---
+  duration_ms: 0.136667
+  ...
+# Subtest: memory review accepts bounded exact revisions and rejects supplied scope
+ok 61 - memory review accepts bounded exact revisions and rejects supplied scope
+  ---
+  duration_ms: 0.260875
+  ...
+# Subtest: receipt inspection only accepts exact retained identities and read-only actions
+ok 62 - receipt inspection only accepts exact retained identities and read-only actions
+  ---
+  duration_ms: 0.327625
+  ...
+# Subtest: source selection accepts only finite source IDs and no renderer authority
+ok 63 - source selection accepts only finite source IDs and no renderer authority
+  ---
+  duration_ms: 0.436875
+  ...
+# Subtest: branch creation accepts exact durable references but no replay or execution authority
+ok 64 - branch creation accepts exact durable references but no replay or execution authority
+  ---
+  duration_ms: 0.306459
+  ...
+# Subtest: task plan actions bind exact reviews and cannot supply approval or native configuration
+ok 65 - task plan actions bind exact reviews and cannot supply approval or native configuration
+  ---
+  duration_ms: 0.419708
+  ...
+# Subtest: plan-first message admission is a boolean opt-in with no renderer plan grant
+ok 66 - plan-first message admission is a boolean opt-in with no renderer plan grant
+  ---
+  duration_ms: 0.100791
+  ...
+# Subtest: input removals accept typed identities without extra authority
+ok 67 - input removals accept typed identities without extra authority
+  ---
+  duration_ms: 0.153917
+  ...
+# Subtest: task recovery carries the retained outcome identity without execution authority
+ok 68 - task recovery carries the retained outcome identity without execution authority
+  ---
+  duration_ms: 0.156875
+  ...
+# Subtest: task access review carries selected account identities but cannot grant raw scope
+ok 69 - task access review carries selected account identities but cannot grant raw scope
+  ---
+  duration_ms: 0.206458
+  ...
+# Subtest: frontend preferences import latest Chromium keys once without changing their database or Go theme
+ok 70 - frontend preferences import latest Chromium keys once without changing their database or Go theme
+  ---
+  duration_ms: 40.429167
+  ...
+# Subtest: preference patches serialize, reject extra authority and recover an abandoned writer lock
+ok 71 - preference patches serialize, reject extra authority and recover an abandoned writer lock
+  ---
+  duration_ms: 139.2665
+  ...
+# Subtest: removing the mascot preference preserves the rest of an existing terminal profile
+ok 72 - removing the mascot preference preserves the rest of an existing terminal profile
+  ---
+  duration_ms: 68.458875
+  ...
+# Subtest: corrupt or interrupted legacy import retains source bytes and leaves no completed migration marker
+ok 73 - corrupt or interrupted legacy import retains source bytes and leaves no completed migration marker
+  ---
+  duration_ms: 82.986083
+  ...
+# Subtest: preference writers retain native exclusion until a crashed process exits and then recover
+ok 74 - preference writers retain native exclusion until a crashed process exits and then recover
+  ---
+  duration_ms: 109.304292
+  ...
+# Subtest: concurrent preference instances never lose an acknowledged patch during stale lock recovery
+ok 75 - concurrent preference instances never lose an acknowledged patch during stale lock recovery
+  ---
+  duration_ms: 88.674417
+  ...
+# Subtest: reading anchors reopen privately without storing conversation text and remain isolated by chat/profile
+ok 76 - reading anchors reopen privately without storing conversation text and remain isolated by chat/profile
+  ---
+  duration_ms: 15.656583
+  ...
+# Subtest: invalid and linked anchors fail explicitly without modifying history or the retained file
+ok 77 - invalid and linked anchors fail explicitly without modifying history or the retained file
+  ---
+  duration_ms: 8.277083
+  ...
+# Subtest: dialogue dispatch starts one background owner and returns results without moving focus
+ok 78 - dialogue dispatch starts one background owner and returns results without moving focus
+  ---
+  duration_ms: 2.26225
+  ...
+# Subtest: an unconfirmed background admission or control is reported and never automatically replayed
+ok 79 - an unconfirmed background admission or control is reported and never automatically replayed
+  ---
+  duration_ms: 0.431417
+  ...
+# Subtest: plan cancellation reports the original owner's confirmed receipt without moving focus
+ok 80 - plan cancellation reports the original owner's confirmed receipt without moving focus
+  ---
+  duration_ms: 0.50525
+  ...
+# Subtest: plan revision admission releases the parent conversation while its original owner prepares
+ok 81 - plan revision admission releases the parent conversation while its original owner prepares
+  ---
+  duration_ms: 0.304541
+  ...
+# Subtest: a plan correction rechecks the task limit while stop remains available
+ok 82 - a plan correction rechecks the task limit while stop remains available
+  ---
+  duration_ms: 1.397292
+  ...
+# Subtest: managed navigation waits for the new owner's applied view and preserves original execution
+ok 83 - managed navigation waits for the new owner's applied view and preserves original execution
+  ---
+  duration_ms: 0.21825
+  ...
+# Subtest: a failed managed view acknowledgement retires only the new view and restores the original owner
+ok 84 - a failed managed view acknowledgement retires only the new view and restores the original owner
+  ---
+  duration_ms: 0.521
+  ...
+# Subtest: direct ancestry navigation uses only the current owner's exact parent even when idle
+ok 85 - direct ancestry navigation uses only the current owner's exact parent even when idle
+  ---
+  duration_ms: 0.249417
+  ...
+# Subtest: browser sign-in retains its owner and Connections returns to it
+ok 86 - browser sign-in retains its owner and Connections returns to it
+  ---
+  duration_ms: 1.760209
+  ...
+# Subtest: durable update badges include unopened chats and clear from fresh receipts
+ok 87 - durable update badges include unopened chats and clear from fresh receipts
+  ---
+  duration_ms: 0.598666
+  ...
+# Subtest: chat navigation retains original execution, approvals and unread results
+ok 88 - chat navigation retains original execution, approvals and unread results
+  ---
+  duration_ms: 0.831375
+  ...
+# Subtest: session capacity never evicts running or queued work and admissions are bounded
+ok 89 - session capacity never evicts running or queued work and admissions are bounded
+  ---
+  duration_ms: 1.286709
+  ...
+# Subtest: reviewed plan starts share the existing three-working-chat admission limit
+ok 90 - reviewed plan starts share the existing three-working-chat admission limit
+  ---
+  duration_ms: 0.690417
+  ...
+# Subtest: failed chat startup restores focus and leaves original work running
+ok 91 - failed chat startup restores focus and leaves original work running
+  ---
+  duration_ms: 0.667208
+  ...
+# Subtest: host navigation events are consumed once and reconnect targets only the selected chat
+ok 92 - host navigation events are consumed once and reconnect targets only the selected chat
+  ---
+  duration_ms: 5.811208
+  ...
+# Subtest: profile maintenance closes idle cached chats and refuses pending background work
+ok 93 - profile maintenance closes idle cached chats and refuses pending background work
+  ---
+  duration_ms: 0.251
+  ...
+# Subtest: receipt_busy retains its runtime and blocks profile maintenance and restart
+ok 94 - receipt_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 0.29875
+  ...
+# Subtest: catalog_busy retains its runtime and blocks profile maintenance and restart
+ok 95 - catalog_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 0.27875
+  ...
+# Subtest: goal_busy retains its runtime and blocks profile maintenance and restart
+ok 96 - goal_busy retains its runtime and blocks profile maintenance and restart
+  ---
+  duration_ms: 0.278792
+  ...
+# Subtest: action corrections reuse the exact local or delegated owner without allocating work
+ok 97 - action corrections reuse the exact local or delegated owner without allocating work
+  ---
+  duration_ms: 0.476583
+  ...
+# Subtest: confirmed preference changes refresh cached owners once without replaying tasks
+ok 98 - confirmed preference changes refresh cached owners once without replaying tasks
+  ---
+  duration_ms: 0.589792
+  ...
+# Subtest: source preview shows verified retained bytes, cited lines and independently recorded read ranges
+ok 99 - source preview shows verified retained bytes, cited lines and independently recorded read ranges
+  ---
+  duration_ms: 29.923958
+  ...
+# Subtest: latest retained results expose the same sealed evidence without a transcript bundle
+ok 100 - latest retained results expose the same sealed evidence without a transcript bundle
+  ---
+  duration_ms: 10.035041
+  ...
+# Subtest: current byte-range file reads include the terminating newline without inventing an extra read line
+ok 101 - current byte-range file reads include the terminating newline without inventing an extra read line
+  ---
+  duration_ms: 13.707625
+  ...
+# Subtest: source references cannot open another run, conversation, unselected source or arbitrary path
+ok 102 - source references cannot open another run, conversation, unselected source or arbitrary path
+  ---
+  duration_ms: 11.8735
+  ...
+# Subtest: source tampering fails closed; no fallback to the current workspace
+ok 103 - source tampering fails closed; no fallback to the current workspace
+  ---
+  duration_ms: 13.391417
+  ...
+# Subtest: linked source bytes cannot bypass the retained-evidence boundary
+ok 104 - linked source bytes cannot bypass the retained-evidence boundary
+  ---
+  duration_ms: 16.892125
+  ...
+# Subtest: unverified or missing replay is explicit and never invented from a model's cited range
+ok 105 - unverified or missing replay is explicit and never invented from a model's cited range
+  ---
+  duration_ms: 7.895167
+  ...
+# Subtest: source authority is checked again after reading
+ok 106 - source authority is checked again after reading
+  ---
+  duration_ms: 8.699167
+  ...
+# Subtest: bounded tool reads retain the exact partial final line instead of claiming it was fully read
+ok 107 - bounded tool reads retain the exact partial final line instead of claiming it was fully read
+  ---
+  duration_ms: 5.984875
+  ...
+# Subtest: large retained text is bounded without splitting UTF-8
+ok 108 - large retained text is bounded without splitting UTF-8
+  ---
+  duration_ms: 5.620542
+  ...
+# Subtest: citation metadata supports retained web and connected evidence without native configuration
+ok 109 - citation metadata supports retained web and connected evidence without native configuration
+  ---
+  duration_ms: 8.096583
+  ...
+# Subtest: ambiguous locator never substitutes a capture; exact evidence IDs disambiguate
+ok 110 - ambiguous locator never substitutes a capture; exact evidence IDs disambiguate
+  ---
+  duration_ms: 3.690417
+  ...
+# Subtest: evidence byte-page read ranges preserve partial first and final columns
+ok 111 - evidence byte-page read ranges preserve partial first and final columns
+  ---
+  duration_ms: 15.295167
+  ...
+# Subtest: catalogue size, disappearing source, unsupported binary/PDF capture and late revocation stay explicit
+ok 112 - catalogue size, disappearing source, unsupported binary/PDF capture and late revocation stay explicit
+  ---
+  duration_ms: 13.147
+  ...
+# Subtest: normalized fetched preview is identified separately from exact raw-byte read ranges
+ok 113 - normalized fetched preview is identified separately from exact raw-byte read ranges
+  ---
+  duration_ms: 7.812375
+  ...
+# Subtest: inherited sources use only host-bound original provenance and cannot invent read ranges
+ok 114 - inherited sources use only host-bound original provenance and cannot invent read ranges
+  ---
+  duration_ms: 7.987666
+  ...
+# Subtest: knowledge responses expose sealed bytes through exact evidence IDs without live saved-record reads
+ok 115 - knowledge responses expose sealed bytes through exact evidence IDs without live saved-record reads
+  ---
+  duration_ms: 6.941958
+  ...
+# Subtest: current knowledge refresh is identified as a request-start snapshot rather than a model tool call
+ok 116 - current knowledge refresh is identified as a request-start snapshot rather than a model tool call
+  ---
+  duration_ms: 6.769667
+  ...
+# Subtest: native journal and maintenance roots follow relative Unix profiles without relocating host inputs
+ok 117 - native journal and maintenance roots follow relative Unix profiles without relocating host inputs
+  ---
+  duration_ms: 0.828917
+  ...
+# Subtest: terminal handoff preserves literal arguments and records success or an early failure
+ok 118 - terminal handoff preserves literal arguments and records success or an early failure
+  ---
+  duration_ms: 35.724166
+  ...
+# Subtest: runtime naming and Windows native argument quoting are platform-aware
+ok 119 - runtime naming and Windows native argument quoting are platform-aware
+  ---
+  duration_ms: 0.496042
+  ...
+# Subtest: Windows handoff executes native argv literally and retains exit status
+ok 120 - Windows handoff executes native argv literally and retains exit status # SKIP
+  ---
+  duration_ms: 0.150209
+  ...
+# Subtest: updates require explicit actions and cannot change feed, channel or install on ordinary quit
+ok 121 - updates require explicit actions and cannot change feed, channel or install on ordinary quit
+  ---
+  duration_ms: 2.111916
+  ...
+# Subtest: manual builds neither configure nor contact an updater
+ok 122 - manual builds neither configure nor contact an updater
+  ---
+  duration_ms: 0.180083
+  ...
+# Subtest: availability, actual download progress and ready state stay separate
+ok 123 - availability, actual download progress and ready state stay separate
+  ---
+  duration_ms: 5.646708
+  ...
+# Subtest: restart checks current work both before and after the user's review
+ok 124 - restart checks current work both before and after the user's review
+  ---
+  duration_ms: 0.479375
+  ...
+# Subtest: declining restart and failed preparation never invoke the installer
+ok 125 - declining restart and failed preparation never invoke the installer
+  ---
+  duration_ms: 0.331875
+  ...
+# Subtest: an installer error event restores the session without resubmitting work
+ok 126 - an installer error event restores the session without resubmitting work
+  ---
+  duration_ms: 4.407292
+  ...
+# Subtest: only a reviewed prepared install invokes quitAndInstall
+ok 127 - only a reviewed prepared install invokes quitAndInstall
+  ---
+  duration_ms: 0.259667
+  ...
+# Subtest: download failure never becomes an installable update
+ok 128 - download failure never becomes an installable update
+  ---
+  duration_ms: 0.16125
+  ...
+# Subtest: host restart blockers cover live work, queue, approvals, external steps and editable forms
+ok 129 - host restart blockers cover live work, queue, approvals, external steps and editable forms
+  ---
+  duration_ms: 0.280542
+  ...
+# Subtest: selected files become private independent copies and attachment-only drafts survive restart
+ok 130 - selected files become private independent copies and attachment-only drafts survive restart
+  ---
+  duration_ms: 12.060584
+  ...
+# Subtest: imports reject unsupported, oversized and excessive inputs without leaving partial selections
+ok 131 - imports reject unsupported, oversized and excessive inputs without leaving partial selections
+  ---
+  duration_ms: 22.345667
+  ...
+# Subtest: upload submission carries bounded opaque identities and a conversation binding
+ok 132 - upload submission carries bounded opaque identities and a conversation binding
+  ---
+  duration_ms: 1.110792
+  ...
+# Subtest: cleanup keeps files belonging to admitted messages and defers unreadable journals
+ok 133 - cleanup keeps files belonging to admitted messages and defers unreadable journals
+  ---
+  duration_ms: 10.763375
+  ...
+# Subtest: dialogue-only and completed turns retain captured inputs across pruning without a Work journal
+ok 134 - dialogue-only and completed turns retain captured inputs across pruning without a Work journal
+  ---
+  duration_ms: 8.739042
+  ...
+# Subtest: invalid or linked dialogue storage defers cleanup instead of losing uncertain inputs
+ok 135 - invalid or linked dialogue storage defers cleanup instead of losing uncertain inputs
+  ---
+  duration_ms: 9.01625
+  ...
+# Subtest: larger document intake and all attachment guards share the Go runtime limits
+ok 136 - larger document intake and all attachment guards share the Go runtime limits
+  ---
+  duration_ms: 19.958833
+  ...
+# Subtest: pending input scope history protects withdrawn originals during cleanup
+ok 137 - pending input scope history protects withdrawn originals during cleanup
+  ---
+  duration_ms: 2.635875
+  ...
+# Subtest: failed tasks awaiting explicit setup repair retain original attachments until discarded
+ok 138 - failed tasks awaiting explicit setup repair retain original attachments until discarded
+  ---
+  duration_ms: 2.329
+  ...
+# Subtest: dictation requests accept audio bytes and reject file paths and extra authority
+ok 139 - dictation requests accept audio bytes and reject file paths and extra authority
+  ---
+  duration_ms: 1.081792
+  ...
+# Subtest: microphone permission belongs only to the current app window and explicit audio grant
+ok 140 - microphone permission belongs only to the current app window and explicit audio grant
+  ---
+  duration_ms: 0.375333
+  ...
+# Subtest: local model downloads cannot select URLs, paths, credentials or native programs
+ok 141 - local model downloads cannot select URLs, paths, credentials or native programs
+  ---
+  duration_ms: 0.834
+  ...
+1..141
+# tests 141
+# suites 0
+# pass 139
+# fail 1
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 6362.033458

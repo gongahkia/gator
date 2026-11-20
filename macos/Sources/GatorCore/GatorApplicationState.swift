@@ -195,6 +195,10 @@ public final class GatorApplicationState {
     }
     func receive(_ event: BridgeEvent, generation ownerGeneration: UUID) {
         guard ownerGeneration == generation, connectionStatus != .closed else { return }
+        // terminal animation ticks do not change any native presentation or
+        // authority data. Do not invalidate SwiftUI or reconcile owners for them.
+        if connectionStatus == .connected, case .state(let next) = event,
+           let snapshot, snapshot.hasSameNativeContent(as: next) { return }
         let priorSnapshot = snapshot
         defer { changed?(self, priorSnapshot) }
         switch event {

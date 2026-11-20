@@ -1,0 +1,20 @@
+[
+  {
+    "probe": 20,
+    "sampleDuration": 300.14527201652527,
+    "medianCPUPercentOneCore": 0.2638912428838751,
+    "peakCPUPercentOneCore": 43.111600003855344,
+    "peakRSSMiB": 146.359375,
+    "peakPhysicalMiB": 70.01651763916016,
+    "qualification": "CONTAMINATED: not a controlled phase or acceptance measurement"
+  },
+  {
+    "probe": 21,
+    "sampleDuration": 183.64887285232544,
+    "medianCPUPercentOneCore": 0.26512977433125184,
+    "peakCPUPercentOneCore": 37.624290316258275,
+    "peakRSSMiB": 129.546875,
+    "peakPhysicalMiB": 47.28211975097656,
+    "qualification": "CONTAMINATED: not a controlled phase or acceptance measurement"
+  }
+]

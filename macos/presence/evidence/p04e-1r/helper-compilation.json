@@ -1,0 +1,38 @@
+[
+  {
+    "command": [
+      "swiftc",
+      "-swift-version",
+      "6",
+      "-strict-concurrency=complete",
+      "-warnings-as-errors",
+      "-target",
+      "arm64-apple-macos15.0",
+      "-parse-as-library",
+      "macos/presence/acceptance/Controller.swift",
+      "-o",
+      "/tmp/gator-presence-r1-controller-check"
+    ],
+    "exit": 0,
+    "output": "",
+    "sourceSHA256": "c0829402f0214adad90afe3a100a1e8c2b53c8f8c9bc5a8022d91a9796329a9c"
+  },
+  {
+    "command": [
+      "swiftc",
+      "-swift-version",
+      "6",
+      "-strict-concurrency=complete",
+      "-warnings-as-errors",
+      "-target",
+      "arm64-apple-macos15.0",
+      "-parse-as-library",
+      "macos/presence/acceptance/RecordFixture.swift",
+      "-o",
+      "/tmp/gator-presence-r1-record-check"
+    ],
+    "exit": 0,
+    "output": "",
+    "sourceSHA256": "702164648c142a8059d725e26bc76bb9e2e27bbc32e93f83817e3a0498bdf7f8"
+  }
+]

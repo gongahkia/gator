@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var quickAccess: NotchQuickAccess?
     var desktopPet: NativeDesktopPet?
     var openConversationWindow: (() -> Void)?
+    #if DEBUG
+    var acceptanceDiagnostics: NativeAcceptanceDiagnostics?
+    #endif
     private var terminating = false
     private var mayTerminate = false
     private var presentationObservers: [NSObjectProtocol] = []
@@ -22,6 +25,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NativeApplicationPresentation.update()
     }
     func applicationWillTerminate(_ notification: Notification) {
+        #if DEBUG
+        acceptanceDiagnostics?.stop(); acceptanceDiagnostics = nil
+        #endif
         desktopPet?.stop(); desktopPet = nil
         quickAccess?.stop()
         for observer in presentationObservers { NotificationCenter.default.removeObserver(observer) }

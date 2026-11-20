@@ -1,0 +1,60 @@
+[
+  {
+    "epoch": 1795152776.09233,
+    "cycle": 5,
+    "phase": "idle",
+    "state": {
+      "action": "state",
+      "bundle": "dev.gator.presence.r1",
+      "capture": [
+        {
+          "kCGWindowAlpha": 1,
+          "kCGWindowBounds": {
+            "Height": 740,
+            "Width": 820,
+            "X": 325,
+            "Y": 125
+          },
+          "kCGWindowIsOnscreen": true,
+          "kCGWindowLayer": 0,
+          "kCGWindowMemoryUsage": 2368,
+          "kCGWindowName": "Gator",
+          "kCGWindowNumber": 62299,
+          "kCGWindowOwnerName": "PresenceClosure",
+          "kCGWindowOwnerPID": 25302,
+          "kCGWindowSharingState": 1,
+          "kCGWindowStoreType": 1
+        }
+      ],
+      "controllerPID": 25289,
+      "elapsed": 0.0034600496292114258,
+      "focusedElement": {
+        "description": "Message Gator",
+        "id": "gator.composer.text",
+        "role": "AXTextArea",
+        "title": ""
+      },
+      "focusedWindow": {
+        "description": "",
+        "id": "conversation",
+        "role": "AXWindow",
+        "title": "Gator \u2013 Retained topic 0001"
+      },
+      "frontPID": 25302,
+      "ok": true,
+      "pid": 25302,
+      "started": 1795152776.0923429,
+      "window": "conversation",
+      "windows": [
+        {
+          "description": "",
+          "id": "conversation",
+          "role": "AXWindow",
+          "title": "Gator \u2013 Retained topic 0001"
+        }
+      ]
+    },
+    "pending": null,
+    "durable": null
+  }
+]

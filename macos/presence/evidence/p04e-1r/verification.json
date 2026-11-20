@@ -1,0 +1,58 @@
+[
+  {
+    "name": "swift-build",
+    "command": [
+      "swift",
+      "build",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build"
+    ],
+    "startedUTC": "2026-11-20T05:39:57.737104+00:00",
+    "seconds": 1.4705134159885347,
+    "exit": 0,
+    "GATOR_TEST_BINARY": "/tmp/Gator-Native-P04E1R-Verified.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "5eb910001bb27b6b7d9216fae7fddd9151fd1cfd998c01391fa60716ab3c5713"
+  },
+  {
+    "name": "swift-full",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel"
+    ],
+    "startedUTC": "2026-11-20T05:39:59.237381+00:00",
+    "seconds": 143.61488437501248,
+    "exit": 0,
+    "GATOR_TEST_BINARY": "/tmp/Gator-Native-P04E1R-Verified.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "5eb910001bb27b6b7d9216fae7fddd9151fd1cfd998c01391fa60716ab3c5713"
+  },
+  {
+    "name": "swift-strict",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors",
+      "--filter",
+      "mascot|presence|desktopPet|desktopPresence|realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval|approvalGuardsExactIdentity"
+    ],
+    "startedUTC": "2026-11-20T05:42:22.871876+00:00",
+    "seconds": 18.06033216699143,
+    "exit": 0,
+    "GATOR_TEST_BINARY": "/tmp/Gator-Native-P04E1R-Verified.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "5eb910001bb27b6b7d9216fae7fddd9151fd1cfd998c01391fa60716ab3c5713"
+  }
+]

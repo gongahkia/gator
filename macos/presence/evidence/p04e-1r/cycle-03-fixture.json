@@ -1,0 +1,16 @@
+{
+  "number": 3,
+  "candidate": "/tmp/Gator-Native-P04E1R-Verified.app",
+  "root": "/tmp/gator-native-test-presence-r1-kvar8v5g",
+  "app": "/tmp/gator-native-test-presence-r1-kvar8v5g/PresenceClosure.app",
+  "bundle": "dev.gator.presence.r1",
+  "pid": 24368,
+  "providerPID": 24360,
+  "ids": [
+    "work-20261120T041348-746f94287774dfa5",
+    "work-20261120T041348-e42b14c797c90d4e"
+  ],
+  "mode": "reactions",
+  "binarySHA256": "4f1740a4ebb360fe5e15332906ddada4a752237861e1464f686a617ae33ea917",
+  "GoSHA256": "5eb910001bb27b6b7d9216fae7fddd9151fd1cfd998c01391fa60716ab3c5713"
+}

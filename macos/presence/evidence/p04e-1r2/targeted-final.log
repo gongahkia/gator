@@ -1,0 +1,65 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/5] Compiling GatorCoreTests NativeSnapshotPublicationTests.swift
+[4/5] Emitting module GatorCoreTests
+[5/36] Compiling GatorCoreTests ApplicationStateTests.swift
+[6/36] Compiling GatorCoreTests BridgeProtocolTests.swift
+[7/36] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[8/36] Compiling GatorCoreTests GoIntegrationTests.swift
+[9/36] Compiling GatorCoreTests NativeCatalogTests.swift
+[10/36] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[11/36] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[12/36] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[13/36] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[14/36] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[15/36] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[16/36] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[17/36] Compiling GatorCoreTests NativeProviderTests.swift
+[18/36] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[19/36] Compiling GatorCoreTests NativeRecoveryTests.swift
+[20/36] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[21/36] Compiling GatorCoreTests NativePerformanceTests.swift
+[22/36] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[23/36] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[24/36] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[25/36] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[26/36] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[27/36] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[28/36] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[29/36] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[30/36] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[31/36] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[32/36] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[33/36] Compiling GatorCoreTests ManagedSessionTests.swift
+[34/36] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[35/36] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[35/37] Write Objects.LinkFileList
+[36/37] Linking GatorNativePackageTests
+Build complete! (6.30s)
+Test Suite 'Selected tests' started at 2026-11-20 14:20:11.637.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 14:20:11.638.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 14:20:11.638.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 14:20:11.638.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.022 seconds.
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.008 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() started.
+✔ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() passed after 0.008 seconds.
+◇ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() started.
+✔ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() passed after 0.007 seconds.
+◇ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() started.
+P04E1R2_HEADLESS_PENDING owner=work-20261120T062011-c9a06ed6ca267130 generation=9B38A926-734A-4C4B-A83A-CE520DC89D3F interaction=1 callbacks=0 durablePendingUnchanged=true shutdown=true nativeDesktopCycle=false
+✔ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() passed after 0.628 seconds.
+◇ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() started.
+✔ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() passed after 1.894 seconds.
+✔ Test run with 7 tests in 0 suites passed after 2.569 seconds.

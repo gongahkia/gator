@@ -1,0 +1,171 @@
+{
+  "targetCleanEndToEndCycles": 10,
+  "certifiedCleanEndToEndCycles": 0,
+  "cycles": [
+    {
+      "cycle": 3,
+      "appPID": 24368,
+      "sampleCount": 28,
+      "sampledSeconds": 27.093294858932495,
+      "rssMiB": {
+        "min": 0.03125,
+        "max": 132.46875
+      },
+      "physicalFootprintMiB": {
+        "min": 0.07819366455078125,
+        "max": 53.20415496826172,
+        "lifetimePeak": 53.51665496826172
+      },
+      "cpuPercentOneCore": {
+        "median": 0.4682563953386935,
+        "maxOneSecond": 1.161497825208479,
+        "settledLast5Median": 0.4597707790047781
+      },
+      "approvalCommands": [],
+      "durableInteractions": [
+        {
+          "path": "/tmp/gator-native-test-presence-r1-kvar8v5g/state/gator/interactions/work-20261120T041400-9c5ae3d732fd/1.json",
+          "status": "pending",
+          "approved": null,
+          "SHA256": "4fe65970e8c5e4149a5752d79657f33f081ed3c0f3d8b144db71f064c65151c3"
+        }
+      ],
+      "GoLaunches": [
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-kvar8v5g/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 24392,
+          "requestedConversation": "work-20261120T041400-6f7452c169a2b94f",
+          "epoch": 1795148040.601129,
+          "wrapperPID": 24391
+        },
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-kvar8v5g/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 24372,
+          "requestedConversation": "work-20261120T041348-e42b14c797c90d4e",
+          "epoch": 1795148030.0791209,
+          "wrapperPID": 24371
+        }
+      ],
+      "survivingGoPIDs": [],
+      "GoExitStatuses": [
+        0,
+        0
+      ],
+      "acceptance": "partial sequence only; no passive input audit"
+    },
+    {
+      "cycle": 4,
+      "appPID": 24456,
+      "sampleCount": 89,
+      "sampledSeconds": 88.37180399894714,
+      "rssMiB": {
+        "min": 0.03125,
+        "max": 157.703125
+      },
+      "physicalFootprintMiB": {
+        "min": 0.07819366455078125,
+        "max": 61.126007080078125,
+        "lifetimePeak": 61.469757080078125
+      },
+      "cpuPercentOneCore": {
+        "median": 0.5818980108054479,
+        "maxOneSecond": 1.4303070726631306,
+        "settledLast5Median": 0.5748236027868086
+      },
+      "approvalCommands": [],
+      "durableInteractions": [
+        {
+          "path": "/tmp/gator-native-test-presence-r1-e9fslnpp/state/gator/interactions/work-20261120T041440-12412f154482/1.json",
+          "status": "pending",
+          "approved": null,
+          "SHA256": "4fe65970e8c5e4149a5752d79657f33f081ed3c0f3d8b144db71f064c65151c3"
+        }
+      ],
+      "GoLaunches": [
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-e9fslnpp/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 24491,
+          "requestedConversation": "work-20261120T041440-8f944745bcba4cc8",
+          "epoch": 1795148080.575032,
+          "wrapperPID": 24490
+        },
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-e9fslnpp/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 24461,
+          "requestedConversation": "work-20261120T041432-918175bfa607c627",
+          "epoch": 1795148074.432106,
+          "wrapperPID": 24460
+        }
+      ],
+      "survivingGoPIDs": [],
+      "GoExitStatuses": [
+        0,
+        0
+      ],
+      "acceptance": "partial sequence only; no passive input audit"
+    },
+    {
+      "cycle": 5,
+      "appPID": 25302,
+      "sampleCount": 125,
+      "sampledSeconds": 124.4816529750824,
+      "rssMiB": {
+        "min": 0.03125,
+        "max": 137.375
+      },
+      "physicalFootprintMiB": {
+        "min": 0.07819366455078125,
+        "max": 54.64160919189453,
+        "lifetimePeak": 54.93848419189453
+      },
+      "cpuPercentOneCore": {
+        "median": 0.5534375972234866,
+        "maxOneSecond": 1.009117458023191,
+        "settledLast5Median": 0.37588940615460464
+      },
+      "approvalCommands": [],
+      "durableInteractions": [
+        {
+          "path": "/tmp/gator-native-test-presence-r1-_fos4djn/state/gator/interactions/work-20261120T053257-b679b466a289/1.json",
+          "status": "pending",
+          "approved": null,
+          "SHA256": "4fe65970e8c5e4149a5752d79657f33f081ed3c0f3d8b144db71f064c65151c3"
+        }
+      ],
+      "GoLaunches": [
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-_fos4djn/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 25308,
+          "requestedConversation": "work-20261120T053252-dde9bf3c1a74b705",
+          "epoch": 1795152775.5639338,
+          "wrapperPID": 25306
+        },
+        {
+          "direction": "launch",
+          "runtime": "/tmp/gator-native-test-presence-r1-_fos4djn/PresenceClosure.app/Contents/Resources/gator-runtime",
+          "pid": 25314,
+          "requestedConversation": "work-20261120T053257-b72e5518f9c76e9e",
+          "epoch": 1795152777.64951,
+          "wrapperPID": 25313
+        }
+      ],
+      "survivingGoPIDs": [],
+      "GoExitStatuses": [
+        0,
+        0
+      ],
+      "acceptance": "ABORTED for foreign input"
+    }
+  ],
+  "limitations": [
+    "Not matched performance trials: different durations and interaction patterns",
+    "Source-PID zero input is unattributed, not proven to be another automation process",
+    "No frame-by-frame/resource-owner instrumentation added to production",
+    "No new native recording completed before the user requested headless-only continuation"
+  ]
+}

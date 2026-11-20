@@ -1,0 +1,70 @@
+{
+  "required": 10,
+  "completed": 0,
+  "rows": [
+    {
+      "cycle": 1,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 2,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 3,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 4,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 5,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 6,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 7,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 8,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 9,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    },
+    {
+      "cycle": 10,
+      "status": "NOT RUN",
+      "reason": "Unowned input in two preparation probes; user directed headless-only continuation"
+    }
+  ],
+  "preparationProbes": [
+    {
+      "probe": 20,
+      "status": "ABORT",
+      "reason": "Unowned startup input; no pending review created"
+    },
+    {
+      "probe": 21,
+      "status": "ABORT",
+      "reason": "Unowned input after quiet readiness gate; no pending review created"
+    }
+  ],
+  "historicalNegative": "INVALID; unchanged",
+  "userDirection": "Finish headless; leave native acceptance open"
+}

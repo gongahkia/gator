@@ -1,0 +1,12 @@
+{
+  "userDirection": "Continue headless; leave desktop acceptance unverified",
+  "requiredCleanCycles": 10,
+  "certifiedCompletedCleanCycles": 0,
+  "nativeStallRootCause": "UNRESOLVED",
+  "historicalNegativeApprovalTest": "INVALID",
+  "newMonitoredBatch": "ABORTED on source-PID-zero input after controller-initiated Send and Open Original Task",
+  "correction": "The fixture Send was controller-initiated before the first monitored unowned event; earlier commentary and the clarification question incorrectly attributed that Send to another source.",
+  "newNativeRecording": "NOT CAPTURED: batch aborted before recorder startup",
+  "baselineB2Matrix": "NOT TESTED",
+  "finalVerdict": "CONDITIONAL; not fully accepted"
+}

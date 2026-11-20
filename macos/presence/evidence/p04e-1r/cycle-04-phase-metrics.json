@@ -1,0 +1,44 @@
+{
+  "units": "CPU converted from Mach ticks using measured 125/3 timebase; physical memory is total process footprint",
+  "phases": [
+    {
+      "phase": "idle before request",
+      "start": 1795148075.15681,
+      "end": 1795148080.3541908,
+      "samples": 6,
+      "medianCPUPercent": 0.4957156895283462,
+      "medianPhysicalMiB": 46.53221130371094,
+      "maximumRSSMiB": 129.015625
+    },
+    {
+      "phase": "pending before settings",
+      "start": 1795148080.3541908,
+      "end": 1795148095.844603,
+      "samples": 15,
+      "medianCPUPercent": 23.135120173691945,
+      "medianPhysicalMiB": 52.45408630371094,
+      "maximumRSSMiB": 138.734375
+    },
+    {
+      "phase": "settings interactions",
+      "start": 1795148095.844603,
+      "end": 1795148145.7300029,
+      "samples": 50,
+      "medianCPUPercent": 24.61843903004623,
+      "medianPhysicalMiB": 58.852569580078125,
+      "maximumRSSMiB": 155.703125
+    },
+    {
+      "phase": "post-settings",
+      "start": 1795148145.7300029,
+      "end": 1795148147.153997,
+      "samples": 1,
+      "medianCPUPercent": 27.409491037701002,
+      "medianPhysicalMiB": 60.391632080078125,
+      "maximumRSSMiB": 156.109375
+    }
+  ],
+  "working": "Not separately resolved at 1Hz",
+  "postGIF": "Not independently observed",
+  "limits": "manual partial sequence; not matched performance acceptance"
+}

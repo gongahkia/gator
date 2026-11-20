@@ -1,0 +1,67 @@
+{
+  "UTC": "2026-11-20T06:38:14.666698+00:00",
+  "startingHEAD": "c34735f0bc49d7a920c354e7bb10a94cecbfedcc",
+  "finalHEAD": "c34735f0bc49d7a920c354e7bb10a94cecbfedcc",
+  "candidate": "/tmp/Gator-Native-P04E1R2-Verified.app",
+  "candidateHashes": {
+    "Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "Contents/MacOS/GatorMac": "fe2cf9e7d8313fe99aad6ee1424fff75acff27e542812f50f5e2cb6b530f375c",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/gator-runtime": "7cc9847678f1dbc1a141a17f3aed6671af175a476427833cd5b08bb68172e96a",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+    "Contents/Resources/Presence/completed.gif": "8855aa8b205539a33abe8fe1687a110dbc9ba7f12a2864d26fd85e328c7b9bbb",
+    "Contents/Resources/Presence/attention.gif": "bf00539083313e171ec47ab95a8253bcdfd5b5025c39e39b531d73caef0da07c"
+  },
+  "sourceHashes": {
+    "macos/Sources/GatorCore/GatorApplicationState.swift": "e4c7aecbd407eda2254421c683f2babc8244ef56ccc30f5ca1b553efa10aaaf0",
+    "macos/Sources/GatorCore/BridgeProtocol.swift": "9872c393af6cc253cc542cd60e33ef5398b0ae1d1ada24f61d8bb390d69418f5",
+    "macos/Sources/GatorMac/GatorApp.swift": "37fe47e33c4c4471169ca13ef68b6f07ca1dac073e178565bbe86775340de193",
+    "macos/Sources/GatorMac/NativeAcceptanceDiagnostics.swift": "27553d428506e2d4d0c019a9f4ac1e2763527b85a16f1bcd7fb76a035e0b9ae6",
+    "macos/Sources/GatorMac/AppDelegate.swift": "3b9e3cc7c0821090fe21d397b46ed073bf5ccc45c5afa224b84bbccb1bf52b06",
+    "macos/presence/acceptance-r2/fixture.py": "73c6d4664dd0edfe21612911359bd2430a46979c8ecc53b736139aa45c8c499e",
+    "macos/presence/acceptance-r2/CheckCPUUnits.c": "a5a9bd7f7e14607c6bbe7a52f634e4026976109bb005c2282f2e4ceaeee37a5f",
+    "macos/presence/acceptance-r2/RecordFixture.swift": "14dcdec2e9306166094cac2fdf1f5f9a7baa1b06197a6714fec38040e2d1ffdc",
+    "macos/presence/acceptance-r2/ValidateIdentity.py": "42be466e63df238d003b2aeeedfb33a9149caa99311210c43f0df07c7e6baa77",
+    "macos/presence/acceptance-r2/ProbeBridgeCadence.py": "8643ec939385b1a63a451992cbe8e663cb6189c54cb1e4df6e28d7a626364b81",
+    "macos/presence/acceptance-r2/Controller.swift": "68c96f449689941fefb2feeb245f5b5749e1a4a15354ba8d068ae921e38f503a",
+    "macos/presence/acceptance-r2/sample.c": "397ac6d3610a73e319ace48d4df5df68b0039a311843fbe2e98577acf1a8b02b",
+    "macos/presence/acceptance-r2/IdentityHost.swift": "eb83f88c4e4fe0e0ef5853fc453fce4f17a79060b6f6fe69cb4adc456a34052f",
+    "macos/presence/acceptance-r2/Probe.py": "9bf41c9a5f8c5f6cefa272dc4037caa0b807f1703cfdcb3745d4266d2abd11c5",
+    "macos/presence/acceptance-r2/verify.py": "b7b006328938caf4ff9c61ee1680e95dc89de6d87c784b9057a0f224a0f56d7f",
+    "macos/presence/acceptance-r2/Driver.py": "863872d7950a1c0f027d88eba46091e05b359c83e89306980d4331a241caea0a",
+    "macos/Tests/GatorCoreTests/NativeSnapshotPublicationTests.swift": "2cc8ad4bf6c32dc4ce002e9479a57d0a71ce70e14ba9d900bdc1642e512e39d4"
+  },
+  "modifiedExistingFilesSinceStart": [
+    "macos/Sources/GatorCore/GatorApplicationState.swift",
+    "macos/Sources/GatorCore/BridgeProtocol.swift",
+    "macos/Sources/GatorMac/GatorApp.swift",
+    "macos/Sources/GatorMac/AppDelegate.swift"
+  ],
+  "priorBundles": [
+    {
+      "bundle": "/tmp/Gator-Native-P04E-Emoji.app",
+      "unchanged": true
+    },
+    {
+      "bundle": "/tmp/Gator-Native-P04M-2D.app",
+      "unchanged": true
+    },
+    {
+      "bundle": "/tmp/Gator-Native-Parity-P04.app",
+      "unchanged": true
+    },
+    {
+      "bundle": "/tmp/Gator-Native-P04M-B2.app",
+      "unchanged": true
+    }
+  ],
+  "nativeAcceptance": "CONDITIONAL; 0 of 10 clean cycles",
+  "nativeFinalBinaryLaunched": false,
+  "signingNotarization": "Not performed",
+  "preservedIntermediateCandidates": [
+    "/tmp/Gator-Native-P04E1R2-Baseline.app",
+    "/tmp/Gator-Native-P04E1R2-Diagnostic.app",
+    "/tmp/Gator-Native-P04E1R2-Pre-UTF8.app"
+  ]
+}

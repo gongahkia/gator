@@ -1,6 +1,6 @@
 """Disposable real-Go fixture. Seeded draft avoids all keyboard injection."""
 import hashlib,json,os,pathlib,plistlib,shutil,subprocess,tempfile,time,uuid
-EVIDENCE=pathlib.Path('macos/presence/evidence/p04e-1r').resolve()
+EVIDENCE=pathlib.Path(os.environ.get('GATOR_PRESENCE_EVIDENCE_DIRECTORY','macos/presence/evidence/p04e-1r')).resolve()
 def setup(candidate,number,mode='emoji'):
     root=pathlib.Path(tempfile.mkdtemp(prefix='gator-native-test-presence-r1-',dir='/tmp'));root.chmod(0o700)
     seed=pathlib.Path('/tmp/gator-presence-r1-seed')

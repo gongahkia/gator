@@ -1,0 +1,17 @@
+{
+  "number": 20,
+  "candidate": "/tmp/Gator-Native-P04E1R2-Diagnostic.app",
+  "root": "/tmp/gator-native-test-presence-r2-hyu0yo1s",
+  "app": "/tmp/gator-native-test-presence-r2-hyu0yo1s/ClosureR2.app",
+  "bundle": "dev.gator.presence.r2.c20",
+  "pid": 32855,
+  "providerPID": 32848,
+  "ids": [
+    "work-20261120T060608-66765d4fc9d3ac48",
+    "work-20261120T060608-e8bd39eeef8d93be"
+  ],
+  "mode": "off",
+  "binarySHA256": "e716fcd0284357f86f461b6a2d24c73dd745487e482275d2c4ceeab75d6a5c8c",
+  "GoSHA256": "7cc9847678f1dbc1a141a17f3aed6671af175a476427833cd5b08bb68172e96a",
+  "manifestPath": "/tmp/gator-native-test-presence-r2-hyu0yo1s/fixture.json"
+}

@@ -1,0 +1,312 @@
+{
+  "notAnAcceptanceCycle": true,
+  "controllerPID": 25636,
+  "events": [
+    {
+      "request": {
+        "action": "activate",
+        "pid": 25302
+      },
+      "result": {
+        "action": "activate",
+        "bundle": "dev.gator.presence.r1",
+        "controllerPID": 25636,
+        "elapsed": 0.05931198596954346,
+        "focusedElement": {
+          "description": "Message Gator",
+          "id": "gator.composer.text",
+          "role": "AXTextArea",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "",
+          "id": "conversation",
+          "role": "AXWindow",
+          "title": "Gator \u2013 Review mascot"
+        },
+        "frontPID": 1649,
+        "ok": true,
+        "pid": 25302,
+        "started": 1795152897.828572,
+        "window": "conversation"
+      }
+    },
+    {
+      "request": {
+        "action": "state",
+        "pid": 25302
+      },
+      "result": {
+        "action": "state",
+        "bundle": "dev.gator.presence.r1",
+        "capture": [
+          {
+            "kCGWindowAlpha": 1,
+            "kCGWindowBounds": {
+              "Height": 740,
+              "Width": 820,
+              "X": 325,
+              "Y": 125
+            },
+            "kCGWindowIsOnscreen": true,
+            "kCGWindowLayer": 0,
+            "kCGWindowMemoryUsage": 2368,
+            "kCGWindowName": "Gator",
+            "kCGWindowNumber": 62299,
+            "kCGWindowOwnerName": "PresenceClosure",
+            "kCGWindowOwnerPID": 25302,
+            "kCGWindowSharingState": 1,
+            "kCGWindowStoreType": 1
+          }
+        ],
+        "controllerPID": 25636,
+        "elapsed": 0.027515888214111328,
+        "focusedElement": {
+          "description": "Message Gator",
+          "id": "gator.composer.text",
+          "role": "AXTextArea",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "",
+          "id": "conversation",
+          "role": "AXWindow",
+          "title": "Gator \u2013 Review mascot"
+        },
+        "frontPID": 25302,
+        "ok": true,
+        "pid": 25302,
+        "started": 1795152897.889018,
+        "window": "conversation",
+        "windows": [
+          {
+            "description": "",
+            "id": "conversation",
+            "role": "AXWindow",
+            "title": "Gator \u2013 Review mascot"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "action": "quit",
+        "window": "conversation",
+        "expectedWindow": "conversation",
+        "expectedFocus": {
+          "description": "Message Gator",
+          "id": "gator.composer.text",
+          "role": "AXTextArea",
+          "title": ""
+        },
+        "pid": 25302
+      },
+      "result": {
+        "action": "quit",
+        "bundle": "dev.gator.presence.r1",
+        "controllerPID": 25636,
+        "elapsed": 0.04572701454162598,
+        "focusedElement": {
+          "description": "Message Gator",
+          "id": "gator.composer.text",
+          "role": "AXTextArea",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "",
+          "id": "conversation",
+          "role": "AXWindow",
+          "title": "Gator \u2013 Review mascot"
+        },
+        "frontPID": 25302,
+        "ok": true,
+        "pid": 25302,
+        "requested": true,
+        "started": 1795152897.9167361,
+        "window": "conversation"
+      }
+    },
+    {
+      "request": {
+        "action": "state",
+        "pid": 25302
+      },
+      "result": {
+        "action": "state",
+        "bundle": "dev.gator.presence.r1",
+        "capture": [
+          {
+            "kCGWindowAlpha": 1,
+            "kCGWindowBounds": {
+              "Height": 740,
+              "Width": 820,
+              "X": 325,
+              "Y": 125
+            },
+            "kCGWindowIsOnscreen": true,
+            "kCGWindowLayer": 0,
+            "kCGWindowMemoryUsage": 2368,
+            "kCGWindowName": "Gator",
+            "kCGWindowNumber": 62299,
+            "kCGWindowOwnerName": "PresenceClosure",
+            "kCGWindowOwnerPID": 25302,
+            "kCGWindowSharingState": 1,
+            "kCGWindowStoreType": 1
+          }
+        ],
+        "controllerPID": 25636,
+        "elapsed": 0.0025789737701416016,
+        "focusedElement": {
+          "description": "Message Gator",
+          "id": "gator.composer.text",
+          "role": "AXTextArea",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "",
+          "id": "conversation",
+          "role": "AXWindow",
+          "title": "Gator \u2013 Review mascot"
+        },
+        "frontPID": 25302,
+        "ok": true,
+        "pid": 25302,
+        "started": 1795152897.962657,
+        "window": "conversation",
+        "windows": [
+          {
+            "description": "",
+            "id": "conversation",
+            "role": "AXWindow",
+            "title": "Gator \u2013 Review mascot"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "action": "state",
+        "pid": 25302
+      },
+      "result": {
+        "action": "state",
+        "bundle": "dev.gator.presence.r1",
+        "capture": [
+          {
+            "kCGWindowAlpha": 0.014370417222380638,
+            "kCGWindowBounds": {
+              "Height": 4,
+              "Width": 4,
+              "X": 733,
+              "Y": 341
+            },
+            "kCGWindowIsOnscreen": true,
+            "kCGWindowLayer": 8,
+            "kCGWindowMemoryUsage": 2368,
+            "kCGWindowName": "",
+            "kCGWindowNumber": 62404,
+            "kCGWindowOwnerName": "PresenceClosure",
+            "kCGWindowOwnerPID": 25302,
+            "kCGWindowSharingState": 1,
+            "kCGWindowStoreType": 1
+          },
+          {
+            "kCGWindowAlpha": 1,
+            "kCGWindowBounds": {
+              "Height": 740,
+              "Width": 820,
+              "X": 325,
+              "Y": 125
+            },
+            "kCGWindowIsOnscreen": true,
+            "kCGWindowLayer": 0,
+            "kCGWindowMemoryUsage": 2368,
+            "kCGWindowName": "Gator",
+            "kCGWindowNumber": 62299,
+            "kCGWindowOwnerName": "PresenceClosure",
+            "kCGWindowOwnerPID": 25302,
+            "kCGWindowSharingState": 1,
+            "kCGWindowStoreType": 1
+          }
+        ],
+        "controllerPID": 25636,
+        "elapsed": 0.04001796245574951,
+        "focusedElement": {
+          "description": "alert",
+          "id": "_NS:87",
+          "role": "AXWindow",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "alert",
+          "id": "_NS:87",
+          "role": "AXWindow",
+          "title": ""
+        },
+        "frontPID": 25302,
+        "ok": true,
+        "pid": 25302,
+        "started": 1795152898.0203981,
+        "window": "conversation",
+        "windows": [
+          {
+            "description": "alert",
+            "id": "_NS:87",
+            "role": "AXWindow",
+            "title": ""
+          },
+          {
+            "description": "",
+            "id": "conversation",
+            "role": "AXWindow",
+            "title": "Gator \u2013 Review mascot"
+          }
+        ]
+      }
+    },
+    {
+      "request": {
+        "action": "press",
+        "window": "_NS:87",
+        "expectedWindow": "_NS:87",
+        "expectedFocus": {
+          "description": "alert",
+          "id": "_NS:87",
+          "role": "AXWindow",
+          "title": ""
+        },
+        "target": "Quit and Keep Retained Work",
+        "pid": 25302
+      },
+      "result": {
+        "action": "press",
+        "bundle": "dev.gator.presence.r1",
+        "controllerPID": 25636,
+        "elapsed": 0.006763935089111328,
+        "focusedElement": {
+          "description": "alert",
+          "id": "_NS:87",
+          "role": "AXWindow",
+          "title": ""
+        },
+        "focusedWindow": {
+          "description": "alert",
+          "id": "_NS:87",
+          "role": "AXWindow",
+          "title": ""
+        },
+        "frontPID": 25302,
+        "ok": true,
+        "pid": 25302,
+        "started": 1795152898.060577,
+        "target": {
+          "description": "",
+          "id": "action-button-2",
+          "role": "AXButton",
+          "title": "Quit and Keep Retained Work"
+        },
+        "window": "_NS:87"
+      }
+    }
+  ]
+}

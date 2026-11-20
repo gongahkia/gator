@@ -1,0 +1,14 @@
+"""Read-only audit of the disposable historical profile; no approval replay."""
+import hashlib,json,pathlib
+out=pathlib.Path('macos/presence/evidence/p04e-1r')
+root=pathlib.Path('/tmp/gator-native-test-presence-_5yzro2z')
+run='work-20261120T033715-9b901523bfc5';conversation='work-20261120T033452-ec96d92e176b4efc'
+base=root/'state/gator'
+paths={'interaction':base/'interactions'/run/'1.json','revision':base/'conversations'/conversation/'revisions'/f'{run}.json','trace':base/'traces'/run/'trace.json','manifest':base/'workspaces/bac79099c6189eaf335d5b4ca6f7ed57'/run/'manifest.json','requests':base/'conversations'/conversation/'requests.json','bridge':root/'bridge-12626.jsonl'}
+data={k:json.loads(p.read_text()) for k,p in paths.items() if k!='bridge'}
+bridge=[json.loads(x) for x in paths['bridge'].read_text().splitlines()]
+approvals=[{'line':i+1,'frame':x} for i,x in enumerate(bridge) if x.get('direction')=='command' and x.get('type')=='approval']
+interaction=data['interaction'];revision=data['revision'];manifest=data['manifest'];replay=revision['replay']
+result={'verdict':'HISTORICAL NEGATIVE TEST INVALID','source':'UNKNOWN: old AX/keyboard logs have no per-event timestamp/source-PID linkage','knownNativePID':12492,'bundle':'dev.gator.presence.finalcheck','wrapperPID':12626,'conversation':conversation,'run':run,'commands':approvals,'durableInteraction':interaction,'GoAcceptedDecision':interaction['status']=='resolved' and interaction.get('approved') is True,'retainedOutcome':revision['status'],'replayTools':[{'role':m.get('role'),'name':m.get('tool_name'),'toolCalls':m.get('tool_calls'),'content':m.get('content') if m.get('role')=='tool' else None} for m in replay['messages'] if m.get('role')=='tool' or m.get('tool_calls')],'research':manifest.get('research'),'actionsRecorded':manifest.get('actions',[]),'capturedContract':replay['configuration']['Contract'],'capturedSandbox':replay['configuration']['Code']['Sandbox'],'capturedConnectors':replay['configuration']['Connectors'],'hashes':{k:{'path':str(p),'SHA256':hashlib.sha256(p.read_bytes()).hexdigest()} for k,p in paths.items()},'toolSpans':[s for s in data['trace']['spans'] if s['name'].startswith('tool/')],'limitations':['No key/mouse/AX-source provenance at the decision time','A native approval command and accepted Go decision are verified; the user/control that triggered it is not','No web dispatch is recorded (request/search counters zero); this does not negate the accepted grant','No external-write tool appears in replay; captured contract forbids external actions; no connector configured','Historical zero-effect claims are evidence about effects only']}
+(out/'historical-approval-audit.json').write_text(json.dumps(result,indent=2)+'\n')
+print(json.dumps({'historicalNegative':result['verdict'],'accepted':result['GoAcceptedDecision'],'approvalCommandCount':len(approvals),'interaction':interaction['status'],'research':result['research']},indent=2))

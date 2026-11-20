@@ -1,0 +1,12 @@
+[
+  "TestDesktopApprovalCannotRespondToAnotherLiveRequest",
+  "TestWebResearchReviewIdentityDoesNotDependOnDisplayFields",
+  "TestReadInteractionRecordsValidatesAndScopesRetainedDecisions",
+  "TestInteractionDigestSurvivesRetainedActionPreview",
+  "TestInteractionDigestPreservesLargeJSONNumber",
+  "TestInteractionRunLockReportsActiveThenStopped",
+  "TestPublicResearchWaitsForBoundForegroundReviewAndRetainsFetchedEvidence",
+  "TestWebScopeDenialInvalidRequestsAndRevocation",
+  "TestRevocationDuringReviewExpiresApproval",
+  "TestPublicGrantDoesNotBypassPrivateDNSOrCancelledReview"
+]
