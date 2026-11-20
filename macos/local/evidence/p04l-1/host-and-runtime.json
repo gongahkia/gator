@@ -1,0 +1,50 @@
+{
+  "UTC": "2026-11-20T02:11:43.833205+00:00",
+  "ollamaExecutable": null,
+  "applicationInstalled": false,
+  "queries": {
+    "version": {
+      "error": "<urlopen error [Errno 61] Connection refused>"
+    },
+    "tags": {
+      "error": "<urlopen error [Errno 61] Connection refused>"
+    },
+    "ps": {
+      "error": "<urlopen error [Errno 61] Connection refused>"
+    }
+  },
+  "host": {
+    "sw_vers": {
+      "exit": 0,
+      "output": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.2\nBuildVersion:\t\t25F84\n"
+    },
+    "sysctl -n hw.memsize hw.model": {
+      "exit": 0,
+      "output": "17179869184\nMac15,12\n"
+    },
+    "sysctl vm.swapusage": {
+      "exit": 0,
+      "output": "vm.swapusage: total = 2048.00M  used = 1007.50M  free = 1040.50M  (encrypted)\n"
+    },
+    "vm_stat": {
+      "exit": 0,
+      "output": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                    46610.\nPages active:                                 260942.\nPages inactive:                               252693.\nPages speculative:                             13647.\nPages throttled:                                   0.\nPages wired down:                             142292.\nPages purgeable:                                3422.\n\"Translation faults\":                     1968069270.\nPages copy-on-write:                        82582187.\nPages zero filled:                        1260649589.\nPages reactivated:                          75482189.\nPages purged:                                7591999.\nFile-backed pages:                            182445.\nAnonymous pages:                              344837.\nPages stored in compressor:                   687128.\nPages occupied by compressor:                 295366.\nDecompressions:                             45046816.\nCompressions:                               61434979.\nPageins:                                    42729682.\nPageouts:                                     305383.\nSwapins:                                      202356.\nSwapouts:                                     324791.\n"
+    },
+    "memory_pressure -Q": {
+      "exit": 0,
+      "output": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 56%\n"
+    },
+    "go version": {
+      "exit": 0,
+      "output": "go version go1.27.3 darwin/arm64\n"
+    }
+  },
+  "storage": {
+    "source": "user default",
+    "directoryExists": false,
+    "freeBytesOnNearestExistingFilesystem": 238873595904,
+    "contentsInspected": false,
+    "installedTagIdentity": "UNKNOWN: runtime unavailable"
+  },
+  "applicationInUserApplications": false
+}

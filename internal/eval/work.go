@@ -89,10 +89,11 @@ type WorkGrader struct {
 	Expected string `json:"expected"`
 }
 type Grade struct {
-	Kind     string `json:"kind"`
-	Passed   bool   `json:"passed"`
-	Evidence string `json:"evidence"`
-	Error    string `json:"error,omitempty"`
+	LocalFirst *LocalFirstDecisionCheck `json:"local_first,omitempty"`
+	Kind       string                   `json:"kind"`
+	Passed     bool                     `json:"passed"`
+	Evidence   string                   `json:"evidence"`
+	Error      string                   `json:"error,omitempty"`
 }
 type WorkTrial struct {
 	Metrics           WorkMetrics         `json:"metrics"`
@@ -167,6 +168,10 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 	if err != nil {
 		return WorkDataset{}, err
 	}
+	return loadWorkDatasetData(path, data)
+}
+
+func loadWorkDatasetData(path string, data []byte) (WorkDataset, error) {
 	if len(data) > 8*1024*1024 {
 		return WorkDataset{}, errors.New("dataset manifest too large")
 	}
@@ -229,7 +234,7 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 				return dataset, errors.New("unsupported grader version")
 			}
 			switch g.Kind {
-			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex", "document_text_contains", "document_text_excludes", "cell_equals", "cell_formula_equals", "xlsx_chart_count", "context_contains", "context_absent", "final_contains", "final_excludes", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest", "json_pointer_equals", "json_pointer_contains", "json_pointer_absent", "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
+			case "local_first_decision", "tool_call_count", "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "file_excludes", "file_regex", "file_not_regex", "document_text_contains", "document_text_excludes", "cell_equals", "cell_formula_equals", "xlsx_chart_count", "context_contains", "context_absent", "final_contains", "final_excludes", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest", "json_pointer_equals", "json_pointer_contains", "json_pointer_absent", "pptx_slide_contains", "pptx_slide_excludes", "pptx_text_contains", "pptx_text_excludes", "pptx_slide_count":
 			default:
 				return dataset, fmt.Errorf("unknown grader %q", g.Kind)
 			}
@@ -514,6 +519,23 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 	actual := ""
 	var err error
 	switch g.Kind {
+	case "tool_call_count":
+		count := 0
+		for _, event := range outcome.Events {
+			if event.Kind == agent.EventToolCalled {
+				count++
+			}
+		}
+		grade.Passed = strconv.Itoa(count) == g.Expected
+		grade.Evidence = "observed tool-call event count: " + strconv.Itoa(count)
+		return grade
+	case "local_first_decision":
+		data, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 16*1024)
+		if readErr != nil {
+			grade.Error = "decision artifact unavailable"
+			return grade
+		}
+		return gradeLocalFirstDecision(g, data)
 	case "evidence_reference":
 		contents, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 512*1024)
 		if readErr != nil {

@@ -1,0 +1,13 @@
+=== RUN   TestLocalFirstAuditUseOverwritesAConcurrentIndependentWriter
+    local_first_audit_test.go:86: LF-01 reproduced: independent process saved Theme=mono with Update; stale local Use returned success, reset Theme, and restored the disabled fake CLI configuration
+--- PASS: TestLocalFirstAuditUseOverwritesAConcurrentIndependentWriter (0.03s)
+=== RUN   TestLocalFirstAuditConfigWriterHelper
+    local_first_audit_test.go:92: independent-process helper only
+--- SKIP: TestLocalFirstAuditConfigWriterHelper (0.00s)
+=== RUN   TestLocalFirstAuditRemovalCanOutliveSettingsPublication
+    local_first_audit_test.go:156: LF-02 reproduced: fake Ollama confirmed DELETE, settings replacement failed; operation is partially committed
+--- PASS: TestLocalFirstAuditRemovalCanOutliveSettingsPublication (0.01s)
+=== RUN   TestLocalFirstAuditExistingRuntimeIsNotAdoptedOrStopped
+--- PASS: TestLocalFirstAuditExistingRuntimeIsNotAdoptedOrStopped (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/cmd/gator	0.716s

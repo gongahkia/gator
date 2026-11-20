@@ -1,0 +1,1 @@
+local-first-v1: four deterministic arms; context plan=4096, concurrency=1; live inference disabled

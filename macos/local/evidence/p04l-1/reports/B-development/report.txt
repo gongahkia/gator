@@ -1,0 +1,8 @@
+local-first-B: 25/25 scored trials; 25 cases pass at least once; 25 cases pass every trial.
+Split: development. Grading categories: map[success:25]
+Execution outcomes: map[completed:25]
+Transaction: history=map[passed:25] verification=map[passed:25] delivery=map[not_attempted:25] recovery=map[not_run:25] external_actions=map[none:25]
+Requests: 79 (79 without token usage); retries: 0; tool-surface fallbacks: 0; interventions: 0; tool failures: 2.
+Artifact checks: 50 (0 failed); unsupported exact quotations: 0; semantic entailment is not scored by quote matching.
+Reported tokens: 0 input, 0 output; total latency: 1739 ms; cost: unknown.
+Scripted: true; delegation: false; baseline without goal state: false; provider/model: fixture/scripted-reference; harness: 978813b3b5403798c1c8efa6054e1f6a119ad2ca; disabled roles: [].

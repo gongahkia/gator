@@ -1,0 +1,19 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-json",
+    "-count=1",
+    "./internal/eval",
+    "./internal/localmodel",
+    "./internal/modelcatalog",
+    "./internal/cliagent",
+    "./internal/config",
+    "./internal/model/...",
+    "./internal/agent",
+    "./internal/workrun",
+    "./cmd/gator"
+  ],
+  "liveOptInVariablesCleared": true,
+  "providerKeyEnvironmentCleared": true
+}

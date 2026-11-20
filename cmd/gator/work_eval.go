@@ -20,6 +20,9 @@ import (
 )
 
 func workEvalCommand(args []string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "local-first" {
+		return workLocalFirstEvalCommand(args[1:], out)
+	}
 	if len(args) > 0 && args[0] == "watch" {
 		return workWatchEvalCommand(args[1:], out)
 	}

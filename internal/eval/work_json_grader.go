@@ -15,6 +15,18 @@ import (
 
 func validateStructuredGrader(g WorkGrader) error {
 	switch g.Kind {
+	case "tool_call_count":
+		count, err := strconv.Atoi(g.Expected)
+		if err != nil || count < 0 || count > 128 {
+			return errors.New("tool call count must be 0 through 128")
+		}
+		return nil
+	case "local_first_decision":
+		if g.Path != "decision.json" {
+			return errors.New("local-first decision must use decision.json")
+		}
+		_, err := decodeLocalFirstDecision([]byte(g.Expected))
+		return err
 	case "json_pointer_equals", "json_pointer_contains", "json_pointer_absent":
 		if g.Path == "" {
 			return errors.New("JSON pointer grader requires an output path")

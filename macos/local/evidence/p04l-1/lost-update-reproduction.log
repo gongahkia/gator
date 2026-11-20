@@ -1,0 +1,9 @@
+=== RUN   TestLocalFirstAuditUseOverwritesAConcurrentIndependentWriter
+    local_first_audit_test.go:74: independent writer exit status 1 --- FAIL: TestLocalFirstAuditConfigWriterHelper (0.00s)
+            local_first_audit_test.go:103: child write did not persist <nil>
+        FAIL
+        
+--- FAIL: TestLocalFirstAuditUseOverwritesAConcurrentIndependentWriter (0.02s)
+FAIL
+FAIL	github.com/gongahkia/gator/cmd/gator	0.784s
+FAIL

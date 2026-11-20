@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "local-first-v1",
+  "context_tokens": 4096,
+  "concurrency": 1,
+  "max_requests": 256,
+  "wall_seconds": 120,
+  "arms": {
+    "A": {
+      "dataset": "dataset-A.json",
+      "sha256": "b81b034fbd8f3a569e0fad14114174999aaac722574ef05e52bbc830b37526f7"
+    },
+    "B": {
+      "dataset": "dataset-B.json",
+      "sha256": "ce1314c5a1699a557fc9108c1b9ac2f4991ef0ef08f192d2cd95694907688879"
+    },
+    "C": {
+      "dataset": "dataset-C.json",
+      "sha256": "1a240b9449eb589e92fae8d370de61afbb9ce7f5d9dde19dad4961035e28a7a6"
+    },
+    "D": {
+      "dataset": "dataset-D.json",
+      "sha256": "f4b96702b1b768b294f57f28447c691f098ffcee1f8c8017727185616f3176d6"
+    }
+  }
+}
