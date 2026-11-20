@@ -1,0 +1,83 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/43] Emitting module GatorCoreTests
+[4/47] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[5/48] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[6/48] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[7/48] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[8/48] Compiling GatorMacTests NativeDesktopPetTests.swift
+[9/48] Compiling GatorMacTests NativeInputTests.swift
+[10/48] Emitting module GatorMacTests
+[11/48] Compiling GatorMacTests NativeMascotTests.swift
+[12/48] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[13/48] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[14/48] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[15/48] Compiling GatorCoreTests NativeMessageContentTests.swift
+[16/48] Compiling GatorMacTests NotchGeometryTests.swift
+[17/48] Compiling GatorCoreTests NativeProviderTests.swift
+[18/48] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[19/48] Compiling GatorCoreTests NativeRecoveryTests.swift
+[20/48] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[21/48] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[22/48] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[23/48] Compiling GatorCoreTests NativeCatalogTests.swift
+[24/48] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[25/48] Compiling GatorCoreTests ApplicationStateTests.swift
+[26/48] Compiling GatorCoreTests BridgeProtocolTests.swift
+[27/48] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[28/48] Compiling GatorCoreTests GoIntegrationTests.swift
+[29/48] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[30/48] Compiling GatorCoreTests NativePerformanceTests.swift
+[31/48] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[32/48] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[33/48] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[34/48] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[35/48] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[36/48] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[37/48] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[38/48] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[39/48] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[40/48] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[41/48] Compiling GatorCoreTests resource_bundle_accessor.swift
+[42/48] Compiling GatorCoreTests ManagedSessionTests.swift
+[43/48] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[44/48] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[45/48] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[46/48] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[47/50] Compiling GatorNativePackageTests runner.swift
+[48/50] Emitting module GatorNativePackageTests
+[48/50] Write Objects.LinkFileList
+[49/50] Linking GatorNativePackageTests
+Build complete! (6.43s)
+Test Suite 'Selected tests' started at 2026-11-20 09:41:12.735.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 09:41:12.737.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 09:41:12.737.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 09:41:12.737.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() started.
+✔ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() passed after 0.001 seconds.
+◇ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() started.
+✔ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() passed after 0.001 seconds.
+◇ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() started.
+✔ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() passed after 0.026 seconds.
+◇ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() started.
+✔ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() passed after 0.002 seconds.
+◇ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() started.
+✔ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() passed after 0.001 seconds.
+◇ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() started.
+✔ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() passed after 0.001 seconds.
+◇ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() started.
+✔ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() passed after 0.004 seconds.
+◇ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() started.
+✔ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() passed after 0.001 seconds.
+◇ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() started.
+✔ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() passed after 0.004 seconds.
+◇ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() started.
+✔ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() passed after 0.001 seconds.
+✔ Test run with 10 tests in 0 suites passed after 0.044 seconds.

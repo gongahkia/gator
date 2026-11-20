@@ -6,7 +6,7 @@ enum NativeDesktopPetPreference {
     static let display = "gator.desktopPet.display"
 }
 
-struct NativeDesktopPetScreen: Equatable {
+struct NativeDesktopPetScreen {
     let id: String
     let name: String
     let frame: CGRect
@@ -48,22 +48,27 @@ struct NativeDesktopPetScreen: Equatable {
     func close()
 }
 
+private final class DesktopPetObservers {
+    var entries: [(NotificationCenter, NSObjectProtocol)] = []
+    deinit { for (center, token) in entries { center.removeObserver(token) } }
+}
+
 @MainActor final class NativeDesktopPet {
     private let defaults: UserDefaults
-    private let readSignal: () -> NativeMascotSignal?
-    private let isClosing: () -> Bool
-    private let screens: () -> [NativeDesktopPetScreen]
-    private let makeSurface: () -> any NativeDesktopPetSurface
+    private let readSignal: @MainActor () -> NativeMascotSignal?
+    private let isClosing: @MainActor () -> Bool
+    private let screens: @MainActor () -> [NativeDesktopPetScreen]
+    private let makeSurface: @MainActor () -> any NativeDesktopPetSurface
     private var surface: (any NativeDesktopPetSurface)?
     private var state = NativeMascotStateMachine()
-    private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var observers: DesktopPetObservers? = DesktopPetObservers()
     private var refresh: Task<Void, Never>?
     private var stopped = false
     private var sleeping = false
 
-    init(defaults: UserDefaults = .standard, readSignal: @escaping () -> NativeMascotSignal?,
-         isClosing: @escaping () -> Bool, screens: @escaping () -> [NativeDesktopPetScreen] = NativeDesktopPetScreen.current,
-         makeSurface: @escaping () -> any NativeDesktopPetSurface = { NativeDesktopPetPanel() }) {
+    init(defaults: UserDefaults = .standard, readSignal: @escaping @MainActor () -> NativeMascotSignal?,
+         isClosing: @escaping @MainActor () -> Bool, screens: @escaping @MainActor () -> [NativeDesktopPetScreen] = NativeDesktopPetScreen.current,
+         makeSurface: @escaping @MainActor () -> any NativeDesktopPetSurface = { NativeDesktopPetPanel() }) {
         self.defaults = defaults; self.readSignal = readSignal; self.isClosing = isClosing
         self.screens = screens; self.makeSurface = makeSurface
         observe(.default, UserDefaults.didChangeNotification)
@@ -82,7 +87,7 @@ struct NativeDesktopPetScreen: Equatable {
                 self?.scheduleRefresh()
             }
         }
-        observers.append((center, token))
+        observers?.entries.append((center, token))
     }
 
     private func scheduleRefresh() {
@@ -118,8 +123,7 @@ struct NativeDesktopPetScreen: Equatable {
 
     func stop() {
         stopped = true; refresh?.cancel(); refresh = nil
-        for (center, token) in observers { center.removeObserver(token) }
-        observers.removeAll(); releaseSurface()
+        observers = nil; releaseSurface()
     }
 }
 
@@ -149,8 +153,4 @@ struct NativeDesktopPetScreen: Equatable {
     }
 
     override func close() { canvas.detach(); orderOut(nil); contentView = nil; super.close() }
-}
-
-struct NativeDesktopPetPolicy {
-    static func tuckAway(_ defaults: UserDefaults = .standard) { defaults.set(false, forKey: NativeDesktopPetPreference.shown) }
 }

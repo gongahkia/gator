@@ -1,0 +1,27 @@
+window= title= pos=(613.0, 0.0) size=(243.0, 38.0) main=Optional(0) focused=Optional(0)
+window=com_apple_SwiftUI_Settings_window title=Gator Settings pos=(525.0, 211.0) size=(420.0, 554.0) main=Optional(1) focused=Optional(1)
+window=conversation title=Gator – New chat pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(0) focused=Optional(0)
+captureID=54482 bounds={
+    Height = 38;
+    Width = 243;
+    X = 613;
+    Y = 0;
+}
+captureID=54487 bounds={
+    Height = 72;
+    Width = 72;
+    X = 699;
+    Y = 258;
+}
+captureID=54486 bounds={
+    Height = 554;
+    Width = 420;
+    X = 525;
+    Y = 211;
+}
+captureID=54481 bounds={
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}

@@ -1,0 +1,18 @@
+{
+  "initialHEAD": "8bd1bcbce6c98cb968314fb1f96fbccd6498f493",
+  "finalHEAD": "dd45abc7766decd0280cf44c5ce3d87310dfe268",
+  "changedExistingFiles": [
+    "macos/Sources/GatorMac/GatorApp.swift",
+    "macos/Sources/GatorMac/ConversationView.swift",
+    "macos/Sources/GatorMac/NativeMascotPreferences.swift",
+    "macos/Sources/GatorMac/AppDelegate.swift"
+  ],
+  "unchangedProtectedBundleCount": 61,
+  "changedHistoricalBundleFiles": [],
+  "newProductionFiles": [
+    "macos/Sources/GatorMac/NativeDesktopPet.swift"
+  ],
+  "newTests": [
+    "macos/Tests/GatorMacTests/NativeDesktopPetTests.swift"
+  ]
+}

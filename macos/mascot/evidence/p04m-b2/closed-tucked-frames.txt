@@ -1,0 +1,7 @@
+window= title= pos=(613.0, 0.0) size=(243.0, 38.0) main=Optional(0) focused=Optional(0)
+captureID=54599 bounds={
+    Height = 38;
+    Width = 243;
+    X = 613;
+    Y = 0;
+}

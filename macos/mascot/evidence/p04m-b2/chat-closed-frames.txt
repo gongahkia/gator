@@ -1,0 +1,25 @@
+window= title= pos=(613.0, 0.0) size=(243.0, 38.0) main=Optional(0) focused=Optional(0)
+captureID=54482 bounds={
+    Height = 38;
+    Width = 243;
+    X = 613;
+    Y = 0;
+}
+captureID=54576 bounds={
+    Height = 72;
+    Width = 72;
+    X = 699;
+    Y = 258;
+}
+captureID=54486 bounds={
+    Height = 544;
+    Width = 412;
+    X = 529;
+    Y = 216;
+}
+captureID=54481 bounds={
+    Height = 726;
+    Width = 804;
+    X = 333;
+    Y = 132;
+}

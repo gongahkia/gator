@@ -1,0 +1,8 @@
+ok  	github.com/gongahkia/gator/cmd/gator	(cached)
+ok  	github.com/gongahkia/gator/internal/workapp	(cached)
+ok  	github.com/gongahkia/gator/internal/worksession	(cached)
+ok  	github.com/gongahkia/gator/internal/workspace	(cached)
+ok  	github.com/gongahkia/gator/internal/workactivity	(cached)
+ok  	github.com/gongahkia/gator/internal/modelcatalog	(cached)
+ok  	github.com/gongahkia/gator/internal/auth	(cached)
+ok  	github.com/gongahkia/gator/internal/config	(cached)

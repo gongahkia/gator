@@ -1,0 +1,659 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/25] Compiling GatorCore GoBridgeConnection.swift
+[3/25] Compiling GatorCore ManagedSessionCoordinator.swift
+[4/25] Compiling GatorCore ManagedSessionProtocol.swift
+[5/25] Emitting module GatorCore
+[6/25] Compiling GatorCore NativeCatalogProtocol.swift
+[7/25] Compiling GatorCore NativeConversationCatalog.swift
+[8/25] Compiling GatorCore NativeDraftAttachments.swift
+[9/25] Compiling GatorCore NativeProviderProtocol.swift
+[10/25] Compiling GatorCore NativeProviderSetup.swift
+[11/25] Compiling GatorCore NativeRecovery.swift
+[12/25] Compiling GatorCore NativeRecoveryPreparation.swift
+[13/25] Compiling GatorCore BridgePipeIO.swift
+[14/25] Compiling GatorCore BridgeProtocol.swift
+[15/25] Compiling GatorCore GatorApplicationState.swift
+[16/25] Compiling GatorCore NativeTaskReview.swift
+[17/25] Compiling GatorCore NativeTranscriptSearch.swift
+[18/25] Compiling GatorCore NativeDraftStore.swift
+[19/25] Compiling GatorCore NativeMessageContent.swift
+[20/25] Compiling GatorCore NativePlanExecution.swift
+[21/27] Compiling GatorCore NativeUploadStore.swift
+[22/27] Compiling GatorCore NativeWorkspaceSelection.swift
+[23/90] Compiling GatorMac NativeDropInput.swift
+[24/90] Compiling GatorMac NativeErrorDisclosure.swift
+[25/90] Compiling GatorMac NativeMascotModel.swift
+[26/90] Compiling GatorMac NativeMascotPlayback.swift
+[27/94] Emitting module GatorMac
+[28/94] Compiling GatorMac NativeReadingPositions.swift
+[29/94] Compiling GatorMac NativeStatusMessage.swift
+[30/94] Compiling GatorMac NativeTranscriptFind.swift
+[31/94] Compiling GatorMac NativeWindowConfiguration.swift
+[32/94] Compiling GatorMac NativeAccessibilityStatus.swift
+[33/94] Compiling GatorMac NativeAttachmentActions.swift
+[34/94] Compiling GatorMac NativeComposer.swift
+[35/94] Compiling GatorMac NativeComposerPresentation.swift
+[36/94] Compiling GatorMac NativeDesktopPet.swift
+[38/94] Compiling GatorMac NativeWorkspacePicker.swift
+[39/94] Compiling GatorMac NotchQuickAccess.swift
+[40/94] Compiling GatorMac PlanReviewContent.swift
+[41/98] Compiling GatorMac NativeMascotPreferences.swift
+[42/98] Compiling GatorMac NativeMascotView.swift
+[43/98] Compiling GatorMac NativeMessageBody.swift
+[44/98] Compiling GatorMac NativeProviderSecretEntry.swift
+[48/98] Compiling GatorMac ProviderSetupView.swift
+[65/98] Compiling GatorMac AppDelegate.swift
+[66/98] Compiling GatorMac ApprovalReviewView.swift
+[67/98] Compiling GatorMac AttachmentSelectionView.swift
+[68/98] Compiling GatorMac ComposerView.swift
+[69/98] Compiling GatorMac ConversationCatalogView.swift
+[70/98] Emitting module GatorCoreTests
+[71/98] Compiling GatorMac ConversationView.swift
+[72/98] Compiling GatorMac ExactDecisionButton.swift
+[73/98] Compiling GatorMac ExactReviewContent.swift
+[74/98] Compiling GatorMac GatorApp.swift
+[75/98] Compiling GatorMac MenuBarVisibilityToggle.swift
+[76/98] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[77/98] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[78/98] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[79/98] Compiling GatorCoreTests resource_bundle_accessor.swift
+[83/98] Compiling GatorMac TaskInspectorView.swift
+[93/97] Linking GatorMac
+[94/97] Applying GatorMac
+[96/105] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[97/106] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[98/106] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[99/106] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[100/106] Compiling GatorMacTests NativeMascotTests.swift
+[101/106] Compiling GatorMacTests NativeDesktopPetTests.swift
+[102/106] Emitting module GatorMacTests
+[103/106] Compiling GatorMacTests NativeInputTests.swift
+[104/106] Compiling GatorMacTests NotchGeometryTests.swift
+[105/108] Emitting module GatorNativePackageTests
+[106/108] Compiling GatorNativePackageTests runner.swift
+[106/107] Linking GatorNativePackageTests
+Build complete! (19.35s)
+Test Suite 'All tests' started at 2026-11-20 09:47:46.189.
+Test Suite 'All tests' passed at 2026-11-20 09:47:46.190.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test ackIsNotAdmissionAndLateAcceptancePreservesNewDraft() started.
+✔ Test ackIsNotAdmissionAndLateAcceptancePreservesNewDraft() passed after 0.049 seconds.
+◇ Test sharedPresentationReferencesUseOneOwnerAndSnapshotsReplace() started.
+✔ Test sharedPresentationReferencesUseOneOwnerAndSnapshotsReplace() passed after 0.018 seconds.
+◇ Test navigationAndStopRespectBusyOwner() started.
+✔ Test navigationAndStopRespectBusyOwner() passed after 0.008 seconds.
+◇ Test settingsRequireMatchingActualResultAndReadinessIsConfigurationOnly() started.
+✔ Test settingsRequireMatchingActualResultAndReadinessIsConfigurationOnly() passed after 0.046 seconds.
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.021 seconds.
+◇ Test disconnectPersistsUncertainIdentityAndExplicitRetryUsesOriginal() started.
+✔ Test disconnectPersistsUncertainIdentityAndExplicitRetryUsesOriginal() passed after 0.106 seconds.
+◇ Test reconnectReplacesOwnerWithoutResendingAdmissionOrApproval() started.
+✔ Test reconnectReplacesOwnerWithoutResendingAdmissionOrApproval() passed after 0.023 seconds.
+◇ Test exactApprovalDispatchWaitsForGoAndMissingDetailsCannotApprove() started.
+✔ Test exactApprovalDispatchWaitsForGoAndMissingDetailsCannotApprove() passed after 0.019 seconds.
+◇ Test rejectedAdmissionAndSettingsKeepDraftAndActualValues() started.
+✔ Test rejectedAdmissionAndSettingsKeepDraftAndActualValues() passed after 0.022 seconds.
+◇ Test unreadableDraftStorageDisablesEditingButStillAllowsSafeQuit() started.
+✔ Test unreadableDraftStorageDisablesEditingButStillAllowsSafeQuit() passed after 0.009 seconds.
+◇ Test framingHandlesSplitUTF8AndCoalescedFrames() started.
+✔ Test framingHandlesSplitUTF8AndCoalescedFrames() passed after 0.001 seconds.
+◇ Test framingRejectsMalformedOversizedUnsupportedAndPartialEOF() started.
+✔ Test framingRejectsMalformedOversizedUnsupportedAndPartialEOF() passed after 0.001 seconds.
+◇ Test outboundSubmissionUsesAdmissionContractAndBoundedText() started.
+✔ Test outboundSubmissionUsesAdmissionContractAndBoundedText() passed after 0.001 seconds.
+◇ Test structuredNumbersAndContentRemainLiteralData() started.
+✔ Test structuredNumbersAndContentRemainLiteralData() passed after 0.001 seconds.
+◇ Test retainedDialogueIsVisibleWithoutChangingApprovalMessageIndexes() started.
+✔ Test retainedDialogueIsVisibleWithoutChangingApprovalMessageIndexes() passed after 0.001 seconds.
+◇ Test safetyCleanExitReapsDirectOwnerAndFinishesAllIO() started.
+✔ Test safetyCleanExitReapsDirectOwnerAndFinishesAllIO() passed after 0.846 seconds.
+◇ Test safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+◇ Test case passing 1 argument mode → "stdout" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=stdout elapsed=0.303073958 seconds
+◇ Test case passing 1 argument mode → "stderr" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=stderr elapsed=0.303406375 seconds
+◇ Test case passing 1 argument mode → "both" to safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) started.
+GATOR_SAFETY_SHUTDOWN mode=both elapsed=0.303080042 seconds
+✔ Test safetyInheritedDescriptorsCannotHoldShutdownOrKillDescendants(_:) with 3 test cases passed after 2.010 seconds.
+◇ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() started.
+✔ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() passed after 0.724 seconds.
+◇ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() started.
+✔ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() passed after 0.407 seconds.
+◇ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() started.
+✔ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() passed after 0.434 seconds.
+◇ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() started.
+✔ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() passed after 0.373 seconds.
+◇ Test safetyIndependentOwnersCanShutDownConcurrently() started.
+✔ Test safetyIndependentOwnersCanShutDownConcurrently() passed after 1.512 seconds.
+◇ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() started.
+✔ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() passed after 0.916 seconds.
+◇ Test subprocessAcknowledgementExitAndCleanup() started.
+✔ Test subprocessAcknowledgementExitAndCleanup() passed after 0.506 seconds.
+◇ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() started.
+✔ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() passed after 5.540 seconds.
+◇ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() started.
+✔ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() passed after 0.228 seconds.
+◇ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() started.
+✔ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() passed after 0.220 seconds.
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 2.578 seconds.
+◇ Test managedSurfacesShareCoordinatorAndSwitchingReusesOriginalOwnerWithDrafts() started.
+✔ Test managedSurfacesShareCoordinatorAndSwitchingReusesOriginalOwnerWithDrafts() passed after 0.148 seconds.
+◇ Test transitionsAreSerializedAndFailedFocusRestoresOriginalExecution() started.
+✔ Test transitionsAreSerializedAndFailedFocusRestoresOriginalExecution() passed after 2.171 seconds.
+◇ Test hostSequencesAreDeduplicatedAndStaleNavigationCannotStealFocus() started.
+✔ Test hostSequencesAreDeduplicatedAndStaleNavigationCannotStealFocus() passed after 0.112 seconds.
+◇ Test dispatchBootstrapsExactChildOnceAndRoutesAllControlsWithoutMovingFocus() started.
+✔ Test dispatchBootstrapsExactChildOnceAndRoutesAllControlsWithoutMovingFocus() passed after 0.162 seconds.
+◇ Test uncertainBootstrapIsReportedAndNeverReplayedOrEvicted() started.
+✔ Test uncertainBootstrapIsReportedAndNeverReplayedOrEvicted() passed after 0.168 seconds.
+◇ Test staleControlsAndUnknownDispatchReturnErrorsWithoutAlternativeTargets() started.
+✔ Test staleControlsAndUnknownDispatchReturnErrorsWithoutAlternativeTargets() passed after 0.087 seconds.
+◇ Test lateAdmissionStaysWithOriginalDraftAndDisconnectDoesNotAffectOthers() started.
+✔ Test lateAdmissionStaysWithOriginalDraftAndDisconnectDoesNotAffectOthers() passed after 0.247 seconds.
+◇ Test capacityNeverEvictsBusyOrReviewOwnersAndWorkingLimitIsAuthoritative() started.
+✔ Test capacityNeverEvictsBusyOrReviewOwnersAndWorkingLimitIsAuthoritative() passed after 0.390 seconds.
+◇ Test backgroundCompletionAndApprovalAttentionNeverStealSelectionOrTokens() started.
+✔ Test backgroundCompletionAndApprovalAttentionNeverStealSelectionOrTokens() passed after 0.209 seconds.
+◇ Test failedOwnerStartupAndBootstrapCreationDoNotCancelOriginalOrReplay() started.
+✔ Test failedOwnerStartupAndBootstrapCreationDoNotCancelOriginalOrReplay() passed after 0.126 seconds.
+◇ Test localRevisionUsesOriginalOwnerTaskAndForegroundStopNeverTargetsBackground() started.
+✔ Test localRevisionUsesOriginalOwnerTaskAndForegroundStopNeverTargetsBackground() passed after 0.136 seconds.
+◇ Test independentUncertainAdmissionsPersistTogetherAndRestartNeverReplaysEither() started.
+✔ Test independentUncertainAdmissionsPersistTogetherAndRestartNeverReplaysEither() passed after 0.375 seconds.
+◇ Test safetySixteenIndependentActorsPreserveEveryDistinctDraftAndSelection() started.
+✔ Test safetySixteenIndependentActorsPreserveEveryDistinctDraftAndSelection() passed after 0.223 seconds.
+◇ Test safetyCrossProcessTransactionsPreserveSixteenLoadedBeforeWriteSnapshots() started.
+✔ Test safetyCrossProcessTransactionsPreserveSixteenLoadedBeforeWriteSnapshots() passed after 10.998 seconds.
+◇ Test safetyStaleSameContextWritersFailInsteadOfReplacingNewerDrafts() started.
+✔ Test safetyStaleSameContextWritersFailInsteadOfReplacingNewerDrafts() passed after 0.022 seconds.
+◇ Test safetyFullSnapshotSaveMergesUnrelatedContextsAndRejectsStaleSelection() started.
+✔ Test safetyFullSnapshotSaveMergesUnrelatedContextsAndRejectsStaleSelection() passed after 0.002 seconds.
+◇ Test safetyUnrelatedWritesPreservePendingPlanRecoveryReceiptAndApprovalCorrectionIdentity() started.
+✔ Test safetyUnrelatedWritesPreservePendingPlanRecoveryReceiptAndApprovalCorrectionIdentity() passed after 0.002 seconds.
+◇ Test safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+◇ Test case passing 1 argument stage → .beforeReplace to safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+◇ Test case passing 1 argument stage → .afterReplace to safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+✔ Test safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) with 2 test cases passed after 0.043 seconds.
+◇ Test safetyFailedEncodingOrWriteCannotReplaceTheExistingArchive() started.
+✔ Test safetyFailedEncodingOrWriteCannotReplaceTheExistingArchive() passed after 0.008 seconds.
+◇ Test safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 1 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 2 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 3 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 4 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 5 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 6 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 7 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+✔ Test safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) with 7 test cases passed after 0.008 seconds.
+◇ Test safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+◇ Test case passing 1 argument text → "{broken" to safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+◇ Test case passing 1 argument text → "{"version":99,"selectedConversationID":"","drafts":{}}" to safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+✔ Test safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) with 2 test cases passed after 0.004 seconds.
+◇ Test realGoLostAttachmentAdmissionRetainsOriginalIdentityAndNeverReplaysAfterRestart() started.
+✔ Test realGoLostAttachmentAdmissionRetainsOriginalIdentityAndNeverReplaysAfterRestart() passed after 1.006 seconds.
+◇ Test attachmentDraftsShareSurfacesRemainOwnerScopedAndRestoreAcrossRestart() started.
+✔ Test attachmentDraftsShareSurfacesRemainOwnerScopedAndRestoreAcrossRestart() passed after 0.121 seconds.
+◇ Test attachmentAdmissionRequiresExactResultAndPreservesNewerDraftAndFiles() started.
+✔ Test attachmentAdmissionRequiresExactResultAndPreservesNewerDraftAndFiles() passed after 0.284 seconds.
+◇ Test missingAndRejectedUploadsRemainRepairableAndUncertainRequestsNeverReplay() started.
+✔ Test missingAndRejectedUploadsRemainRepairableAndUncertainRequestsNeverReplay() passed after 0.551 seconds.
+◇ Test cancelledOrStaleImportCannotAttachToReplacementContext() started.
+✔ Test cancelledOrStaleImportCannotAttachToReplacementContext() passed after 0.034 seconds.
+◇ Test attachmentArchiveRetainsAgedDraftsAndFailsClosedWithoutOverwriting() started.
+✔ Test attachmentArchiveRetainsAgedDraftsAndFailsClosedWithoutOverwriting() passed after 0.002 seconds.
+◇ Test firstWorkspaceAttachmentSurvivesRestartAndDurableConversationPromotion() started.
+✔ Test firstWorkspaceAttachmentSurvivesRestartAndDurableConversationPromotion() passed after 0.292 seconds.
+◇ Test attachedDialogueUsesInstantsAcrossUTCLocalOffsetsAndPreservesInputIdentity() started.
+✔ Test attachedDialogueUsesInstantsAcrossUTCLocalOffsetsAndPreservesInputIdentity() passed after 0.001 seconds.
+◇ Test uncertainFirstAdmissionRetainsWorkspaceRequestIdentityInDurableOwnerAfterRestart() started.
+✔ Test uncertainFirstAdmissionRetainsWorkspaceRequestIdentityInDurableOwnerAfterRestart() passed after 0.271 seconds.
+◇ Test realGoReceivesImmutableDocumentAndFilesOnlyImageThroughManagedOwner() started.
+✔ Test realGoReceivesImmutableDocumentAndFilesOnlyImageThroughManagedOwner() passed after 0.531 seconds.
+◇ Test realGoAttachmentDialogueRetainsInputsWhileOriginalWorkContinues() started.
+✔ Test realGoAttachmentDialogueRetainsInputsWhileOriginalWorkContinues() passed after 0.913 seconds.
+◇ Test realGoFreshNativeOwnerHasDurableIdentityBeforeFirstDraftWithoutStartingWork() started.
+✔ Test realGoFreshNativeOwnerHasDurableIdentityBeforeFirstDraftWithoutStartingWork() passed after 0.352 seconds.
+◇ Test catalogActualGoPagesScopesOlderSelectionRenameConflictAndOwnerDrafts() started.
+GATOR_P02_RENAME requestToConfirmedCachedOwnerTitle=0.045375459 seconds
+✔ Test catalogActualGoPagesScopesOlderSelectionRenameConflictAndOwnerDrafts() passed after 11.248 seconds.
+◇ Test catalogActualGoSmallHundredsAndLargeBoundedMeasurementsAndFallback() started.
+GATOR_P02_GO_BENCH records=12 titleRequestToResult=0.036392791 seconds workContentRequestToResult=0.015699625 seconds pageItems=12 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=310 titleRequestToResult=1.123165042 seconds workContentRequestToResult=0.027896 seconds pageItems=50 titleFallback=false contentFallback=false incomplete=false
+GATOR_P02_GO_BENCH records=1500 titleRequestToResult=5.143739084 seconds workContentRequestToResult=5.20184475 seconds pageItems=50 titleFallback=true contentFallback=true incomplete=false
+✔ Test catalogActualGoSmallHundredsAndLargeBoundedMeasurementsAndFallback() passed after 52.302 seconds.
+◇ Test catalogManagedNonRecentOpenReusesOwnersPreservesDraftsAndNeverReconnectsDisconnectedOwner() started.
+✔ Test catalogManagedNonRecentOpenReusesOwnersPreservesDraftsAndNeverReconnectsDisconnectedOwner() passed after 0.377 seconds.
+◇ Test catalogNativeAPIRejectsReusedIdentityInsteadOfReadingThePreviousResult() started.
+✔ Test catalogNativeAPIRejectsReusedIdentityInsteadOfReadingThePreviousResult() passed after 0.044 seconds.
+◇ Test catalogCapacityNeverRetiresOwnersHoldingRecoveryEvidence() started.
+✔ Test catalogCapacityNeverRetiresOwnersHoldingRecoveryEvidence() passed after 0.399 seconds.
+◇ Test catalogClosedDuringOpenValidationCannotStealForeground() started.
+✔ Test catalogClosedDuringOpenValidationCannotStealForeground() passed after 0.228 seconds.
+◇ Test catalogQueryCompletesAcrossForegroundSwitchWithoutChangingDraftFocusOrOwners() started.
+✔ Test catalogQueryCompletesAcrossForegroundSwitchWithoutChangingDraftFocusOrOwners() passed after 0.284 seconds.
+◇ Test catalogDestinationVerificationRejectsChangedRecordAndReleasesOnlyTheNewIdleCandidate() started.
+✔ Test catalogDestinationVerificationRejectsChangedRecordAndReleasesOnlyTheNewIdleCandidate() passed after 0.271 seconds.
+◇ Test catalogProtocolEncodesOnlyTypedQueriesScopesAndExactVersionedActions() started.
+✔ Test catalogProtocolEncodesOnlyTypedQueriesScopesAndExactVersionedActions() passed after 0.001 seconds.
+◇ Test catalogDecodingPreservesEmptyPagesCoverageAndRejectsDuplicateRows() started.
+✔ Test catalogDecodingPreservesEmptyPagesCoverageAndRejectsDuplicateRows() passed after 0.001 seconds.
+◇ Test catalogBoundedSwiftProjectionAndSelectionMeasurements() started.
+GATOR_P02_SWIFT_BENCH pageSize=50 projection100=0.0636595 seconds selection1000=0.006424125 seconds
+✔ Test catalogBoundedSwiftProjectionAndSelectionMeasurements() passed after 0.071 seconds.
+◇ Test catalogTitleValidationUsesByteLimitAndRejectsControlCharacters() started.
+✔ Test catalogTitleValidationUsesByteLimitAndRejectsControlCharacters() passed after 0.001 seconds.
+◇ Test catalogSupersededQueryScopeAndClosedSearchCannotPublishStaleResults() started.
+✔ Test catalogSupersededQueryScopeAndClosedSearchCannotPublishStaleResults() passed after 0.007 seconds.
+◇ Test catalogPageAnchorsResetWithQueryAndSelectionDoesNotFollowRowIndexes() started.
+✔ Test catalogPageAnchorsResetWithQueryAndSelectionDoesNotFollowRowIndexes() passed after 0.025 seconds.
+◇ Test catalogRenameConflictKeepsAttemptAndRequiresReviewThenExplicitFreshSave() started.
+✔ Test catalogRenameConflictKeepsAttemptAndRequiresReviewThenExplicitFreshSave() passed after 0.024 seconds.
+◇ Test catalogUnconfirmedRenameNeverRetriesAndQueryRefreshRequiresFreshReview() started.
+✔ Test catalogUnconfirmedRenameNeverRetriesAndQueryRefreshRequiresFreshReview() passed after 0.019 seconds.
+◇ Test catalogOpenResultIsExplicitAndDoesNotReplacePresentationOnLateClose() started.
+✔ Test catalogOpenResultIsExplicitAndDoesNotReplacePresentationOnLateClose() passed after 0.012 seconds.
+◇ Test safetyLateEditIsRejectedDuringOwnerShutdownAndAcceptedTextRemainsDurable() started.
+✔ Test safetyLateEditIsRejectedDuringOwnerShutdownAndAcceptedTextRemainsDurable() passed after 0.014 seconds.
+◇ Test safetyConcurrentAcceptedEditJoinsAnAlreadyRunningFlush() started.
+✔ Test safetyConcurrentAcceptedEditJoinsAnAlreadyRunningFlush() passed after 0.020 seconds.
+◇ Test safetyFailedClosingWriteRestoresEditingAndRetriedQuitSavesLatestInput() started.
+✔ Test safetyFailedClosingWriteRestoresEditingAndRetriedQuitSavesLatestInput() passed after 0.029 seconds.
+◇ Test safetyAllOwnersCloseAtOneBarrierAndFailedPreflightStopsNoOwner() started.
+✔ Test safetyAllOwnersCloseAtOneBarrierAndFailedPreflightStopsNoOwner() passed after 0.112 seconds.
+◇ Test safetyQueuedAttachmentImportCannotAcceptFilesAfterClosingBarrier() started.
+✔ Test safetyQueuedAttachmentImportCannotAcceptFilesAfterClosingBarrier() passed after 0.032 seconds.
+◇ Test safetyFinalDisconnectChangesMustPersistBeforeQuitCanSucceed() started.
+✔ Test safetyFinalDisconnectChangesMustPersistBeforeQuitCanSucceed() passed after 0.020 seconds.
+◇ Test safetyUnconfirmedTransportExitBlocksQuitAndReplacementUntilConfirmed() started.
+✔ Test safetyUnconfirmedTransportExitBlocksQuitAndReplacementUntilConfirmed() passed after 0.026 seconds.
+◇ Test duplicateDocumentBasenamesPreserveDistinctBytesAndFailGoAdmissionWithoutExecution() started.
+✔ Test duplicateDocumentBasenamesPreserveDistinctBytesAndFailGoAdmissionWithoutExecution() passed after 0.233 seconds.
+◇ Test nativeStreamingSnapshotHandlingBenchmark() started.
+GATOR_STREAM_BENCHMARK samples=5 snapshots=30 retainedMessages=500 wireBytes=2176935 medianBatchMS=206.4729928970337 medianPerSnapshotMS=6.88243309656779
+✔ Test nativeStreamingSnapshotHandlingBenchmark() passed after 1.081 seconds.
+◇ Test nativeDraftPersistenceKeepsPendingIdentityAndNeverTouchesTerminalDrafts() started.
+✔ Test nativeDraftPersistenceKeepsPendingIdentityAndNeverTouchesTerminalDrafts() passed after 0.001 seconds.
+◇ Test malformedNativeDraftsFailClosedWithoutOverwriting() started.
+✔ Test malformedNativeDraftsFailClosedWithoutOverwriting() passed after 0.001 seconds.
+◇ Test realGoInertApprovalNavigationPreservesExactOwnerDraftAndUnrelatedWork() started.
+✔ Test realGoInertApprovalNavigationPreservesExactOwnerDraftAndUnrelatedWork() passed after 0.726 seconds.
+◇ Test nativeMarkdownPreservesCodeWhitespaceAndSeparatesReadableBlocks() started.
+✔ Test nativeMarkdownPreservesCodeWhitespaceAndSeparatesReadableBlocks() passed after 0.001 seconds.
+◇ Test nestedMarkdownRetainsUnorderedOrderedAndMixedHierarchy() started.
+✔ Test nestedMarkdownRetainsUnorderedOrderedAndMixedHierarchy() passed after 0.001 seconds.
+◇ Test markdownBlankLinesAndWrappedItemsKeepTheirParent() started.
+✔ Test markdownBlankLinesAndWrappedItemsKeepTheirParent() passed after 0.001 seconds.
+◇ Test markdownTabsAndMultipleDepthsDoNotFlattenIntoRootItems() started.
+✔ Test markdownTabsAndMultipleDepthsDoNotFlattenIntoRootItems() passed after 0.001 seconds.
+◇ Test markdownFencesNeverParseListLikeCodeAsLists() started.
+✔ Test markdownFencesNeverParseListLikeCodeAsLists() passed after 0.001 seconds.
+◇ Test markdownOrdinalsAndNonListPunctuationStayLiteral() started.
+✔ Test markdownOrdinalsAndNonListPunctuationStayLiteral() passed after 0.001 seconds.
+◇ Test nativePresentationBenchmark() started.
+GATOR_BENCHMARK {"fixtures":[{"bytes":24084,"decodeMedianMS":0.61798095703125,"messages":50,"transcriptMedianMS":0.025987625122070312},{"bytes":240934,"decodeMedianMS":5.6580305099487305,"messages":500,"transcriptMedianMS":0.23603439331054688},{"bytes":964934,"decodeMedianMS":21.347999572753906,"messages":2000,"transcriptMedianMS":0.85699558258056641}],"kind":"native-presentation","peakRSSBytes":48070656,"samples":7}
+✔ Test nativePresentationBenchmark() passed after 0.214 seconds.
+◇ Test nativeOwnerStartupBenchmark() started.
+GATOR_OWNER_BENCHMARK {"cachedOwners":4,"idlePSSamplePID_RSSKiB_CPUPercent":"78290  36112   0.0\n78291  37200   0.0\n78292  37184   0.0\n78293  36400   0.0\n","timeToConnectedMS":[50.32193660736084,51.483035087585449,53.052067756652832,64.828991889953613]}
+✔ Test nativeOwnerStartupBenchmark() passed after 3.706 seconds.
+◇ Test nativeThumbnailBenchmark() started.
+GATOR_THUMBNAIL_BENCHMARK files=12 sourcePixels=512x512 stagedBytes=11116140 thumbnailBytes=930144 elapsedMS=91.63796901702881 peakRSSBytes=53329920
+✔ Test nativeThumbnailBenchmark() passed after 0.355 seconds.
+◇ Test exactPlanAuthorizationRequiresFullCurrentInspectionAndCorrectOwner() started.
+✔ Test exactPlanAuthorizationRequiresFullCurrentInspectionAndCorrectOwner() passed after 0.042 seconds.
+◇ Test planAckIsNotResultAndOnlyMatchingResultCanProjectExecution() started.
+✔ Test planAckIsNotResultAndOnlyMatchingResultCanProjectExecution() passed after 0.089 seconds.
+◇ Test revisionDigestStateScopeAndPreparationChangesInvalidatePlanReview() started.
+✔ Test revisionDigestStateScopeAndPreparationChangesInvalidatePlanReview() passed after 0.356 seconds.
+◇ Test duplicatePlanDecisionIsSerializedAndGoRejectionKeepsExactReview() started.
+✔ Test duplicatePlanDecisionIsSerializedAndGoRejectionKeepsExactReview() passed after 0.069 seconds.
+◇ Test planUncertaintyPersistsAndRestartNeverReplaysAuthorization() started.
+✔ Test planUncertaintyPersistsAndRestartNeverReplaysAuthorization() passed after 0.105 seconds.
+◇ Test selectedOwnerAndFocusEpochGuardPlanAuthorizationAcrossConversations() started.
+✔ Test selectedOwnerAndFocusEpochGuardPlanAuthorizationAcrossConversations() passed after 0.136 seconds.
+◇ Test nativePlanAdmissionCannotBypassThreeWorkingOwnersOrEvictReview() started.
+✔ Test nativePlanAdmissionCannotBypassThreeWorkingOwnersOrEvictReview() passed after 0.227 seconds.
+◇ Test planContentAndDecisionSemanticsDoNotImplyCompletedStepsOrReturnConsent() started.
+✔ Test planContentAndDecisionSemanticsDoNotImplyCompletedStepsOrReturnConsent() passed after 0.001 seconds.
+◇ Test latePlanResultFromAnotherOwnerCannotClearSelectedOwnersPendingControl() started.
+✔ Test latePlanResultFromAnotherOwnerCannotClearSelectedOwnersPendingControl() passed after 1.135 seconds.
+◇ Test finalPlanAdmissionRechecksCapacityAndStateAfterDurableRecording() started.
+✔ Test finalPlanAdmissionRechecksCapacityAndStateAfterDurableRecording() passed after 0.029 seconds.
+◇ Test approvedStartCannotAuthorizeUnapprovedDispatchedOrCancelledPlans() started.
+✔ Test approvedStartCannotAuthorizeUnapprovedDispatchedOrCancelledPlans() passed after 0.128 seconds.
+◇ Test planPreparationRunningFlagDoesNotClaimReviewedExecution() started.
+✔ Test planPreparationRunningFlagDoesNotClaimReviewedExecution() passed after 0.054 seconds.
+◇ Test nativePlanReceiptRetentionBoundsCompletedHistoryWithoutDroppingUncertainty() started.
+✔ Test nativePlanReceiptRetentionBoundsCompletedHistoryWithoutDroppingUncertainty() passed after 0.015 seconds.
+◇ Test realGoExactPlanApprovalExecutesOnceAndConversationContinues() started.
+✔ Test realGoExactPlanApprovalExecutesOnceAndConversationContinues() passed after 0.409 seconds.
+◇ Test realGoRevisedPlanRequiresFreshInspectionBeforeSingleExecution() started.
+✔ Test realGoRevisedPlanRequiresFreshInspectionBeforeSingleExecution() passed after 0.422 seconds.
+◇ Test realGoRestoredApprovedPlanDoesNotAutoStartAndExplicitStartExecutesOnce() started.
+retained approved without dispatch true
+✔ Test realGoRestoredApprovedPlanDoesNotAutoStartAndExplicitStartExecutesOnce() passed after 0.972 seconds.
+◇ Test realGoRejectsWrongPlanIdentitiesAndUnapprovedStartIndependentlyOfNativeGuards() started.
+✔ Test realGoRejectsWrongPlanIdentitiesAndUnapprovedStartIndependentlyOfNativeGuards() passed after 0.605 seconds.
+◇ Test providerActualGoSaveReplaceRemoveRelaunchAndSecretArtifactBoundary() started.
+✔ Test providerActualGoSaveReplaceRemoveRelaunchAndSecretArtifactBoundary() passed after 2.443 seconds.
+◇ Test providerActualGoIndependentOwnersRejectCompetingReviewedWritesAndDoNotStealChat() started.
+✔ Test providerActualGoIndependentOwnersRejectCompetingReviewedWritesAndDoNotStealChat() passed after 1.667 seconds.
+◇ Test providerProtocolCarriesSecretOnlyInExplicitSaveAndNeverChat() started.
+✔ Test providerProtocolCarriesSecretOnlyInExplicitSaveAndNeverChat() passed after 0.001 seconds.
+◇ Test providerReviewSaveRemoveCancelAndFailureRequireFreshExplicitIntent() started.
+✔ Test providerReviewSaveRemoveCancelAndFailureRequireFreshExplicitIntent() passed after 0.006 seconds.
+◇ Test providerStaleCompletionDoesNotInstallReviewOrClaimSave() started.
+✔ Test providerStaleCompletionDoesNotInstallReviewOrClaimSave() passed after 0.018 seconds.
+◇ Test providerAcknowledgementWithoutConfirmedStorageIsNotSuccessAndQuitWaitsOperation() started.
+✔ Test providerAcknowledgementWithoutConfirmedStorageIsNotSuccessAndQuitWaitsOperation() passed after 0.012 seconds.
+◇ Test providerManagedOwnerPinNavigationPendingApprovalAndQuitBoundary() started.
+✔ Test providerManagedOwnerPinNavigationPendingApprovalAndQuitBoundary() passed after 0.117 seconds.
+◇ Test providerCompletionAfterSelectionChangeUpdatesStatusWithoutChangingSelection() started.
+✔ Test providerCompletionAfterSelectionChangeUpdatesStatusWithoutChangingSelection() passed after 0.012 seconds.
+◇ Test providerDisconnectedOriginRequiresReconciliationAndFreshExplicitHostSelection() started.
+✔ Test providerDisconnectedOriginRequiresReconciliationAndFreshExplicitHostSelection() passed after 0.070 seconds.
+◇ Test realGoInterruptedPlanRestoresOriginalIdentityWithoutReplay() started.
+✔ Test realGoInterruptedPlanRestoresOriginalIdentityWithoutReplay() passed after 0.533 seconds.
+◇ Test realGoReceiptInspectAndSentCheckNeverSendOrRewriteOriginalEvidence() started.
+✔ Test realGoReceiptInspectAndSentCheckNeverSendOrRewriteOriginalEvidence() passed after 0.406 seconds.
+◇ Test realGoReceiptRejectsForeignRunManifestConversationAndCorrelation() started.
+✔ Test realGoReceiptRejectsForeignRunManifestConversationAndCorrelation() passed after 0.554 seconds.
+◇ Test recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "interrupted" to recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "failed" to recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "review" to recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "stopped" to recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "completed" to recoveryStatesRemainDistinct(_:) started.
+◇ Test case passing 1 argument state → "unknown" to recoveryStatesRemainDistinct(_:) started.
+✔ Test recoveryStatesRemainDistinct(_:) with 6 test cases passed after 0.001 seconds.
+◇ Test recoveredAttemptsAreDistinctAndNeverGainBundleAuthority() started.
+✔ Test recoveredAttemptsAreDistinctAndNeverGainBundleAuthority() passed after 0.001 seconds.
+◇ Test exactBundleIdentityAndDuplicateProjection() started.
+✔ Test exactBundleIdentityAndDuplicateProjection() passed after 0.001 seconds.
+◇ Test ineligibleReceiptsHaveNoCheck(_:) started.
+◇ Test case passing 1 argument status → "executed" to ineligibleReceiptsHaveNoCheck(_:) started.
+◇ Test case passing 1 argument status → "failed" to ineligibleReceiptsHaveNoCheck(_:) started.
+◇ Test case passing 1 argument status → "pending" to ineligibleReceiptsHaveNoCheck(_:) started.
+◇ Test case passing 1 argument status → "denied" to ineligibleReceiptsHaveNoCheck(_:) started.
+✔ Test ineligibleReceiptsHaveNoCheck(_:) with 4 test cases passed after 0.001 seconds.
+◇ Test conflictingAndAmbiguousReceiptsFailClosed() started.
+✔ Test conflictingAndAmbiguousReceiptsFailClosed() passed after 0.001 seconds.
+◇ Test failedRequestGuidanceIsReadOnlyAndPartialQueueIsNotCompletion() started.
+✔ Test failedRequestGuidanceIsReadOnlyAndPartialQueueIsNotCompletion() passed after 0.001 seconds.
+◇ Test receiptAckIsNotResultDuplicateClicksAndWrongRequestCannotComplete() started.
+✔ Test receiptAckIsNotResultDuplicateClicksAndWrongRequestCannotComplete() passed after 0.047 seconds.
+◇ Test receiptDisconnectPersistsUncertaintyNoReplayOrWrongOwnerAndDraftIsolation() started.
+✔ Test receiptDisconnectPersistsUncertaintyNoReplayOrWrongOwnerAndDraftIsolation() passed after 0.145 seconds.
+◇ Test lateReceiptResultRemainsWithOriginalOwnerWhileAnotherChatIsSelected() started.
+✔ Test lateReceiptResultRemainsWithOriginalOwnerWhileAnotherChatIsSelected() passed after 0.096 seconds.
+◇ Test inspectionNeverTriggersRecoveryMutationOrLookupAndUnresolvedOwnersCannotBeEvicted() started.
+✔ Test inspectionNeverTriggersRecoveryMutationOrLookupAndUnresolvedOwnersCannotBeEvicted() passed after 0.210 seconds.
+◇ Test missingOrMalformedManifestCannotOfferReceiptChecks() started.
+✔ Test missingOrMalformedManifestCannotOfferReceiptChecks() passed after 0.001 seconds.
+◇ Test exactTaskIdentityCombinesFailedRequestAndPlanWithoutTextMatching() started.
+✔ Test exactTaskIdentityCombinesFailedRequestAndPlanWithoutTextMatching() passed after 0.001 seconds.
+◇ Test realGoActionCorrectionKeepsChildOwnerAndRequiresFreshExactApproval() started.
+✔ Test realGoActionCorrectionKeepsChildOwnerAndRequiresFreshExactApproval() passed after 1.028 seconds.
+◇ Test realGoPlanRevisionDistinguishesAdmissionFromReplacementAndRejectsOldReview() started.
+✔ Test realGoPlanRevisionDistinguishesAdmissionFromReplacementAndRejectsOldReview() passed after 0.328 seconds.
+◇ Test taskInspectorUsesExactBackgroundOwnerAndRetainsIdentityAndNavigation() started.
+✔ Test taskInspectorUsesExactBackgroundOwnerAndRetainsIdentityAndNavigation() passed after 0.136 seconds.
+◇ Test correctionAffordanceOnlyOpensDraftAndAdmissionRestoresUnrelatedDraft() started.
+✔ Test correctionAffordanceOnlyOpensDraftAndAdmissionRestoresUnrelatedDraft() passed after 0.061 seconds.
+◇ Test staleOrDisconnectedCorrectionPreservesTextAndNeverReroutes() started.
+✔ Test staleOrDisconnectedCorrectionPreservesTextAndNeverReroutes() passed after 0.053 seconds.
+◇ Test correctionDraftPersistsSeparatelyAndRequiresFreshInspectionAfterRestart() started.
+✔ Test correctionDraftPersistsSeparatelyAndRequiresFreshInspectionAfterRestart() passed after 0.084 seconds.
+◇ Test approvalCannotReappearFromRetainedOlderSnapshotOrBeRepeatedAfterSubmission() started.
+✔ Test approvalCannotReappearFromRetainedOlderSnapshotOrBeRepeatedAfterSubmission() passed after 0.050 seconds.
+◇ Test missingReviewedMessageFailsClosedForBothApprovalAndDecline() started.
+✔ Test missingReviewedMessageFailsClosedForBothApprovalAndDecline() passed after 0.034 seconds.
+◇ Test planInspectionMatchesExactReadResultAndCannotReuseChangedDigest() started.
+✔ Test planInspectionMatchesExactReadResultAndCannotReuseChangedDigest() passed after 0.067 seconds.
+◇ Test exactContentAndNativeSemanticsAreAccessibleAndDoNotTreatReturnAsConsent() started.
+✔ Test exactContentAndNativeSemanticsAreAccessibleAndDoNotTreatReturnAsConsent() passed after 0.001 seconds.
+◇ Test taskInspectionDoesNotExposeRawToolPayloadOrPrivateReasoning() started.
+✔ Test taskInspectionDoesNotExposeRawToolPayloadOrPrivateReasoning() passed after 0.001 seconds.
+◇ Test realGoActionEnvelopeRendersExactPublicContentWithoutInterpretingUserBody() started.
+✔ Test realGoActionEnvelopeRendersExactPublicContentWithoutInterpretingUserBody() passed after 0.001 seconds.
+◇ Test uncertainCorrectionRetainsOriginalAdmissionAndIsNotReplayedAfterRestart() started.
+✔ Test uncertainCorrectionRetainsOriginalAdmissionAndIsNotReplayedAfterRestart() passed after 0.188 seconds.
+◇ Test inspectionBecomesStaleWhenOriginalOwnerReconnectsAndDoesNotStealFocus() started.
+✔ Test inspectionBecomesStaleWhenOriginalOwnerReconnectsAndDoesNotStealFocus() passed after 0.129 seconds.
+◇ Test staleCorrectionAffordanceCannotRedirectANewerConversationSelection() started.
+✔ Test staleCorrectionAffordanceCannotRedirectANewerConversationSelection() passed after 0.081 seconds.
+◇ Test workModeSelectionRequiresActualGoProjectionNotJustAcknowledgement() started.
+✔ Test workModeSelectionRequiresActualGoProjectionNotJustAcknowledgement() passed after 0.081 seconds.
+◇ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() started.
+✔ Test transcriptSearchExactCaseAndRepeatedMatchesPreserveMessageIdentityAndOrder() passed after 0.001 seconds.
+◇ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() started.
+✔ Test transcriptSearchUnicodeUsesComposedBoundariesAndLiteralCaseInsensitiveMatching() passed after 0.001 seconds.
+◇ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() started.
+✔ Test transcriptSearchEmptyWhitespaceAndAbsentQueriesHaveNoResults() passed after 0.001 seconds.
+◇ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() started.
+✔ Test transcriptSearchExcludesPrivateFieldsCollapsedDetailsAndUnrenderedStructuredText() passed after 0.001 seconds.
+◇ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() started.
+✔ Test transcriptSearchIncludesProjectedPublicDialogueWithoutInventingOlderHistory() passed after 0.001 seconds.
+◇ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() started.
+✔ Test transcriptSearchLongMessagesAreCompleteWithinExplicitBoundsAndExcerptsStaySmall() passed after 0.118 seconds.
+◇ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() started.
+✔ Test transcriptSearchRejectsStaleGenerationConversationDeletionAndChangedContent() passed after 0.001 seconds.
+◇ Test transcriptSearchBenchmarks() started.
+GATOR_P01_BENCH messages=50 build=0.00018325 seconds query20=0.006193667 seconds absent20=0.003956292 seconds resolve1000=0.000545833 seconds liveResolve100=0.000784666 seconds
+GATOR_P01_BENCH messages=500 build=0.001638458 seconds query20=0.063473208 seconds absent20=0.043268791 seconds resolve1000=0.000606458 seconds liveResolve100=0.005435125 seconds
+GATOR_P01_BENCH messages=2000 build=0.007357166 seconds query20=0.248174375 seconds absent20=0.169741583 seconds resolve1000=0.000625708 seconds liveResolve100=0.021555208 seconds
+✔ Test transcriptSearchBenchmarks() passed after 0.578 seconds.
+◇ Test nativeCopiesArePrivateImmutableUniqueAndAtomic() started.
+✔ Test nativeCopiesArePrivateImmutableUniqueAndAtomic() passed after 0.003 seconds.
+◇ Test nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "empty" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "document" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "image" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "extension" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "filename" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "count" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+◇ Test case passing 1 argument kind → "total" to nativeUploadLimitsRejectInvalidSelections(_:) started.
+✔ Test nativeUploadLimitsRejectInvalidSelections(_:) with 7 test cases passed after 0.024 seconds.
+◇ Test privateRootDirectoriesAndFilesRejectSymlinksAndChangedBytes() started.
+✔ Test privateRootDirectoriesAndFilesRejectSymlinksAndChangedBytes() passed after 0.002 seconds.
+◇ Test imagesDecodeBoundedlyAndPasteNormalizesWithoutOriginalPaths() started.
+✔ Test imagesDecodeBoundedlyAndPasteNormalizesWithoutOriginalPaths() passed after 0.004 seconds.
+◇ Test clipboardPolicyKeepsTextAndFileURLsSeparateFromImageIntent() started.
+✔ Test clipboardPolicyKeepsTextAndFileURLsSeparateFromImageIntent() passed after 0.001 seconds.
+◇ Test repeatedImagePastesHaveDistinctBackendInputNamesAndImmutableIDs() started.
+✔ Test repeatedImagePastesHaveDistinctBackendInputNamesAndImmutableIDs() passed after 0.002 seconds.
+◇ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() started.
+GATOR_P03_HANDOFF requestToConfirmedOwner=0.087912916 seconds
+✔ Test workspaceActualGoCanonicalFoldersDraftsCatalogAndRestartIdentity() passed after 2.620 seconds.
+◇ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() started.
+✔ Test workspaceActualGoRejectsFilesMissingControlCharactersAndRevokedAccessWithoutArchiveChanges() passed after 1.709 seconds.
+◇ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() started.
+✔ Test workspaceActualGoFolderMovedBetweenValidationAndStartupKeepsPreviousOwner() passed after 1.902 seconds.
+◇ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() started.
+✔ Test workspaceActualGoIndependentInstancesKeepDistinctConversationSourcesAndDrafts() passed after 2.421 seconds.
+◇ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() started.
+✔ Test workspaceActualGoUnicodeNormalizationDoesNotRejectTheConfirmedDestination() passed after 1.854 seconds.
+◇ Test workspaceRequestEncodesPathAsDataAndResultIdentity() started.
+✔ Test workspaceRequestEncodesPathAsDataAndResultIdentity() passed after 0.001 seconds.
+◇ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() started.
+✔ Test workspaceCancelAndSameFolderKeepOwnerDraftAndArchiveBytes() passed after 0.044 seconds.
+◇ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() started.
+✔ Test workspaceDifferentFoldersKeepDraftAttachmentsApprovalsAndWorkingScopeIsolated() passed after 0.182 seconds.
+◇ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() started.
+✔ Test workspaceResultCannotMoveForegroundAfterConversationChangesOrStartSecondChoice() passed after 0.082 seconds.
+◇ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() started.
+✔ Test workspaceDisconnectBeforeConfirmationKeepsOriginalAndRequiresExplicitReconnect() passed after 0.035 seconds.
+◇ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() started.
+✔ Test workspaceNewOwnerFailureRequiresReviewAndNeverReplaysTransition() passed after 0.216 seconds.
+◇ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() started.
+✔ Test workspaceCapacityPreservesEveryRecoveryOwnerAndOriginalDraft() passed after 0.243 seconds.
+◇ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() started.
+✔ Test workspaceWrongConversationResultIsRejectedWithoutOwnerCreation() passed after 0.041 seconds.
+◇ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() started.
+✔ Test workspacePickerTicketCannotSurviveAnExplicitOwnerReconnect() passed after 0.048 seconds.
+◇ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() started.
+✔ Test workspaceUnexpectedNewOwnerReviewIsRetainedWithoutAuthorizingOrSelectingIt() passed after 0.119 seconds.
+◇ Test realGoPrepareRetryAdmitsOnlyProposalAndSeparateApprovalExecutesExactlyOnce() started.
+✔ Test realGoPrepareRetryAdmitsOnlyProposalAndSeparateApprovalExecutesExactlyOnce() passed after 0.566 seconds.
+◇ Test realGoAccessSelectionRevalidatesStaleScopeAndPreparesWithoutWrites() started.
+✔ Test realGoAccessSelectionRevalidatesStaleScopeAndPreparesWithoutWrites() passed after 0.653 seconds.
+◇ Test realGoPreparationInterruptionRetainsPendingIdentityAndNeverReplays() started.
+✔ Test realGoPreparationInterruptionRetainsPendingIdentityAndNeverReplays() passed after 0.441 seconds.
+◇ Test realGoRecoveryRejectsWrongIdentityAndChangedProcessingScopeBeforePreparation() started.
+✔ Test realGoRecoveryRejectsWrongIdentityAndChangedProcessingScopeBeforePreparation() passed after 0.372 seconds.
+◇ Test recoveryEligibilityFailsClosed(_:) started.
+◇ Test case passing 1 argument variant → "token" to recoveryEligibilityFailsClosed(_:) started.
+◇ Test case passing 1 argument variant → "interrupted" to recoveryEligibilityFailsClosed(_:) started.
+◇ Test case passing 1 argument variant → "unsafe" to recoveryEligibilityFailsClosed(_:) started.
+◇ Test case passing 1 argument variant → "completed" to recoveryEligibilityFailsClosed(_:) started.
+◇ Test case passing 1 argument variant → "provider" to recoveryEligibilityFailsClosed(_:) started.
+✔ Test recoveryEligibilityFailsClosed(_:) with 5 test cases passed after 0.163 seconds.
+◇ Test orderedAccountSelectionInvalidatesOldTokenAndRequiresFreshReadyReview() started.
+✔ Test orderedAccountSelectionInvalidatesOldTokenAndRequiresFreshReadyReview() passed after 0.046 seconds.
+◇ Test recoveryAdmissionNeedsExactResultAndPreparedPlanNeverImpliesExecution() started.
+✔ Test recoveryAdmissionNeedsExactResultAndPreparedPlanNeverImpliesExecution() passed after 0.050 seconds.
+◇ Test accessPreparationCarriesReviewedPositionalChoicesAndInvalidatesPlanReads() started.
+✔ Test accessPreparationCarriesReviewedPositionalChoicesAndInvalidatesPlanReads() passed after 0.051 seconds.
+◇ Test changedRecoveryAndOwnerGenerationInvalidateAccessAndPendingNeverReplays() started.
+✔ Test changedRecoveryAndOwnerGenerationInvalidateAccessAndPendingNeverReplays() passed after 0.076 seconds.
+◇ Test reorderedOrStaleAccessResultCannotSupplyPreparationAuthority() started.
+✔ Test reorderedOrStaleAccessResultCannotSupplyPreparationAuthority() passed after 0.056 seconds.
+◇ Test recoveryFinalAdmissionRechecksCapacityAndLeavesNoSendOnFailure() started.
+✔ Test recoveryFinalAdmissionRechecksCapacityAndLeavesNoSendOnFailure() passed after 0.037 seconds.
+◇ Test lateRecoveryResultStaysWithOriginalOwnerAndCannotClearAnotherDraft() started.
+✔ Test lateRecoveryResultStaysWithOriginalOwnerAndCannotClearAnotherDraft() passed after 1.127 seconds.
+◇ Test recoveryPreparationCannotBypassThreeWorkingOwners() started.
+✔ Test recoveryPreparationCannotBypassThreeWorkingOwners() passed after 0.205 seconds.
+◇ Test anOldExplicitDecisionCannotAuthorizeANewReadyAccountSelection() started.
+✔ Test anOldExplicitDecisionCannotAuthorizeANewReadyAccountSelection() passed after 0.050 seconds.
+◇ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() started.
+✔ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() passed after 0.001 seconds.
+◇ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() started.
+✔ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() passed after 0.001 seconds.
+◇ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() started.
+✔ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() passed after 0.021 seconds.
+◇ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() started.
+✔ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() passed after 0.002 seconds.
+◇ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() started.
+✔ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() passed after 0.002 seconds.
+◇ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() started.
+✔ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() passed after 0.001 seconds.
+◇ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() started.
+✔ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() passed after 0.001 seconds.
+◇ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() started.
+✔ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() passed after 0.002 seconds.
+◇ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() started.
+✔ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() passed after 0.001 seconds.
+◇ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() started.
+✔ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() passed after 0.010 seconds.
+◇ Test desktopPetRepeatedTuckReleasesItsPresentation() started.
+✔ Test desktopPetRepeatedTuckReleasesItsPresentation() passed after 0.020 seconds.
+◇ Test desktopPetSleepAndWakeRespectThePersistedEnableState() started.
+✔ Test desktopPetSleepAndWakeRespectThePersistedEnableState() passed after 0.008 seconds.
+◇ Test commandVPasteRoutesExactlyOnceAndPlainTextUsesNativeInsertion() started.
+✔ Test commandVPasteRoutesExactlyOnceAndPlainTextUsesNativeInsertion() passed after 0.059 seconds.
+◇ Test markedTextDoesNotBecomeAnAttachmentOrLoseComposition() started.
+✔ Test markedTextDoesNotBecomeAnAttachmentOrLoseComposition() passed after 0.012 seconds.
+◇ Test filePasteboardCarriesOnlyExplicitFileURLsAndRetainsOrdering() started.
+✔ Test filePasteboardCarriesOnlyExplicitFileURLsAndRetainsOrdering() passed after 0.001 seconds.
+◇ Test tabLeavesComposerAndShiftTabReturnsWithoutInsertingText() started.
+✔ Test tabLeavesComposerAndShiftTabReturnsWithoutInsertingText() passed after 0.021 seconds.
+◇ Test nativeAccentMeetsReadableTextContrastInBothAppearances() started.
+✔ Test nativeAccentMeetsReadableTextContrastInBothAppearances() passed after 0.002 seconds.
+◇ Test fullWindowUsesStandardApplicationMenusWhileMenuBarOnlyStaysAccessory() started.
+✔ Test fullWindowUsesStandardApplicationMenusWhileMenuBarOnlyStaysAccessory() passed after 0.001 seconds.
+◇ Test oversizedPlainTextPasteLeavesCurrentNativeDraftIntact() started.
+✔ Test oversizedPlainTextPasteLeavesCurrentNativeDraftIntact() passed after 0.001 seconds.
+◇ Test ownerSwitchReplacesNativeCompositionContextAndKeepsCallbacksWithOriginalOwner() started.
+✔ Test ownerSwitchReplacesNativeCompositionContextAndKeepsCallbacksWithOriginalOwner() passed after 0.104 seconds.
+◇ Test windowPresentationKeepsSwiftUISceneIdentityAndMapsBothSurfaces() started.
+✔ Test windowPresentationKeepsSwiftUISceneIdentityAndMapsBothSurfaces() passed after 0.004 seconds.
+◇ Test reopeningGatorWithoutVisibleWindowsUsesTheExistingConversationScene() started.
+✔ Test reopeningGatorWithoutVisibleWindowsUsesTheExistingConversationScene() passed after 0.001 seconds.
+◇ Test mascotOnlyOffersTheTwoSelectedAppearances() started.
+✔ Test mascotOnlyOffersTheTwoSelectedAppearances() passed after 0.001 seconds.
+◇ Test mascotPreferencesPersistUsingNativeAppStorage() started.
+✔ Test mascotPreferencesPersistUsingNativeAppStorage() passed after 0.002 seconds.
+◇ Test mascotStatePrecedenceAndOwnerReplacement() started.
+✔ Test mascotStatePrecedenceAndOwnerReplacement() passed after 0.001 seconds.
+◇ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() started.
+✔ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() passed after 0.001 seconds.
+◇ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() started.
+✔ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() passed after 0.001 seconds.
+◇ Test mascotCompletionRequiresCanonicalFinishedOutcome() started.
+✔ Test mascotCompletionRequiresCanonicalFinishedOutcome() passed after 0.001 seconds.
+◇ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() started.
+✔ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() passed after 0.001 seconds.
+◇ Test mascotCollapseDoesNotMutateReadingAnchors() started.
+✔ Test mascotCollapseDoesNotMutateReadingAnchors() passed after 0.001 seconds.
+◇ Test mascotReadingAnchorRemainsExactAcrossAppearanceChanges() started.
+✔ Test mascotReadingAnchorRemainsExactAcrossAppearanceChanges() passed after 0.001 seconds.
+◇ Test mascotFrameCacheIsBoundedAndStaticDoesNotDecodeTheClip() started.
+✔ Test mascotFrameCacheIsBoundedAndStaticDoesNotDecodeTheClip() passed after 0.004 seconds.
+◇ Test mascotExportManifestMatchesFinitePlaybackSpecifications() started.
+✔ Test mascotExportManifestMatchesFinitePlaybackSpecifications() passed after 0.001 seconds.
+◇ Test mascotAnimationUsesFiniteNativeKeyframes() started.
+✔ Test mascotAnimationUsesFiniteNativeKeyframes() passed after 0.002 seconds.
+◇ Test mascotHiddenAndReduceMotionCancelPlaybackAndReleaseFrames() started.
+✔ Test mascotHiddenAndReduceMotionCancelPlaybackAndReleaseFrames() passed after 0.002 seconds.
+◇ Test mascotStaleDecodeAndHiddenResponsesCannotReplay() started.
+✔ Test mascotStaleDecodeAndHiddenResponsesCannotReplay() passed after 0.001 seconds.
+◇ Test mascotMissingAssetsRemainNonfatalAndDoNotLoop() started.
+✔ Test mascotMissingAssetsRemainNonfatalAndDoNotLoop() passed after 0.001 seconds.
+◇ Test mascotProductionSourceHasNoLive3DOrExecutionDependency() started.
+✔ Test mascotProductionSourceHasNoLive3DOrExecutionDependency() passed after 0.003 seconds.
+◇ Test providerSecretEditorUsesNativeSecureMaskAndClearsOnDismantle() started.
+✔ Test providerSecretEditorUsesNativeSecureMaskAndClearsOnDismantle() passed after 0.001 seconds.
+◇ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() started.
+✔ Test providerReviewEscapeCancelsAfterSecureEditorRemoval() passed after 0.132 seconds.
+◇ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() started.
+✔ Test providerSecureEditorEscapeClearsTransientBindingBeforeCancellation() passed after 0.007 seconds.
+◇ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() started.
+✔ Test transcriptFindQuerySelectionWrapAndCloseKeepReadingAnchorIntent() passed after 0.001 seconds.
+◇ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() started.
+✔ Test transcriptFindBackgroundSnapshotsDoNotRequestFocusOrNavigation() passed after 0.001 seconds.
+◇ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() started.
+✔ Test transcriptFindConversationSwitchAndReconnectRejectStaleSelections() passed after 0.001 seconds.
+◇ Test uiuxStatusTextMeetsAAOnResolvedNativeSurfaces() started.
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAqua surface=window foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAqua surface=text foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAqua surface=control foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameDarkAqua surface=window foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameDarkAqua surface=text foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameDarkAqua surface=control foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityAqua surface=window foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityAqua surface=text foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityAqua surface=control foreground=[0.15294117647058825, 0.15294117647058825, 0.15294117647058825] background=[1.0, 1.0, 1.0] ratio=14.938418916797357
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityDarkAqua surface=window foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityDarkAqua surface=text foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+GATOR_UIUX_CONTRAST appearance=NSAppearanceNameAccessibilityDarkAqua surface=control foreground=[0.8650519031141869, 0.8650519031141869, 0.8650519031141869] background=[0.11764705882352941, 0.11764705882352941, 0.11764705882352941] ratio=12.225809383321625
+✔ Test uiuxStatusTextMeetsAAOnResolvedNativeSurfaces() passed after 0.001 seconds.
+◇ Test uiuxSlashFeedbackOnlyAppearsForLeadingSlashAndDoesNotRewriteText() started.
+✔ Test uiuxSlashFeedbackOnlyAppearsForLeadingSlashAndDoesNotRewriteText() passed after 0.001 seconds.
+◇ Test uiuxDuplicateAttachmentNamesAreExplainedWithoutChangingUploadIdentity() started.
+✔ Test uiuxDuplicateAttachmentNamesAreExplainedWithoutChangingUploadIdentity() passed after 0.001 seconds.
+◇ Test uiuxReadingPositionsRetainIndependentAnchorsAndExplicitFollowIntent() started.
+✔ Test uiuxReadingPositionsRetainIndependentAnchorsAndExplicitFollowIntent() passed after 0.001 seconds.
+◇ Test uiuxReadingPositionsBoundRetentionAndRecoverMissingAnchors() started.
+✔ Test uiuxReadingPositionsBoundRetentionAndRecoverMissingAnchors() passed after 0.001 seconds.
+◇ Test uiuxRecentConversationProjectionPreservesGoOrderAndSelection() started.
+✔ Test uiuxRecentConversationProjectionPreservesGoOrderAndSelection() passed after 0.001 seconds.
+◇ Test uiuxListInlineRenderingPreservesEmphasisAndCode() started.
+✔ Test uiuxListInlineRenderingPreservesEmphasisAndCode() passed after 0.002 seconds.
+◇ Test uiuxNestedListRenderingWrapsAtCompactAndFullWidths() started.
+✔ Test uiuxNestedListRenderingWrapsAtCompactAndFullWidths() passed after 0.011 seconds.
+◇ Test uiuxEditorGrowthIsMeasuredAndBounded() started.
+✔ Test uiuxEditorGrowthIsMeasuredAndBounded() passed after 0.002 seconds.
+◇ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() started.
+✔ Test workspacePickerAllowsOneExistingDirectoryAndNeverCreatesFolders() passed after 0.418 seconds.
+◇ Test cameraGapRequiresActualDisplayEvidence() started.
+✔ Test cameraGapRequiresActualDisplayEvidence() passed after 0.001 seconds.
+◇ Test notchPanelTracksNegativeDisplayOriginsAndStaysWithinScreen() started.
+✔ Test notchPanelTracksNegativeDisplayOriginsAndStaysWithinScreen() passed after 0.001 seconds.
+✔ Test run with 255 tests in 0 suites passed after 139.065 seconds.

@@ -1,0 +1,40 @@
+✔ host streams Go state and closes its child on exit (74.291375ms)
+✔ restart preparation waits for the canonical application and never forces a busy child to exit (87.878959ms)
+✔ native helpers preserve literal argv, bound output and support cancellation (127.096833ms)
+✔ native playback carries language and rate without exposing reply text in arguments (2.372375ms)
+✔ cancelling voice enumeration prevents native playback (0.14825ms)
+✔ explicit system voices use installed names and keep speech text out of arguments (0.152042ms)
+✔ local voice model downloads can be cancelled and manual reading stops with its chat (0.797292ms)
+✔ dictation captures the provider route and cannot deliver into another conversation (1.236542ms)
+✔ spoken output ignores retained history, speaks only new replies and aborts on close (0.147375ms)
+✔ spoken output stops on chat switch, preference disable and explicit playback cancellation (0.161667ms)
+✔ PDF preview renders actual distinct page images and rejects nonexistent pages (963.981625ms)
+✔ dialogue dispatch starts one background owner and returns results without moving focus (2.382167ms)
+✔ an unconfirmed background admission or control is reported and never automatically replayed (0.455041ms)
+✔ plan cancellation reports the original owner's confirmed receipt without moving focus (0.487417ms)
+✔ plan revision admission releases the parent conversation while its original owner prepares (1.699667ms)
+✔ a plan correction rechecks the task limit while stop remains available (0.710083ms)
+✔ managed navigation waits for the new owner's applied view and preserves original execution (1.576666ms)
+✔ a failed managed view acknowledgement retires only the new view and restores the original owner (1.317875ms)
+✔ direct ancestry navigation uses only the current owner's exact parent even when idle (0.197709ms)
+✔ browser sign-in retains its owner and Connections returns to it (0.416666ms)
+✔ durable update badges include unopened chats and clear from fresh receipts (0.146667ms)
+✔ chat navigation retains original execution, approvals and unread results (0.18425ms)
+✔ session capacity never evicts running or queued work and admissions are bounded (0.213375ms)
+✔ reviewed plan starts share the existing three-working-chat admission limit (0.189125ms)
+✔ failed chat startup restores focus and leaves original work running (0.101917ms)
+✔ host navigation events are consumed once and reconnect targets only the selected chat (5.410375ms)
+✔ profile maintenance closes idle cached chats and refuses pending background work (0.193208ms)
+✔ receipt_busy retains its runtime and blocks profile maintenance and restart (0.1725ms)
+✔ catalog_busy retains its runtime and blocks profile maintenance and restart (0.120042ms)
+✔ goal_busy retains its runtime and blocks profile maintenance and restart (0.162875ms)
+✔ action corrections reuse the exact local or delegated owner without allocating work (0.179292ms)
+✔ confirmed preference changes refresh cached owners once without replaying tasks (0.141791ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1346.714375

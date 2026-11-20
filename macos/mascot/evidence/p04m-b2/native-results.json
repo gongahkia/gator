@@ -1,0 +1,37 @@
+{
+  "profile": "/tmp/gator-pet-b2-profile-3f5yg3vp",
+  "testBundleID": "dev.gator.pet.b2.fixture",
+  "firstPID": 74984,
+  "relaunchPID": 76896,
+  "menuTuckObserved": true,
+  "relaunchTucked": true,
+  "passiveClickReachedPeer": true,
+  "peerStayedFrontmost": true,
+  "peerClickCount": 1,
+  "stylesObserved": [
+    "rendered",
+    "classic"
+  ],
+  "settingsSizePoints": [
+    420,
+    554
+  ],
+  "staticToggled": true,
+  "chatClosedWithPetVisible": true,
+  "lastMenuTuckWithChatClosed": true,
+  "quitTerminated": true,
+  "preferences": {
+    "gator.desktopPet.shown": "0",
+    "gator.mascot.shown": "0",
+    "gator.mascot.style": "classic",
+    "gator.mascot.animated": "0"
+  },
+  "workHistoryFiles": 0,
+  "requestArchives": 0,
+  "limitations": [
+    "Physical display migration not tested",
+    "Physical VoiceOver and IME not tested",
+    "Go-backed responding animation not retested in B2",
+    "Fullscreen uses approved manual Tuck Away"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "HEAD": "dd45abc7766decd0280cf44c5ce3d87310dfe268",
+  "bundle": "/tmp/Gator-Native-P04M-B2.app",
+  "executableSHA256": "a92b8c85a8a782b3d803efe7c51e5c2fa9f7fe9e945680adbfc4d497c4b97857",
+  "exactFinalBinaryNativeSmokePassed": true,
+  "sourceHashes": {
+    "macos/Sources/GatorMac/NativeDesktopPet.swift": "e475ce497020aaef5317a812b69ce04e17f3131c0bb203d8e2c8654becd89d07",
+    "macos/Sources/GatorMac/AppDelegate.swift": "fe32f0367c3d8cc7874167a0c3bee1bc49be3aab2855c25fcd8ae4cd9a279e51",
+    "macos/Sources/GatorMac/GatorApp.swift": "47c0243e2dc656b51fb41fc6a4b7834282979ae2c118deb4c424983dce539925",
+    "macos/Sources/GatorMac/ConversationView.swift": "bba4923386816806328370de5214cdcd552887d3596702e412aac271820660b1",
+    "macos/Sources/GatorMac/NativeMascotPreferences.swift": "bdddc981ff07b4f06ee7d53a1117d221e687dd8680f3dd0715b7593d4db1ed19",
+    "macos/Tests/GatorMacTests/NativeDesktopPetTests.swift": "299ea9b1b29b3d4d6df77e55f299f5335243a44218cb3e6dd682d4083b3b532f"
+  },
+  "assets": {
+    "count": 119,
+    "allHashesMatch": true
+  },
+  "preservedEarlierGUICandidate": "/tmp/Gator-Native-P04M-B2-GUI-Checked.app"
+}

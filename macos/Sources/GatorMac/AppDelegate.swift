@@ -5,6 +5,7 @@ import GatorCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var application: ManagedSessionCoordinator?
     var quickAccess: NotchQuickAccess?
+    var desktopPet: NativeDesktopPet?
     var openConversationWindow: (() -> Void)?
     private var terminating = false
     private var mayTerminate = false
@@ -21,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NativeApplicationPresentation.update()
     }
     func applicationWillTerminate(_ notification: Notification) {
+        desktopPet?.stop(); desktopPet = nil
         quickAccess?.stop()
         for observer in presentationObservers { NotificationCenter.default.removeObserver(observer) }
         presentationObservers.removeAll()

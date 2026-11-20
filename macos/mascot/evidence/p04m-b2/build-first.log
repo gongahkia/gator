@@ -1,0 +1,203 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[3/11] Emitting module GatorMac
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeDesktopPet.swift:9:8: error: type 'NativeDesktopPetScreen' does not conform to protocol 'Equatable'
+  7 | }
+  8 | 
+  9 | struct NativeDesktopPetScreen: Equatable {
+    |        |- error: type 'NativeDesktopPetScreen' does not conform to protocol 'Equatable'
+    |        `- note: add stubs for conformance
+ 10 |     let id: String
+ 11 |     let name: String
+ 12 |     let frame: CGRect
+ 13 |     let visible: CGRect
+ 14 |     var safeInsets = NSEdgeInsetsZero
+    |         `- note: stored property type 'NSEdgeInsets' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NativeDesktopPetScreen' to 'Equatable'
+ 15 |     var notch: NotchGeometry?
+ 16 | 
+
+Swift.==:1:24: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'RawRepresentable'
+1 | @inlinable public func == <T>(lhs: T, rhs: T) -> Bool where T : RawRepresentable, T.RawValue : Equatable
+  |                        `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'RawRepresentable'
+
+Swift.FloatingPoint.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'FloatingPoint'
+1 | protocol FloatingPoint {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'FloatingPoint'
+3 | 
+
+Swift.BinaryInteger.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'BinaryInteger'
+1 | protocol BinaryInteger {
+2 | public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : BinaryInteger}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'BinaryInteger'
+3 | 
+
+Swift._Pointer.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+1 | protocol _Pointer {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+3 | 
+
+Swift._Pointer.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+1 | protocol _Pointer {
+2 | @inlinable public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : _Pointer}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+3 | 
+
+Swift.Strideable.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'Strideable'
+1 | protocol Strideable {
+2 | @inlinable public static func == (x: Self, y: Self) -> Bool}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'Strideable'
+3 | 
+
+Swift.StringProtocol.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'StringProtocol'
+1 | protocol StringProtocol {
+2 | @inlinable public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : StringProtocol}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'StringProtocol'
+3 | 
+
+Swift.SIMD.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'SIMD'
+1 | protocol SIMD {
+2 | public static func == (a: Self, b: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'SIMD'
+3 | 
+
+CoreFoundation._CFObject.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_CFObject'
+1 | protocol _CFObject {
+2 | public static func == (left: Self, right: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_CFObject'
+3 | 
+
+Foundation.AttributedStringProtocol.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'AttributedStringProtocol'
+1 | protocol AttributedStringProtocol {
+2 | public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : AttributedStringProtocol}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'AttributedStringProtocol'
+3 | 
+
+Foundation._BridgedStoredNSError.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_BridgedStoredNSError'
+1 | protocol _BridgedStoredNSError {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_BridgedStoredNSError'
+3 | 
+
+Swift.Equatable.==:2:13: note: protocol requires function '==' with type '(NativeDesktopPetScreen, NativeDesktopPetScreen) -> Bool'
+1 | protocol Equatable {
+2 | static func == (lhs: Self, rhs: Self) -> Bool}
+  |             `- note: protocol requires function '==' with type '(NativeDesktopPetScreen, NativeDesktopPetScreen) -> Bool'
+3 | 
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeDesktopPet.swift:65:95: error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 63 | 
+ 64 |     init(defaults: UserDefaults = .standard, readSignal: @escaping () -> NativeMascotSignal?,
+ 65 |          isClosing: @escaping () -> Bool, screens: @escaping () -> [NativeDesktopPetScreen] = NativeDesktopPetScreen.current,
+    |                                                                                               `- error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 66 |          makeSurface: @escaping () -> any NativeDesktopPetSurface = { NativeDesktopPetPanel() }) {
+ 67 |         self.defaults = defaults; self.readSignal = readSignal; self.isClosing = isClosing
+[4/11] Compiling GatorMac ConversationView.swift
+[5/11] Compiling GatorMac NativeMascotPreferences.swift
+[6/11] Compiling GatorMac AppDelegate.swift
+[7/11] Compiling GatorMac NativeDesktopPet.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeDesktopPet.swift:9:8: error: type 'NativeDesktopPetScreen' does not conform to protocol 'Equatable'
+  7 | }
+  8 | 
+  9 | struct NativeDesktopPetScreen: Equatable {
+    |        |- error: type 'NativeDesktopPetScreen' does not conform to protocol 'Equatable'
+    |        `- note: add stubs for conformance
+ 10 |     let id: String
+ 11 |     let name: String
+ 12 |     let frame: CGRect
+ 13 |     let visible: CGRect
+ 14 |     var safeInsets = NSEdgeInsetsZero
+    |         `- note: stored property type 'NSEdgeInsets' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NativeDesktopPetScreen' to 'Equatable'
+ 15 |     var notch: NotchGeometry?
+ 16 | 
+
+Swift.==:1:24: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'RawRepresentable'
+1 | @inlinable public func == <T>(lhs: T, rhs: T) -> Bool where T : RawRepresentable, T.RawValue : Equatable
+  |                        `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'RawRepresentable'
+
+Swift.FloatingPoint.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'FloatingPoint'
+1 | protocol FloatingPoint {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'FloatingPoint'
+3 | 
+
+Swift.BinaryInteger.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'BinaryInteger'
+1 | protocol BinaryInteger {
+2 | public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : BinaryInteger}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'BinaryInteger'
+3 | 
+
+Swift._Pointer.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+1 | protocol _Pointer {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+3 | 
+
+Swift._Pointer.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+1 | protocol _Pointer {
+2 | @inlinable public static func == <Other>(lhs: Self, rhs: Other) -> Bool where Other : _Pointer}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_Pointer'
+3 | 
+
+Swift.Strideable.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'Strideable'
+1 | protocol Strideable {
+2 | @inlinable public static func == (x: Self, y: Self) -> Bool}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'Strideable'
+3 | 
+
+Swift.StringProtocol.==:2:31: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'StringProtocol'
+1 | protocol StringProtocol {
+2 | @inlinable public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : StringProtocol}
+  |                               `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'StringProtocol'
+3 | 
+
+Swift.SIMD.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'SIMD'
+1 | protocol SIMD {
+2 | public static func == (a: Self, b: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'SIMD'
+3 | 
+
+CoreFoundation._CFObject.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_CFObject'
+1 | protocol _CFObject {
+2 | public static func == (left: Self, right: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_CFObject'
+3 | 
+
+Foundation.AttributedStringProtocol.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to 'AttributedStringProtocol'
+1 | protocol AttributedStringProtocol {
+2 | public static func == <RHS>(lhs: Self, rhs: RHS) -> Bool where RHS : AttributedStringProtocol}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to 'AttributedStringProtocol'
+3 | 
+
+Foundation._BridgedStoredNSError.==:2:20: note: candidate would match if 'NativeDesktopPetScreen' conformed to '_BridgedStoredNSError'
+1 | protocol _BridgedStoredNSError {
+2 | public static func == (lhs: Self, rhs: Self) -> Bool}
+  |                    `- note: candidate would match if 'NativeDesktopPetScreen' conformed to '_BridgedStoredNSError'
+3 | 
+
+Swift.Equatable.==:2:13: note: protocol requires function '==' with type '(NativeDesktopPetScreen, NativeDesktopPetScreen) -> Bool'
+1 | protocol Equatable {
+2 | static func == (lhs: Self, rhs: Self) -> Bool}
+  |             `- note: protocol requires function '==' with type '(NativeDesktopPetScreen, NativeDesktopPetScreen) -> Bool'
+3 | 
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeDesktopPet.swift:65:95: error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 63 | 
+ 64 |     init(defaults: UserDefaults = .standard, readSignal: @escaping () -> NativeMascotSignal?,
+ 65 |          isClosing: @escaping () -> Bool, screens: @escaping () -> [NativeDesktopPetScreen] = NativeDesktopPetScreen.current,
+    |                                                                                               `- error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 66 |          makeSurface: @escaping () -> any NativeDesktopPetSurface = { NativeDesktopPetPanel() }) {
+ 67 |         self.defaults = defaults; self.readSignal = readSignal; self.isClosing = isClosing
+[8/11] Compiling GatorMac GatorApp.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeDesktopPet.swift:65:95: error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 63 | 
+ 64 |     init(defaults: UserDefaults = .standard, readSignal: @escaping () -> NativeMascotSignal?,
+ 65 |          isClosing: @escaping () -> Bool, screens: @escaping () -> [NativeDesktopPetScreen] = NativeDesktopPetScreen.current,
+    |                                                                                               `- error: converting function value of type '@MainActor @Sendable () -> [NativeDesktopPetScreen]' to '() -> [NativeDesktopPetScreen]' loses global actor 'MainActor'
+ 66 |          makeSurface: @escaping () -> any NativeDesktopPetSurface = { NativeDesktopPetPanel() }) {
+ 67 |         self.defaults = defaults; self.readSignal = readSignal; self.isClosing = isClosing
+[9/12] Compiling GatorMac NotchQuickAccess.swift

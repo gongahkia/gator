@@ -50,6 +50,7 @@ struct GatorApp: App {
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 MenuBarVisibilityToggle()
                 SettingsLink { Text("Mascot Appearance…") }
+                NativeDesktopPetMenu()
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(delegate.quickAccess?.canShow != true)
                 Button("Focus Message") { application.focusComposer() }.keyboardShortcut("l")
@@ -103,6 +104,12 @@ extension AppDelegate {
         application = sessions
         openConversationWindow = openWindow
         if quickAccess == nil { quickAccess = NotchQuickAccess(sessions: sessions, openWindow: openWindow) }
+        if desktopPet == nil {
+            desktopPet = NativeDesktopPet(readSignal: { [weak sessions] in
+                guard let sessions else { return nil }
+                return NativeMascotProjection.signal(sessions.current)
+            }, isClosing: { [weak sessions] in sessions == nil || sessions?.stopping == true || sessions?.current.closing == true })
+        }
         await sessions.start()
     }
 }

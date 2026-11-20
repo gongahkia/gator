@@ -178,6 +178,7 @@ struct ConversationView: View {
             Toggle("Notch Quick Access", isOn: $notchEnabled)
             MenuBarVisibilityToggle()
             SettingsLink { Text("Mascot Appearance…") }
+            NativeDesktopPetMenu()
             Button("Connection & Model Details") { connectionDetails = true }
             Divider()
             Button("Reconnect and Inspect") { Task { await sessions.reconnect() } }.disabled(application.connectionStatus != .disconnected)

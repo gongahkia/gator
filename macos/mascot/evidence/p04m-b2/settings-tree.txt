@@ -1,0 +1,26 @@
+AXWindow | Gator Settings |  |  | com_apple_SwiftUI_Settings_window
+ AXGroup |  |  |  | 
+  AXScrollArea |  |  |  | 
+   AXHeading |  | Gator Mascot |  | 
+   AXGroup |  |  |  | 
+    AXStaticText |  |  | Show In-Chat Mascot | 
+    AXCheckBox |  |  |  | gator.mascot.shown
+    AXStaticText |  |  | Mascot Style | 
+    AXPopUpButton |  |  | 3D-rendered | gator.mascot.style
+    AXStaticText |  |  | Animate Mascot | 
+    AXCheckBox |  |  |  | gator.mascot.animated
+    AXStaticText |  |  | Short reactions to the current conversation. macOS Reduce Motion takes precedence. | 
+   AXHeading |  | Desktop Pet |  | 
+   AXGroup |  |  |  | 
+    AXStaticText |  |  | Show Desktop Pet | 
+    AXCheckBox |  |  |  | gator.desktopPet.shown
+    AXStaticText |  |  | Display | 
+    AXPopUpButton |  |  | Primary Display | gator.desktopPet.display
+    AXButton |  | Tuck Away Desktop Pet |  | gator.desktopPet.tuck
+    AXStaticText |  |  | Click-through companion for the current conversation. Uses the style and animation settings above, independently of the in-chat mascot. | 
+    AXStaticText |  |  | May remain visible in fullscreen or shared screens. Tuck Away hides it until you explicitly turn it on again. | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator Settings | 
