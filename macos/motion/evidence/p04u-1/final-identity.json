@@ -1,7 +1,7 @@
 {
   "UTC": "2026-11-20T08:26:38.775817+00:00",
   "startingHEAD": "5258dab779a9ecb2e95f761224fed88b32cca3f1",
-  "finalHEAD": "dd9790d4abe388441bd3e277b4a2487b19dc7403",
+  "finalHEAD": "e5f75551602190fafbd5097db2acac24fa811a1e",
   "sources": {
     "macos/Sources/GatorCore/NativeDraftAttachments.swift": "96da89b97e3d43c9c8d2e67534b605fb8320f4d509bfac317e8510b1ee5f0a6a",
     "macos/Sources/GatorCore/BridgePipeIO.swift": "b29a2c93affa3761dd75d82853cbf079aba2a5632aa666b69fa48015379f067a",
@@ -79,5 +79,6 @@
     "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
     "Contents/Resources/Presence/completed.gif": "8855aa8b205539a33abe8fe1687a110dbc9ba7f12a2864d26fd85e328c7b9bbb",
     "Contents/Resources/Presence/attention.gif": "bf00539083313e171ec47ab95a8253bcdfd5b5025c39e39b531d73caef0da07c"
-  }
+  },
+  "changedPathCount": 138
 }

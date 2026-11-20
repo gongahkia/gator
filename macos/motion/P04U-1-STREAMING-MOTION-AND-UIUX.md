@@ -101,7 +101,7 @@ The PNGs below are **headless NSHostingView component renders**, not screenshots
 
 No trustworthy actual packaged-app motion recording was obtained; none is fabricated. No old ten-cycle acceptance work was attempted. Full/compact interaction, live selection, Find reveal scrolling, actual pulse/stream visual smoothness, physical accessibility and hidden-window compositor behavior remain NOT TESTED. GPU activity/energy are NOT TESTED.
 
-Carry-forward blockers remain exactly: historical accepted approval input has unknown provenance and its negative test is INVALID; prior 1.4 GiB layout stall/failed guarded Quit is unresolved; approximately 23–25% pending-review CPU has not been independently explained or accepted; ten complete native cycles are unverified. New headless results do not resolve those facts.
+Carry-forward blockers remain exactly: historical accepted approval input has unknown provenance and its negative test is INVALID; prior approximately 1.4 GB layout stall/failed guarded Quit is unresolved; approximately 23–25% pending-review CPU has not been independently explained or accepted; ten complete native cycles are unverified. New headless results do not resolve those facts.
 
 ## Verification, resources and delivery
 
@@ -134,3 +134,69 @@ The candidate costs more active CPU: about **+7.75 percentage points** in this f
 The initial 42 ms SwiftUI-tail and rejected native-text-view trials are retained in `initial-swiftui-tail/` and `initial-native-tail/`. They are not final candidate measurements. No high-memory test or cleanup failure was relabeled PASS. The active cost remains a native acceptance/performance consideration for the complete app beside a local model.
 
 Strategy comparison uses 10 deterministic runs per dataset (not a real model benchmark). For the 1,680-grapheme burst, strict character/word/adaptive paths require respectively 1,681 / 282 / 5 ticks, including final color settlement. At completion every strategy has zero pending characters; the largest measured synchronous cursor completion reconciliation across datasets is 149.04 μs in the optimized standalone benchmark. This is not whole-app final-paint latency. Oversized content bypasses animation entirely.
+
+### Final verification
+
+| Check | Result |
+|---|---|
+| `swift build --package-path macos --scratch-path /tmp/gator-native-build` | PASS |
+| Complete normal Swift suite, final production code | **294 PASS**, 146.692 s test time |
+| Final focused strict Swift 6, complete concurrency checks, warnings as errors | **68 PASS**, 3.415 s test time |
+| Complete final Swift suite under the same strict flags | **294 PASS**, 144.991 s test time |
+| Relevant Go safety regressions, forced fresh with `-count=1` | **10 PASS**, two packages (`internal/workapp`, `internal/workrun`) |
+| Host tests with installed Node 26.7.0 | **140 PASS, 0 FAIL, 1 Windows-only SKIP**, 141 total |
+| Standalone reveal benchmark, optimized strict Swift 6 / explicit `arm64-apple-macosx15.0` | PASS |
+| Packaged Info.plist and Mach-O deployment minimum | **15.0**, PASS; macOS 15 runtime NOT TESTED |
+| Source preservation | All existing GatorCore sources/tests and resource hashes unchanged; no Go/host/README edit |
+| Packaged resources/dependencies | Eight files, existing two reaction GIFs unchanged; no RealityKit/SceneKit/WebView or rejected custom prose-view type in native executable |
+
+The 28 added tests cover the cursor/Unicode/identities, static and failure boundaries, copy/pasteboard fidelity, independent preferences, pulse/visibility lifetime, policy/reading anchors, source equality, native component sizing and real-Go deltas. Two opt-in evidence hooks return without capture/measurement during an ordinary suite; they were separately invoked with `GATOR_MOTION_CAPTURE=1` and `GATOR_MOTION_BENCH=before/after` to produce the retained artifacts. They are not represented as actual desktop tests.
+
+The first strict attempt rejected two test-owned `weak var` probes under the new compiler's WeakMutability warning. Both now explicitly clear their weak references after the unchanged assertions. No warning was suppressed and no assertion was relaxed. The complete final strict run above includes these final test sources; production source/bundle did not change. Original failure logs are retained.
+
+Other retained failures belong to the rejected native prose-view experiment or preliminary compilation, not the shipped code. Its release test remained failing and the entire experiment was removed from the production target. All final production-source identities match the measured configuration. The later test-only warning cleanup is identified in [final-identity.json](evidence/p04u-1/final-identity.json).
+
+The original 100 spinner-only states / zero owner-reconciliation callback test, meaningful/Unicode snapshot comparison, exact approval expiry, real-Go spinner/review and 20-cycle navigation/shutdown regressions pass unchanged. The new real-Go test observes actual loopback SSE public activity, exact entry identity and retained final output; context/generation and an unsent draft survive. Neither it nor the component presenter admits additional work. No paid model request or user-owned profile is used.
+
+Exact commands, UTC times, exits and runtime identity: [verification.json](evidence/p04u-1/verification.json). Logs: [normal full](evidence/p04u-1/swift-full.log), [final full strict](evidence/p04u-1/swift-full-final-strict.log), [focused strict](evidence/p04u-1/swift-strict-final.log), [Go](evidence/p04u-1/go-safety.log), [host](evidence/p04u-1/host-node26.log), [package](evidence/p04u-1/package.log).
+
+Reproduction:
+
+```sh
+export PATH=/Users/gongahkia/.local/share/fnm/node-versions/v26.7.0/installation/bin:$PATH
+export GATOR_TEST_BINARY=/tmp/Gator-Native-P04U1-Motion.app/Contents/Resources/gator-runtime
+swift build --package-path macos --scratch-path /tmp/gator-native-build
+swift test --package-path macos --scratch-path /tmp/gator-native-build --no-parallel
+swift test --package-path macos --scratch-path /tmp/gator-native-build --no-parallel -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+npm test --prefix app-host
+python3 macos/motion/lab/MeasureHosted.py
+```
+
+The exact ten-test Go filter and separate verification commands are in [Verify.py](lab/Verify.py). The development bundle was built once into the fresh requested destination with `GATOR_NATIVE_APP_PATH=/tmp/Gator-Native-P04U1-Motion.app bash macos/scripts/build-dev-app.sh`. That script refuses an existing destination. It must be given another fresh destination for a later rebuild; prior apps were preserved.
+
+### Changed files and delivery identity
+
+Production files:
+
+- `ConversationView.swift`: typed public-entry presenter, motion policy/visibility, native follow role, bounded welcome/status/tool-disclosure/readiness corrections.
+- `NativeMessageBody.swift`: equatable block subviews with byte-sensitive source equality; native Markdown semantics retained.
+- `NativeMascotPreferences.swift`: independent streaming-motion toggle; all previous controls remain.
+- New `NativeMotionPresentation.swift`, `NativeStreamingReveal.swift`, `NativeStreamingPresentation.swift`, `NativeMotionVisibility.swift`, `NativeThinkingPulse.swift`: presentation-only policy, cursor, view/task lifetime and status pulse.
+
+Tests: new `NativeStreamingTests.swift`, `NativeMotionRenderTests.swift`, `NativeMotionGoTests.swift`. No existing safety assertions were edited. Supporting report, benchmark/verification scripts, rejected-experiment copies and all raw evidence remain under `macos/motion/`. [Full changed-path inventory](evidence/p04u-1/changed-files.txt) includes preliminary failures and intermediate experiments, rather than concealing them.
+
+The initial clean HEAD was `5258dab779a9ecb2e95f761224fed88b32cca3f1`; final observed HEAD is `dd9790d4abe388441bd3e277b4a2487b19dc7403`, advanced externally. No commit/reset was performed. Current source, measured-source correspondence and bundle hashes: [final identity](evidence/p04u-1/final-identity.json), [packaging](evidence/p04u-1/packaging.json). Prior P04E1R2 native binary still matches its reported SHA256 `fe2cf9e7d8313fe99aad6ee1424fff75acff27e542812f50f5e2cb6b530f375c`.
+
+Development candidate: **`/tmp/Gator-Native-P04U1-Motion.app`**.
+
+Native executable SHA256: `757dcf483c31948c9e9d3e5188c2d158454c0862e6ee28b5cdf482dadb89399a`.
+
+Go runtime SHA256: `e80643697191a50a6c4e68b9711951de739db97d91322ddc80f9eacc686eb354`.
+
+### Decision
+
+- **IMPLEMENTATION RESULT: PASS** for the bounded presentation increment and headless regression gates.
+- **NATIVE ACCEPTANCE: NOT TESTED** for the packaged-app interaction/motion gate. Headless component images and Go fixtures do not substitute for it.
+- **RELEASE READINESS: BLOCKED** by the carried-forward native stability/approval-provenance debt and unverified real-window behavior. No overall production acceptance is claimed.
+
+Stop after P04U-1. No P04E-2, P04L-2, autonomy, CUA, P05–P10 or P11 implementation was started. No credentials/defaults/permissions were changed, no real model download or paid inference occurred, and no signing/notarization workflow was performed.

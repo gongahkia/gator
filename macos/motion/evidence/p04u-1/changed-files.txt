@@ -124,6 +124,7 @@ macos/motion/evidence/p04u-1/streaming-native-prose-3.log
 macos/motion/evidence/p04u-1/streaming-native-prose.log
 macos/motion/evidence/p04u-1/streaming-render.log
 macos/motion/evidence/p04u-1/swift-build.log
+macos/motion/evidence/p04u-1/swift-full-final-strict.log
 macos/motion/evidence/p04u-1/swift-full.log
 macos/motion/evidence/p04u-1/swift-strict-final.log
 macos/motion/evidence/p04u-1/swift-strict-weak-warning.log
