@@ -1,0 +1,99 @@
+[
+  {
+    "args": [
+      "activate"
+    ],
+    "exit": 0,
+    "output": "activated_owned_fixture=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuBarItem::Window"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuItem::Gator"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "wait-window",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "ready=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuBarItem::File"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "New Conversation"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "wait",
+      "conversation",
+      "gator.composer.text"
+    ],
+    "exit": 0,
+    "output": "ready=true\n"
+  },
+  {
+    "args": [
+      "focus",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "activated=Optional(true) raised=0 main=0 focus=0 ready=true\ncontroller=12546 frontName=PresenceCheck frontBundle=dev.gator.presence.finalcheck front=12492 target=12492 window=conversation focused=AXTextArea:Message Gator:gator.composer.text\n"
+  },
+  {
+    "args": [
+      "set-value",
+      "conversation",
+      "gator.composer.text",
+      "Controlled local presence observation"
+    ],
+    "exit": 0,
+    "output": "set_owned_fixture_text=0 confirmed=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "conversation",
+      "Send message"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "frames"
+    ],
+    "exit": 0,
+    "output": "captureID=60744 bounds={\n    Height = 21;\n    Width = 66;\n    X = 345;\n    Y = 144;\n}\ncaptureID=60705 bounds={\n    Height = 732;\n    Width = 812;\n    X = 329;\n    Y = 129;\n}\n"
+  },
+  {
+    "unverified": ""
+  }
+]

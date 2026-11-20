@@ -1,0 +1,17 @@
+fixturePID=8610 bundle=dev.gator.presence.acceptance path=/tmp/gator-native-test-presence-ub6kam_d/Gator-Presence-Desktop.app screenCapture=true
+candidate=60154 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60167 title=Gator Desktop Presence onScreen=true bundle=dev.gator.presence.acceptance
+candidate=60164 title=Gator Settings onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60161 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60160 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60300 title= onScreen=true bundle=dev.gator.presence.acceptance
+candidate=60159 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60156 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60239 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60150 title=Gator onScreen=true bundle=dev.gator.presence.acceptance
+candidate=60162 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60158 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60157 title= onScreen=false bundle=dev.gator.presence.acceptance
+candidate=60155 title= onScreen=false bundle=dev.gator.presence.acceptance
+recording started
+recording finished; audio=false; desktop=false

@@ -1,0 +1,154 @@
+[
+  {
+    "args": [
+      "activate"
+    ],
+    "exit": 0,
+    "output": "activated_owned_fixture=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuBarItem::Window"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuItem::Gator"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "wait-window",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "ready=true\n"
+  },
+  {
+    "args": [
+      "focus",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "activated=Optional(true) raised=-25205 main=0 focus=0 ready=true\ncontroller=12985 frontName=PresenceCheck frontBundle=dev.gator.presence.finalcheck front=12492 target=12492 window=conversation focused=AXTextArea:Message Gator:gator.composer.text\n"
+  },
+  {
+    "args": [
+      "focus-element",
+      "conversation",
+      "gator.composer.text"
+    ],
+    "exit": 0,
+    "output": "set=0 focused=true\ncontroller=12986 frontName=PresenceCheck frontBundle=dev.gator.presence.finalcheck front=12492 target=12492 window=conversation focused=AXTextArea:Message Gator:gator.composer.text\n"
+  },
+  {
+    "args": [
+      "select-all",
+      "conversation",
+      "gator.composer.text"
+    ],
+    "exit": 0,
+    "output": "all_selected=true characters=0\n"
+  },
+  {
+    "args": [
+      "type",
+      "conversation",
+      "gator.composer.text",
+      "Controlled local presence observation"
+    ],
+    "exit": 0,
+    "output": "typed_to=gator.composer.text observed_value=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "conversation",
+      "Send message"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "frames"
+    ],
+    "exit": 0,
+    "output": "window=_NS:8 title=Window pos=(341.0, 141.0) size=(66.0, 20.0) main=Optional(0) focused=Optional(0)\nwindow=conversation title=Gator \u2013 New chat pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(1) focused=Optional(0)\ncaptureID=60822 bounds={\n    Height = 20;\n    Width = 66;\n    X = 341;\n    Y = 141;\n}\ncaptureID=60705 bounds={\n    Height = 740;\n    Width = 820;\n    X = 325;\n    Y = 125;\n}\n"
+  },
+  {
+    "args": [
+      "frames"
+    ],
+    "exit": 0,
+    "output": "window=_NS:8 title=Window pos=(341.0, 141.0) size=(66.0, 20.0) main=Optional(0) focused=Optional(0)\nwindow=conversation title=Gator \u2013 New chat pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(1) focused=Optional(0)\ncaptureID=60822 bounds={\n    Height = 20;\n    Width = 66;\n    X = 341;\n    Y = 141;\n}\ncaptureID=60705 bounds={\n    Height = 740;\n    Width = 820;\n    X = 325;\n    Y = 125;\n}\n"
+  },
+  {
+    "GoRunning": "work-20261120T033452-ec96d92e176b4efc",
+    "GoCompleted": "work-20261120T033409-85024d87074477b4"
+  },
+  {
+    "args": [
+      "focus",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "activated=Optional(true) raised=-25205 main=0 focus=0 ready=true\ncontroller=13031 frontName=PresenceCheck frontBundle=dev.gator.presence.finalcheck front=12492 target=12492 window=conversation focused=AXTextArea:Message Gator:gator.composer.text\n"
+  },
+  {
+    "args": [
+      "focus-element",
+      "conversation",
+      "gator.composer.text"
+    ],
+    "exit": 0,
+    "output": "set=0 focused=true\ncontroller=13032 frontName=PresenceCheck frontBundle=dev.gator.presence.finalcheck front=12492 target=12492 window=conversation focused=AXTextArea:Message Gator:gator.composer.text\n"
+  },
+  {
+    "args": [
+      "type",
+      "conversation",
+      "gator.composer.text",
+      "Review mascot"
+    ],
+    "exit": 0,
+    "output": "typed_to=gator.composer.text observed_value=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "conversation",
+      "Send message"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "press",
+      "conversation",
+      "An action needs your review"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "frames"
+    ],
+    "exit": 0,
+    "output": "window=conversation title=Gator \u2013 Controlled local presence observation pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(1) focused=Optional(1)\ncaptureID=60705 bounds={\n    Height = 740;\n    Width = 820;\n    X = 325;\n    Y = 125;\n}\n"
+  },
+  {
+    "pendingReview": true,
+    "decisionSubmitted": false
+  }
+]

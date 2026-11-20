@@ -1,0 +1,15 @@
+recording started
+fixturePID=12492 bundle=dev.gator.presence.finalcheck path=/tmp/gator-native-test-presence-_5yzro2z/PresenceCheck.app screenCapture=true
+candidate=60732 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60728 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60709 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60705 title=Gator onScreen=true bundle=dev.gator.presence.finalcheck
+candidate=60727 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60734 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60821 title= onScreen=true bundle=dev.gator.presence.finalcheck
+candidate=60733 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60780 title=Window onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60731 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60730 title= onScreen=false bundle=dev.gator.presence.finalcheck
+candidate=60729 title= onScreen=false bundle=dev.gator.presence.finalcheck
+recording finished; audio=false; desktop=false

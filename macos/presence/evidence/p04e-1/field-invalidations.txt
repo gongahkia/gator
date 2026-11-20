@@ -1,0 +1,1 @@
+100 unchanged text/font assignments caused 0 intrinsic-size invalidations

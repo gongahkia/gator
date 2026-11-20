@@ -1,0 +1,6 @@
+captureID=60948 bounds={
+    Height = 72;
+    Width = 72;
+    X = 699;
+    Y = 258;
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "args": [
+      "activate"
+    ],
+    "exit": 0,
+    "output": "activated_owned_fixture=true\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuBarItem::Window"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "press",
+      "menu",
+      "AXMenuItem::Gator"
+    ],
+    "exit": 0,
+    "output": "press=0\n"
+  },
+  {
+    "args": [
+      "wait-window",
+      "conversation"
+    ],
+    "exit": 0,
+    "output": "ready=true\n"
+  },
+  {
+    "unverified": "observable fixture readiness timed out"
+  }
+]

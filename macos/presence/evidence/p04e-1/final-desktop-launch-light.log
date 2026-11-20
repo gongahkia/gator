@@ -1,2 +1,3 @@
 {"root": "/tmp/gator-native-test-presence-ub6kam_d", "providerPID": 8601, "port": 52413, "bundle": "dev.gator.presence.acceptance"}
 {"pid": 8610, "mode": "light"}
+exit 0

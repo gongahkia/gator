@@ -1,0 +1,14 @@
+{
+  "video": "macos/presence/evidence/p04e-1/keyboard-live-reaction.mp4",
+  "fps": 30,
+  "sampleFrames": 690,
+  "firstCompletedEmojiSeconds": 7.6,
+  "reactionOuterRingActiveFrames": 16,
+  "firstLastOuterRingChangeSeconds": [
+    7.8,
+    8.3
+  ],
+  "outerRingChangedPixelsPeak": 40,
+  "settledLastTwoSecondsChangedPixelsPeak": 0,
+  "method": "Compared native header outer ring against median of last 60 frames; >35 RGB difference, excluding central emoji. Contact sheet visually confirms expanding dots followed by static checkmark. Not a GPU/energy measurement."
+}

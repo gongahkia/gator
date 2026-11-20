@@ -6,7 +6,7 @@ import Synchronization
 
 final class FixtureRecordingDelegate:NSObject,SCRecordingOutputDelegate{
     let outcome=Mutex<String?>(nil)
-    func recordingOutputDidStartRecording(_ recordingOutput:SCRecordingOutput){print("recording started")}
+    func recordingOutputDidStartRecording(_ recordingOutput:SCRecordingOutput){FileHandle.standardOutput.write(Data("recording started\n".utf8))}
     func recordingOutputDidFinishRecording(_ recordingOutput:SCRecordingOutput){outcome.withLock{$0="finished"}}
     func recordingOutput(_ recordingOutput:SCRecordingOutput,didFailWithError error:any Error){outcome.withLock{$0=String(describing:error)}}
 }
@@ -16,7 +16,7 @@ final class FixtureRecordingDelegate:NSObject,SCRecordingOutputDelegate{
             _=NSApplication.shared
             guard CommandLine.arguments.count==4,let pid=Int32(CommandLine.arguments[1]),
                   let app=NSRunningApplication(processIdentifier:pid),
-                  app.bundleIdentifier=="dev.gator.presence.acceptance",
+                  ["dev.gator.presence.acceptance", "dev.gator.presence.finalcheck"].contains(app.bundleIdentifier ?? ""),
                   app.bundleURL?.resolvingSymlinksInPath().path.hasPrefix(URL(fileURLWithPath:"/tmp/gator-native-test-presence-").resolvingSymlinksInPath().path)==true else{throw NSError(domain:"RefuseNonfixture",code:1)}
             print("fixturePID=\(pid) bundle=\(app.bundleIdentifier ?? "nil") path=\(app.bundleURL!.path) screenCapture=\(CGPreflightScreenCaptureAccess())")
             let content=try await SCShareableContent.excludingDesktopWindows(false,onScreenWindowsOnly:false)

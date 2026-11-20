@@ -1,0 +1,20 @@
+window= title= pos=(700.0, 262.5) size=(70.0, 63.0) main=nil focused=Optional(0)
+window=conversation title=Gator – Controlled local presence observation pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(1) focused=Optional(1)
+captureID=60948 bounds={
+    Height = 72;
+    Width = 72;
+    X = 699;
+    Y = 258;
+}
+captureID=60705 bounds={
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}
+captureID=60947 bounds={
+    Height = 574;
+    Width = 412;
+    X = 529;
+    Y = 201;
+}

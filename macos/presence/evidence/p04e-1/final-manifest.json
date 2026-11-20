@@ -1,0 +1,60 @@
+{
+  "initialHEAD": "8052f0c2a50809bf04c9eb070a4c069fec785663",
+  "finalObservedHEAD": "8b242432d61039d745f0b545a1b5c39604d6eea2",
+  "changedInitialFiles": [
+    "macos/Sources/GatorMac/GatorApp.swift",
+    "macos/Sources/GatorMac/NativeMascotPlayback.swift",
+    "macos/Sources/GatorMac/NativeDesktopPet.swift",
+    "macos/Sources/GatorMac/ConversationView.swift",
+    "macos/Sources/GatorMac/NativeMascotPreferences.swift",
+    "macos/Sources/GatorMac/NativeMascotView.swift",
+    "macos/Sources/GatorMac/NativeMascotModel.swift",
+    "macos/Tests/GatorMacTests/NativeMascotTests.swift",
+    "macos/Tests/GatorMacTests/NativeDesktopPetTests.swift",
+    "macos/scripts/build-dev-app.sh"
+  ],
+  "missingInitialFiles": [],
+  "protectedSourcesOrPreviousMascotEvidenceChanged": [],
+  "sourceSHA256": {
+    "macos/Sources/GatorMac/GatorApp.swift": "077e751f0c884022e6b2b28a429398b364d3b25db194812fdcaa338aec22a179",
+    "macos/Sources/GatorMac/NativeMascotPlayback.swift": "de05c2cb73a5d4d641e139f38562263dc066ce2ea8c5690e34a9d074637e8446",
+    "macos/Sources/GatorMac/NativeDesktopPet.swift": "0581b354361a180f9ce1313cbc4b9f44b626b1db0c2721f349b67d402956e443",
+    "macos/Sources/GatorMac/ConversationView.swift": "c8203bbd65d677ae3ecb52ced9a6f374c530da0434d9bb8db2df4a695098a34c",
+    "macos/Sources/GatorMac/NativeMascotPreferences.swift": "2123a79e5e82e28a7f6dbe5a5a6d68ec997e68c86a6b5fdfc2296ff968291248",
+    "macos/Sources/GatorMac/NativeMascotView.swift": "18ce3d058c7dcab2b487476d8bfacf2a292d5ed2ffa0882edbf095eaacbdf19d",
+    "macos/Sources/GatorMac/NativeMascotModel.swift": "9d36078f7185dac4e1e2d280ba88cd0aebe26b8f5da359df01aebfe684a9a826",
+    "macos/Tests/GatorMacTests/NativeMascotTests.swift": "e760fb37ce948c7fdc63bc43dd3e830e737b0915e2e833db4adf74bb73f503d7",
+    "macos/Tests/GatorMacTests/NativeDesktopPetTests.swift": "bd41b581d78b6b5c2d7f57102522bb732e1eb99d5d16e843d4cacb19665f5035",
+    "macos/scripts/build-dev-app.sh": "d3425a97767fe89589b9bc38628fb57a2ccfdd30799553a1d4e4f7b529c6ef49"
+  },
+  "previousAcceptedBundles": {
+    "/tmp/Gator-Native-Parity-P04.app": {
+      "unchanged": true,
+      "mismatches": []
+    },
+    "/tmp/Gator-Native-P04M-2D.app": {
+      "unchanged": true,
+      "mismatches": []
+    },
+    "/tmp/Gator-Native-P04M-B2.app": {
+      "unchanged": true,
+      "mismatches": []
+    }
+  },
+  "candidate": "/tmp/Gator-Native-P04E-Emoji.app",
+  "previousCandidatePreserved": "/tmp/Gator-Native-P04E-Emoji-Initial.app",
+  "bundleFilesSHA256": {
+    "Contents/Info.plist": "c48db490e5d710cbe9bca13ec88b19f79e33ca89d590808fcaf1d2597b2e5b23",
+    "Contents/MacOS/GatorMac": "4f1740a4ebb360fe5e15332906ddada4a752237861e1464f686a617ae33ea917",
+    "Contents/Resources/GatorHead.png": "d9704498398ca69035883c5301b0428c8c1595f60c5b4e8d09edf0a2360a60ee",
+    "Contents/Resources/gator-runtime": "48ac4616073a1f6260135241e88c86f2e5a5ffdefb6cf039d9864124bf1b9ea7",
+    "Contents/Resources/AppIcon.icns": "0d91fafee3d8905a7f998be60beec9ac1342429d910bfd1d63fe9015075b1401",
+    "Contents/Resources/GatorMenuBar.png": "b4f33c2246fa8b0970de1913ee5aa56cef55f55450a0acf72d7986677e0f3b2c",
+    "Contents/Resources/Presence/completed.gif": "8855aa8b205539a33abe8fe1687a110dbc9ba7f12a2864d26fd85e328c7b9bbb",
+    "Contents/Resources/Presence/attention.gif": "bf00539083313e171ec47ab95a8253bcdfd5b5025c39e39b531d73caef0da07c"
+  },
+  "oldMascotResourcePresent": false,
+  "live3DModelsPresent": false,
+  "nativeAcceptance": "PARTIAL: sampled full-app layout stall remains unresolved",
+  "commitsCreatedByThisSession": 0
+}
