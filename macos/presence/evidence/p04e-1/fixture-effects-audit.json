@@ -1,0 +1,52 @@
+[
+  {
+    "manifest": "state/gator/workspaces/bac79099c6189eaf335d5b4ca6f7ed57/work-20261120T033715-9b901523bfc5/manifest.json",
+    "status": "completed",
+    "research": {
+      "public_web": false,
+      "origins": [
+        "https://mascot.example.invalid"
+      ],
+      "search_provider": "unavailable: no search provider configured",
+      "requests": 0,
+      "searches": 0,
+      "max_requests": 32,
+      "max_searches": 8,
+      "scope_reviews": 1
+    },
+    "actionCount": 0,
+    "eventFileExists": false
+  },
+  {
+    "manifest": "state/gator/workspaces/bac79099c6189eaf335d5b4ca6f7ed57/work-20261120T033652-928a490db297/manifest.json",
+    "status": "completed",
+    "research": {
+      "public_web": false,
+      "origins": [],
+      "search_provider": "unavailable: no search provider configured",
+      "requests": 0,
+      "searches": 0,
+      "max_requests": 32,
+      "max_searches": 8,
+      "scope_reviews": 0
+    },
+    "actionCount": 0,
+    "eventFileExists": false
+  },
+  {
+    "manifest": "state/gator/workspaces/bac79099c6189eaf335d5b4ca6f7ed57/work-20261120T033409-0d93a9115970/manifest.json",
+    "status": "completed",
+    "research": {
+      "public_web": false,
+      "origins": [],
+      "search_provider": "unavailable: no search provider configured",
+      "requests": 0,
+      "searches": 0,
+      "max_requests": 32,
+      "max_searches": 8,
+      "scope_reviews": 0
+    },
+    "actionCount": 0,
+    "eventFileExists": false
+  }
+]

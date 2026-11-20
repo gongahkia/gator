@@ -36,7 +36,7 @@ try:
  if record.returncode:raise RuntimeError('recording not confirmed')
  run('focus','conversation');run('set-value','conversation','gator.composer.text','Review mascot');run('press','conversation','Send message')
  pending=wait(lambda:next((s for s in states() if s.get('pending_approval')),None),12)
- run('press','conversation','An action needs your review');capture('pending-review.png');trace.append({'pendingReview':True,'decisionSubmitted':False})
+ run('press','conversation','An action needs your review');capture('pending-review.png');trace.append({'pendingReview':True,'decisionRequestedByHarness':False})
 except Exception as error:trace.append({'unverified':str(error)})
 finally:
  (evidence/'controlled-native-results-final.json').write_text(json.dumps(trace,indent=2)+'\n')

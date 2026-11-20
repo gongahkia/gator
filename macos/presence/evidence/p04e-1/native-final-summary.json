@@ -1,0 +1,25 @@
+{
+  "exactFinalExecutableAndResourcesMatchSuccessfulFixture": {
+    "Contents/MacOS/GatorMac": true,
+    "Contents/Resources/gator-runtime": true,
+    "Contents/Resources/Presence/completed.gif": true,
+    "Contents/Resources/Presence/attention.gif": true
+  },
+  "approvalDecisionCommands": [
+    {
+      "type": "approval",
+      "approved": true,
+      "origin": "Unattributed shared-desktop input; no approval action requested by this harness"
+    }
+  ],
+  "extraDelegationCommands": [],
+  "finalNativeVerdict": "PARTIAL: full-app layout stall unresolved; writing/completion/GIF/exact-review checks passed",
+  "liveProviderRequests": "Only inert loopback fixture service; no paid/external provider",
+  "physicalVoiceOver": "NOT TESTED",
+  "actualOSReduceMotionToggle": "NOT TESTED",
+  "normalGuardedQuitAndTuckRelaunch": "Passed earlier final-candidate profile",
+  "stalledPendingReviewGuardedQuit": "Not confirmed; disposable instance force-stopped after sampling",
+  "isolatedPreferencesAndPresenceLifecycle": "Off/close/quit completed; full-app stall not reproduced in either isolated probe",
+  "approvalNegativeAssertion": "CONTAMINATED; historical script intent field is not final bridge evidence",
+  "stalledPreferenceSequence": "Occurred after an approval-review scenario; approved:true appeared before the stall, relationship unconfirmed"
+}
