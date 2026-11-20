@@ -1,0 +1,10 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write sources
+[1/4] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Emitting module GatorMac
+[4/6] Compiling GatorMac NativeMascotPlayback.swift
+Build complete! (1.11s)
+/tmp/gator-native-app.JAXPsV/Gator.app/Contents/Info.plist: OK
+Built /tmp/Gator-Native-P04E1R-Verified.app
+Launch: open '/tmp/Gator-Native-P04E1R-Verified.app'
