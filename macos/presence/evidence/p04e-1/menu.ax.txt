@@ -1,0 +1,139 @@
+AXMenuBar |  |  |  | 
+ [system-wide Apple menu omitted]
+ AXMenuBarItem | Gator |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | About Gator |  |  | orderFrontStandardAboutPanel:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Settings… |  |  | menuAction:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Services |  |  | 
+    AXMenu |  |  |  | 
+     AXMenuItem | Activity Monitor |  |  | _processRequest:
+     AXMenuItem | Allocations & Leaks |  |  | _processRequest:
+     AXMenuItem | File Activity |  |  | _processRequest:
+     AXMenuItem | System Trace |  |  | _processRequest:
+     AXMenuItem | Time Profile Active Application |  |  | _processRequest:
+     AXMenuItem | Time Profile App Under Mouse |  |  | _processRequest:
+     AXMenuItem | Time Profile Entire System |  |  | _processRequest:
+     AXMenuItem | Toggle Instruments Recording |  |  | _processRequest:
+     AXMenuItem | Services Settings… |  |  | _configureServicesMenu:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Hide Gator |  |  | hide:
+   AXMenuItem | Hide Others |  |  | hideOtherApplications:
+   AXMenuItem | Show All |  |  | unhideAllApplications:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Quit Gator |  |  | menuAction:
+ AXMenuBarItem | File |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | New Conversation |  |  | menuAction:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Close |  |  | performClose:
+   AXMenuItem | Close All |  |  | closeAll:
+ AXMenuBarItem | Edit |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | Undo |  |  | undo:
+   AXMenuItem | Redo |  |  | redo:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Cut |  |  | menuAction:
+   AXMenuItem | Copy |  |  | menuAction:
+   AXMenuItem | Paste |  |  | menuAction:
+   AXMenuItem | Select All |  |  | menuAction:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Find in Current Transcript… |  |  | menuAction:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Writing Tools |  |  | __NSTextViewContextSubmenuIdentifierWritingTools
+    AXMenu |  |  |  | 
+     AXMenuItem | Show Writing Tools |  |  | showWritingTools:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Proofread |  |  | showWritingTools:
+     AXMenuItem | Rewrite |  |  | showWritingTools:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Make Friendly |  |  | showWritingTools:
+     AXMenuItem | Make Professional |  |  | showWritingTools:
+     AXMenuItem | Make Concise |  |  | showWritingTools:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Summarize |  |  | showWritingTools:
+     AXMenuItem | Create Key Points |  |  | showWritingTools:
+     AXMenuItem | Make List |  |  | showWritingTools:
+     AXMenuItem | Make Table |  |  | showWritingTools:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Compose… |  |  | showWritingTools:
+   AXMenuItem | AutoFill |  |  | _NSMenuItemAutoFillIdentifier
+    AXMenu |  |  |  | 
+     AXMenuItem | Contact… |  |  | _handleInsertFromContactsCommand:
+     AXMenuItem | Passwords… |  |  | _handleInsertFromPasswordsCommand:
+     AXMenuItem | Credit Card… |  |  | _handleInsertFromCreditCardsCommand:
+   AXMenuItem | Start Dictation… |  |  | startDictation:
+   AXMenuItem | Emoji & Symbols |  |  | orderFrontCharacterPalette:
+ AXMenuBarItem | View |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | Enter Full Screen |  |  | toggleFullScreen:
+ AXMenuBarItem | Conversation |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | Models and Providers… |  |  | menuAction:
+   AXMenuItem | Choose Workspace… |  |  | menuAction:
+   AXMenuItem | All Conversations… |  |  | menuAction:
+   AXMenuItem | Recent Conversations |  |  | ID(id: 4960)
+    AXMenu |  |  |  | 
+     AXMenuItem | Retained topic 0002 · Idle |  |  | menuAction:
+     AXMenuItem | Retained topic 0001 |  |  | menuAction:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Recent conversations reported by Gator |  |  | 
+   AXMenuItem | Show Menu Bar Icon |  |  | menuAction:
+   AXMenuItem | Agent Presence… |  |  | menuAction:
+   AXMenuItem | Show Desktop Presence |  |  | menuAction:
+   AXMenuItem | Tuck Away Desktop Presence |  |  | 
+   AXMenuItem | Show Notch Quick Access |  |  | 
+   AXMenuItem | Focus Message |  |  | menuAction:
+   AXMenuItem | Inspect Current Task |  |  | menuAction:
+   AXMenuItem | Review Pending Action |  |  | 
+ AXMenuBarItem | Window |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | Minimize |  |  | performMiniaturize:
+   AXMenuItem | Minimize All |  |  | miniaturizeAll:
+   AXMenuItem | Zoom |  |  | performZoom:
+   AXMenuItem | Zoom All |  |  | zoomAll:
+   AXMenuItem | Fill |  |  | _zoomFill:
+   AXMenuItem | Center |  |  | _zoomCenter:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Move & Resize |  |  | 
+    AXMenu |  |  |  | 
+     AXMenuItem | Halves |  |  | 
+     AXMenuItem | Left |  |  | _zoomLeft:
+     AXMenuItem | Right |  |  | _zoomRight:
+     AXMenuItem | Top |  |  | _zoomTop:
+     AXMenuItem | Bottom |  |  | _zoomBottom:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Quarters |  |  | 
+     AXMenuItem | Top Left |  |  | _zoomTopLeft:
+     AXMenuItem | Top Right |  |  | _zoomTopRight:
+     AXMenuItem | Bottom Left |  |  | _zoomBottomLeft:
+     AXMenuItem | Bottom Right |  |  | _zoomBottomRight:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Arrange |  |  | 
+     AXMenuItem | Left & Right |  |  | _zoomLeftAndRight:
+     AXMenuItem | Left & Quarters |  |  | _zoomLeftThreeUp:
+     AXMenuItem | Right & Left |  |  | _zoomRightAndLeft:
+     AXMenuItem | Right & Quarters |  |  | _zoomRightThreeUp:
+     AXMenuItem | Top & Bottom |  |  | _zoomTopAndBottom:
+     AXMenuItem | Top & Quarters |  |  | _zoomTopThreeUp:
+     AXMenuItem | Bottom & Top |  |  | _zoomBottomAndTop:
+     AXMenuItem | Bottom & Quarters |  |  | _zoomBottomThreeUp:
+     AXMenuItem | Quarters |  |  | _zoomQuarters:
+     AXMenuItem |  |  |  | 
+     AXMenuItem | Return to Previous Size |  |  | _zoomUntile:
+   AXMenuItem | Full Screen Tile |  |  | 
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Remove Window from Set |  |  | _removeWindowFromStageManagerSet:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Move to DELL P2425HE |  |  | _moveToDisplay:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Gator |  |  | menuAction:
+   AXMenuItem | Models and Providers |  |  | menuAction:
+   AXMenuItem | All Conversations |  |  | menuAction:
+   AXMenuItem |  |  |  | 
+   AXMenuItem | Bring All to Front |  |  | arrangeInFront:
+   AXMenuItem | Arrange in Front |  |  | alternateArrangeInFront:
+ AXMenuBarItem | Help |  |  | 
+  AXMenu |  |  |  | 
+   AXMenuItem | Gator Help |  |  | showHelp:

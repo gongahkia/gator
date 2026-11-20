@@ -69,6 +69,7 @@ struct NativeMascotSignal: Equatable, Sendable {
     var publicTextRevision = 0
     var completedRun = ""
     var failedRun = ""
+    var publicTextActive = false
 }
 struct NativeMascotStateMachine {
     private(set) var previous: NativeMascotSignal?
@@ -82,10 +83,11 @@ struct NativeMascotStateMachine {
         else if next.attention {
             if sameOwner && old?.attention != true { revision += 1 }
             expression = .attention
-        } else if sameOwner, next.working, next.publicTextRevision > 0, next.publicTextRevision != old?.publicTextRevision {
-            expression = .responding; revision += 1
+        } else if next.working, next.publicTextActive, next.publicTextRevision > 0 {
+            expression = .responding
+            if sameOwner && next.publicTextRevision != old?.publicTextRevision { revision += 1 }
         } else if next.working {
-            if expression != .responding { expression = .working }
+            expression = .working
         } else if !next.failedRun.isEmpty { expression = .failed }
         else if sameOwner, !next.completedRun.isEmpty, next.completedRun != old?.completedRun {
             expression = .completed; revision += 1

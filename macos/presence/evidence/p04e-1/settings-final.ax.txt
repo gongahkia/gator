@@ -1,0 +1,30 @@
+AXWindow | Gator Settings |  |  | com_apple_SwiftUI_Settings_window
+ AXGroup |  |  |  | 
+  AXScrollArea |  |  |  | 
+   AXHeading |  | Agent Presence |  | 
+   AXGroup |  |  |  | 
+    AXStaticText |  |  | Show In-Chat Presence | 
+    AXCheckBox |  |  |  | gator.mascot.shown
+    AXStaticText |  |  | Agent Presence | 
+    AXPopUpButton |  |  | Emoji only | gator.presence.mode
+     AXMenu |  |  |  | 
+      AXMenuItem | Emoji only |  |  | menuAction:
+      AXMenuItem | Emoji + GIF reactions |  |  | menuAction:
+      AXMenuItem | Off |  |  | menuAction:
+    AXStaticText |  |  | Animate Reactions | 
+    AXCheckBox |  |  |  | gator.mascot.animated
+    AXStaticText |  |  | Native emoji reflect the current conversation. Optional GIF accents play once for completion or attention; macOS Reduce Motion takes precedence. | 
+   AXHeading |  | Desktop Presence |  | 
+   AXGroup |  |  |  | 
+    AXStaticText |  |  | Show Desktop Presence | 
+    AXCheckBox |  |  |  | gator.desktopPet.shown
+    AXStaticText |  |  | Display | 
+    AXPopUpButton |  |  | Primary Display | gator.desktopPet.display
+    AXButton |  | Tuck Away Desktop Presence |  | gator.desktopPet.tuck
+    AXStaticText |  |  | Click-through emoji for the current conversation. Uses Agent Presence and Animate Reactions above, independently of in-chat visibility. Off hides both surfaces without changing their visibility choices. | 
+    AXStaticText |  |  | May remain visible in fullscreen or shared screens. Tuck Away hides it until you explicitly turn it on again. | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator Settings | 

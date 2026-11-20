@@ -10,15 +10,16 @@ enum NativeMascotProjection {
     }
     static func signal(snapshot: BridgeSnapshot?, messages: [BridgeMessage], owner: String, connected: Bool, reviewing: Bool) -> NativeMascotSignal {
         let publicBytes = snapshot?.value["activity"]["entries"].array.filter { $0["kind"].string == "text" }.reduce(0) { $0 + $1["text"].string.utf8.count } ?? 0
-        let outcome = messages.last { ["completed", "failed"].contains($0.value["activity"]["state"].string) }
+        let outcome = messages.last { ["completed", "failed", "stopped"].contains($0.value["activity"]["state"].string) }
         let identity = outcome.map { $0.value["run_id"].string + ":" + $0.value["activity"]["finished_at"].string } ?? ""
         let confirmed = outcome?.value["activity"]["finished_at"].string.isEmpty == false && outcome?.value["run_id"].string.isEmpty == false
         let completed = confirmed && outcome?.value["activity"]["state"].string == "completed" ? identity : ""
         let failed = confirmed && outcome?.value["activity"]["state"].string == "failed" ? identity : ""
         let attention = snapshot?.hasApproval == true || reviewing || snapshot?.value["task_plans"].array.contains { $0["phase"].string == "review" } == true
+        let publicTextActive = snapshot?.value["activity"]["entries"].array.contains { $0["kind"].string == "text" && $0["state"].string == "running" } == true
         return NativeMascotSignal(owner: owner,
                                  connected: connected, working: snapshot?.running == true || snapshot?.value["dialogue_busy"].bool == true,
-                                 attention: attention, publicTextRevision: publicBytes, completedRun: completed, failedRun: failed)
+                                 attention: attention, publicTextRevision: publicBytes, completedRun: completed, failedRun: failed, publicTextActive: publicTextActive)
     }
 }
 

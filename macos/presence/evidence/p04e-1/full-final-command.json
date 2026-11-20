@@ -1,0 +1,14 @@
+{
+  "command": [
+    "swift",
+    "test",
+    "--package-path",
+    "macos",
+    "--scratch-path",
+    "/tmp/gator-native-build",
+    "--no-parallel"
+  ],
+  "GATOR_TEST_BINARY": "/tmp/Gator-Native-P04E-Emoji.app/Contents/Resources/gator-runtime",
+  "exit": 0,
+  "seconds": 150.58232241598307
+}

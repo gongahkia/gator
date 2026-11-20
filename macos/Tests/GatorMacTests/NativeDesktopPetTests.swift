@@ -91,9 +91,9 @@ private func petScreen(_ id: String = "primary", x: Double = 0, y: Double = 0) -
     defer { pet.stop() }
     fixture.signal = .init(owner: "A", connected: true, working: true); pet.reconcile()
     #expect(surface.requests.last?.expression == .working)
-    fixture.signal = .init(owner: "A", connected: true, working: true, publicTextRevision: 4); pet.reconcile()
+    fixture.signal = .init(owner: "A", connected: true, working: true, publicTextRevision: 4, publicTextActive: true); pet.reconcile()
     #expect(surface.requests.last?.expression == .responding)
-    fixture.signal = .init(owner: "A", connected: true, working: true, attention: true, publicTextRevision: 5); pet.reconcile()
+    fixture.signal = .init(owner: "A", connected: true, working: true, attention: true, publicTextRevision: 5, publicTextActive: true); pet.reconcile()
     #expect(surface.requests.last?.expression == .attention)
     fixture.signal = .init(owner: "B", connected: true, completedRun: "older-completion"); pet.reconcile()
     #expect(surface.requests.last?.owner == "B" && surface.requests.last?.expression == .neutral)

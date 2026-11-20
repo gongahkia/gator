@@ -14,5 +14,39 @@
     ],
     "exit": 0,
     "seconds": 6.68495600001188
+  },
+  {
+    "name": "swift-full",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel"
+    ],
+    "exit": 0,
+    "seconds": 145.16625587502494
+  },
+  {
+    "name": "swift-strict",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors",
+      "--filter",
+      "mascot|presence|desktopPet|desktopPresence"
+    ],
+    "exit": 0,
+    "seconds": 15.858494375017472
   }
 ]

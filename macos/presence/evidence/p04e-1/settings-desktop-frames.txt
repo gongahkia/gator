@@ -1,0 +1,27 @@
+window= title= pos=(700.0, 262.5) size=(70.0, 63.0) main=nil focused=Optional(0)
+window=com_apple_SwiftUI_Settings_window title=Gator Settings pos=(525.0, 196.0) size=(420.0, 584.0) main=Optional(1) focused=Optional(1)
+window=conversation title=Gator – Retained topic 0002 pos=(325.0, 125.0) size=(820.0, 740.0) main=Optional(0) focused=Optional(0)
+captureID=60166 bounds={
+    Height = 82;
+    Width = 169;
+    X = 793;
+    Y = 313;
+}
+captureID=60167 bounds={
+    Height = 72;
+    Width = 72;
+    X = 699;
+    Y = 258;
+}
+captureID=60164 bounds={
+    Height = 586;
+    Width = 420;
+    X = 525;
+    Y = 195;
+}
+captureID=60150 bounds={
+    Height = 740;
+    Width = 820;
+    X = 325;
+    Y = 125;
+}

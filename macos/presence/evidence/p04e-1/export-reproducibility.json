@@ -1,0 +1,8 @@
+{
+  "target": "arm64-apple-macos15.0",
+  "strictSwift6": true,
+  "identicalGIFBytes": {
+    "completed.gif": true,
+    "attention.gif": true
+  }
+}

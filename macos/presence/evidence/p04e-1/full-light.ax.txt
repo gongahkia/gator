@@ -1,0 +1,69 @@
+AXWindow | Gator – Retained topic 0002 |  |  | conversation
+ AXGroup |  |  |  | 
+  AXStaticText |  |  | Current workspace: /tmp/gator-native-test-presence-6fvz5_xq/workspace | gator.window
+  AXStaticText |  |  | Read-only in Work | gator.window
+  AXScrollArea |  |  |  | gator.window
+   AXOpaqueProviderGroup |  |  |  | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | Retained note 0002-32 |  | 
+    AXStaticText |  |  | Public café response. | 
+    AXUnknown |  | •, Parent |  | 
+    AXUnknown |  | 7., Nested bold and code |  | 
+    AXStaticText |  |  | Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text.  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Question topic 0002 note 33 | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | Retained note 0002-33 |  | 
+    AXStaticText |  |  | Public café response. | 
+    AXUnknown |  | •, Parent |  | 
+    AXUnknown |  | 7., Nested bold and code |  | 
+    AXStaticText |  |  | Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text.  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Question topic 0002 note 34 | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | Retained note 0002-34 |  | 
+    AXStaticText |  |  | Public café response. | 
+    AXUnknown |  | •, Parent |  | 
+    AXUnknown |  | 7., Nested bold and code |  | 
+    AXStaticText |  |  | Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text.  | 
+    AXStaticText |  |  | You | 
+    AXStaticText |  |  | Question topic 0002 note 35 | 
+    AXStaticText |  |  | Gator | 
+    AXHeading |  | Retained note 0002-35 |  | 
+    AXStaticText |  |  | Public café response. | 
+    AXUnknown |  | •, Parent |  | 
+    AXUnknown |  | 7., Nested bold and code |  | 
+    AXStaticText |  |  | Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text. Read this retained fixture text.  | 
+   AXScrollBar |  |  |  | 
+    AXValueIndicator |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+    AXButton |  |  |  | 
+  AXScrollArea |  | Conversation status and recovery |  | gator.window
+   AXStaticText |  |  | Connected | 
+   AXMenuButton |  | Select Model |  | 
+  AXScrollArea |  |  |  | gator.window
+   AXTextArea |  | Message Gator | kePresence acceptance — preserve this unsent draft | gator.composer.text
+  AXButton |  | Attach Files |  | gator.window
+  AXMenuButton |  | Image attachment options |  | gator.window
+  AXCheckBox |  | Plan first |  | gator.window
+  AXStaticText |  |  | ⇧ Return: new line | gator.window
+  AXButton |  | Send message |  | gator.window
+ AXToolbar |  |  |  | 
+  AXGroup |  |  |  | 
+   AXMenuButton | Recent Conversations |  |  | gator.recent-conversations
+  AXButton |  | Choose Workspace… |  | folder
+  AXButton |  | Models and Providers… |  | gator.providers.open
+  AXButton |  | All Conversations… |  | gator.catalog.open
+  AXButton |  | Find in Current Transcript |  | magnifyingglass
+  AXButton |  | New Conversation |  | square.and.pencil
+  AXButton |  | Inspect Current Task |  | doc.text.magnifyingglass
+  AXGroup |  |  |  | 
+   AXMenuButton |  | More |  | 
+ AXButton |  |  |  | 
+ AXButton |  |  |  | 
+  AXGroup |  |  |  | 
+ AXButton |  |  |  | 
+ AXStaticText |  |  | Gator | 
+ AXStaticText |  |  | Retained topic 0002 | 

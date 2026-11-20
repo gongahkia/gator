@@ -1,0 +1,136 @@
+[
+  {
+    "file": "macos/Resources/Presence/attention.gif",
+    "bytes": 2179,
+    "sha256": "bf00539083313e171ec47ab95a8253bcdfd5b5025c39e39b531d73caef0da07c",
+    "frames": [
+      {
+        "frame": 0,
+        "nontransparentPixels": 0,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 1,
+        "nontransparentPixels": 48,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 2,
+        "nontransparentPixels": 72,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 3,
+        "nontransparentPixels": 92,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 4,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 5,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 6,
+        "nontransparentPixels": 116,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 7,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 8,
+        "nontransparentPixels": 100,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 9,
+        "nontransparentPixels": 72,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 10,
+        "nontransparentPixels": 56,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 11,
+        "nontransparentPixels": 0,
+        "borderAlphaMax": 0
+      }
+    ]
+  },
+  {
+    "file": "macos/Resources/Presence/completed.gif",
+    "bytes": 1818,
+    "sha256": "8855aa8b205539a33abe8fe1687a110dbc9ba7f12a2864d26fd85e328c7b9bbb",
+    "frames": [
+      {
+        "frame": 0,
+        "nontransparentPixels": 0,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 1,
+        "nontransparentPixels": 48,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 2,
+        "nontransparentPixels": 72,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 3,
+        "nontransparentPixels": 92,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 4,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 5,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 6,
+        "nontransparentPixels": 116,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 7,
+        "nontransparentPixels": 108,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 8,
+        "nontransparentPixels": 100,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 9,
+        "nontransparentPixels": 72,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 10,
+        "nontransparentPixels": 56,
+        "borderAlphaMax": 0
+      },
+      {
+        "frame": 11,
+        "nontransparentPixels": 0,
+        "borderAlphaMax": 0
+      }
+    ]
+  }
+]

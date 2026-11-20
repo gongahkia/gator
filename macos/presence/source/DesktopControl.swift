@@ -56,12 +56,16 @@ let app = AXUIElementCreateApplication(pid)
 }
 @MainActor func dump(_ e: AXUIElement,_ depth: Int = 0) {
     if depth>23 { return }
+    if str(e,"AXRole") == "AXMenuBarItem" && str(e,"AXTitle") == "Apple" { print("[system-wide Apple menu omitted]"); return }
     print(String(repeating:" ",count:depth)+str(e,"AXRole")+" | "+str(e,"AXTitle")+" | "+str(e,"AXDescription")+" | "+String(str(e,"AXValue").prefix(220))+" | "+str(e,"AXIdentifier"))
     for c in elements(e) { dump(c,depth+1) }
 }
 @MainActor func position(_ e: AXUIElement) -> CGPoint {var p=CGPoint.zero;if let v=attr(e,"AXPosition"){AXValueGetValue(unsafeDowncast(v,to:AXValue.self),.cgPoint,&p)};return p}
 @MainActor func size(_ e: AXUIElement) -> CGSize {var p=CGSize.zero;if let v=attr(e,"AXSize"){AXValueGetValue(unsafeDowncast(v,to:AXValue.self),.cgSize,&p)};return p}
 switch action {
+case "activate":
+    _=NSRunningApplication(processIdentifier:pid)?.activate(options:[.activateAllWindows])
+    let ready=until{NSWorkspace.shared.frontmostApplication?.processIdentifier==pid};print("activated_owned_fixture=\(ready)");if !ready{exit(3)}
 case "quit":
     guard let running=NSRunningApplication(processIdentifier:pid) else{exit(2)}
     let requested=running.terminate();let done=until({running.isTerminated},seconds:8)
@@ -108,6 +112,10 @@ case "type":
     requireFocus(args[3],args[4]);let chars=Array(args[5].utf16)
     for down in [true,false]{let e=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:down)!;e.flags=[];e.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:chars);e.post(tap:.cghidEventTap)}
     let ready=until {element(app,"AXFocusedUIElement").map{str($0,"AXValue").contains(args[5])}==true};print("typed_to=\(args[4]) observed_value=\(ready)");if !ready{exit(3)}
+case "set-value":
+    guard let s=scope(args[3]),let e=find(s,args[4]),["AXTextArea","AXTextField"].contains(str(e,"AXRole")),str(e,"AXSubrole") != "AXSecureTextField" else{exit(2)}
+    let code=AXUIElementSetAttributeValue(e,"AXValue" as CFString,args[5] as CFString)
+    let ready=until{str(e,"AXValue")==args[5]};print("set_owned_fixture_text=\(code.rawValue) confirmed=\(ready)");if !ready{exit(3)}
 case "inspect":
     guard let s=scope(args[3]),let e=find(s,args[4]) else{print("missing");exit(2)}
     print("role=\(str(e,"AXRole")) title=\(str(e,"AXTitle")) desc=\(str(e,"AXDescription")) id=\(str(e,"AXIdentifier")) focused=\(attr(e,"AXFocused") as Any) enabled=\(attr(e,"AXEnabled") as Any) pos=\(position(e)) size=\(size(e)) value=\(str(e,"AXValue"))")

@@ -11,8 +11,8 @@ private var presenceRoot: URL {
     var state=NativeMascotStateMachine()
     state.receive(.init(owner:"A",connected:true,completedRun:"old"));#expect(state.expression == .neutral)
     state.receive(.init(owner:"A",connected:true,working:true));#expect(state.expression == .working)
-    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:12));#expect(state.expression == .responding)
-    state.receive(.init(owner:"A",connected:true,working:true,attention:true,publicTextRevision:14));#expect(state.expression == .attention)
+    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:12, publicTextActive: true));#expect(state.expression == .responding)
+    state.receive(.init(owner:"A",connected:true,working:true,attention:true,publicTextRevision:14, publicTextActive: true));#expect(state.expression == .attention)
     state.receive(.init(owner:"A",connected:false,working:true,attention:true));#expect(state.expression == .disconnected)
     state.receive(.init(owner:"A",connected:true,completedRun:"new-confirmed"));#expect(state.expression == .completed)
     state.receive(.init(owner:"B",connected:true,completedRun:"new-confirmed"));#expect(state.expression == .neutral)
@@ -21,8 +21,8 @@ private var presenceRoot: URL {
     var state=NativeMascotStateMachine()
     state.receive(.init(owner:"A",connected:true,working:true));state.receive(.init(owner:"A",connected:true))
     #expect(state.expression == .neutral)
-    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:100))
-    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:4))
+    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:100, publicTextActive: true))
+    state.receive(.init(owner:"A",connected:true,working:true,publicTextRevision:4, publicTextActive: true))
     #expect(state.expression == .responding)
 }
 @Test func mascotProjectionReadsOnlyPublicSelectedOwnerContent() {
@@ -103,6 +103,8 @@ private var presenceRoot: URL {
     }
     let signal = NativeMascotProjection.signal(snapshot: nil, messages: [message("completed", "old", "a"), message("failed", "new", "b")], owner: "A", connected: true, reviewing: false)
     #expect(signal.completedRun.isEmpty && signal.failedRun == "new:b")
+    let stopped = NativeMascotProjection.signal(snapshot: nil, messages: [message("completed", "old", "a"), message("stopped", "new", "b")], owner: "A", connected: true, reviewing: false)
+    #expect(stopped.completedRun.isEmpty && stopped.failedRun.isEmpty)
     var state = NativeMascotStateMachine(); state.receive(signal)
     #expect(state.expression == .failed)
     state.receive(.init(owner: "A", connected: true, working: true, failedRun: "new:b")); #expect(state.expression == .working)
@@ -156,8 +158,8 @@ private var presenceRoot: URL {
     let animation = NativeMascotPlayer.keyframes(frames)
     #expect(animation.repeatCount == 0 && animation.values?.count == 12 && animation.keyTimes?.first == 0 && animation.keyTimes?.last == 1)
     var installed: CAKeyframeAnimation?
-    let player = NativeMascotPlayer(root: presenceRoot, installAnimation: { layer, animation in
-        installed = animation; layer.add(animation, forKey: "gator.expression")
+    let player = NativeMascotPlayer(root: presenceRoot, installAnimation: { _, animation in
+        installed = animation
     })
     player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
     player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1)); await player.settled()
@@ -230,7 +232,7 @@ private var presenceRoot: URL {
 
 @Test @MainActor func presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() async {
     for change in ["reduce", "off", "state", "hide", "animation"] {
-        let player = NativeMascotPlayer(root: presenceRoot)
+        let player = NativeMascotPlayer(root: presenceRoot, installAnimation: { _, _ in })
         player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
         var request = NativeMascotRequest(owner: "A", mode: .reactions, expression: .completed, revision: 1)
         player.configure(request); await player.settled(); #expect(player.activeFrameBytes > 0)
@@ -245,4 +247,15 @@ private var presenceRoot: URL {
         #expect(player.layer.animationKeys() == nil && player.activeFrameBytes == 0 && player.layer.contents == nil)
         #expect(await player.store.bytes == 0)
     }
+}
+
+@Test func presenceWritingRequiresAnActivePublicTextEntryAndEndsWhenGoClosesIt() {
+    func signal(_ kind: String, _ state: String) -> NativeMascotSignal {
+        NativeMascotProjection.signal(snapshot: BridgeSnapshot(.object(["running": .bool(true), "activity": .object(["entries": .array([.object(["kind": .string(kind), "state": .string(state), "text": .string("fixture")])])])])), messages: [], owner: "A", connected: true, reviewing: false)
+    }
+    var state = NativeMascotStateMachine()
+    state.receive(signal("text", "running")); #expect(state.expression == .responding)
+    state.receive(signal("text", "completed")); #expect(state.expression == .working)
+    state.receive(signal("reasoning", "running")); #expect(state.expression == .working)
+    state.receive(signal("tool", "running")); #expect(state.expression == .working)
 }

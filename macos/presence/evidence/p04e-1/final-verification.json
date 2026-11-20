@@ -1,0 +1,48 @@
+[
+  {
+    "name": "strict-final",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors",
+      "--filter",
+      "mascot|presence|desktopPet|desktopPresence"
+    ],
+    "exit": 0,
+    "seconds": 3.2385341670014895,
+    "testGoBinary": "/tmp/Gator-Native-Parity-P04.app/Contents/Resources/gator-runtime"
+  },
+  {
+    "name": "package-final",
+    "command": [
+      "bash",
+      "macos/scripts/build-dev-app.sh"
+    ],
+    "exit": 0,
+    "seconds": 15.968873208010336,
+    "testGoBinary": "/tmp/Gator-Native-Parity-P04.app/Contents/Resources/gator-runtime"
+  },
+  {
+    "name": "full-final",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel"
+    ],
+    "exit": 0,
+    "seconds": 148.31497141698492,
+    "testGoBinary": "/tmp/Gator-Native-P04E-Emoji-Verified.app/Contents/Resources/gator-runtime"
+  }
+]
