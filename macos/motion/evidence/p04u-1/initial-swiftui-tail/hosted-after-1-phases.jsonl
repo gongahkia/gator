@@ -1,0 +1,5 @@
+{"phase":"idle","pid":71072,"epoch":1795161830.48194}
+{"phase":"streaming","pid":71072,"epoch":1795161833.6763659}
+{"phase":"settled","epoch":1795161846.0740271,"pid":71072}
+{"phase":"hidden-component","epoch":1795161849.242198,"pid":71072}
+{"phase":"end","epoch":1795161852.388407,"pid":71072}

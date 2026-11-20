@@ -1,0 +1,101 @@
+[0/1] Planning build
+Building for debugging...
+[0/7] Write sources
+[1/7] Write swift-version--58304C5D6DBC2206.txt
+[3/9] Emitting module GatorMac
+[4/9] Compiling GatorMac NativeStreamingProse.swift
+[5/10] Compiling GatorMac NativeStreamingPresentation.swift
+[5/10] Write Objects.LinkFileList
+[6/10] Linking GatorMac
+[7/10] Applying GatorMac
+[9/21] Compiling GatorMacTests NativeStreamingTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:147:87: warning: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+145 | @Test @MainActor func streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() async {
+146 |     let positions = NativeReadingPositions(); positions.remember("A", anchor: "row-9", following: false)
+147 |     var model: NativeStreamingPresentation? = NativeStreamingPresentation(); weak var probe = model
+    |                                                                                       `- warning: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+148 |     model?.receive(motionEntry("One"), policy: .init(), now: 1)
+149 |     model?.receive(motionEntry("One two three four five"), policy: .init(), now: 2)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:190:14: warning: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+188 | @Test @MainActor func streamingVisibilityProbeHasNoFocusAndReleasesObservers() {
+189 |     var probe: NativeMotionVisibility.Probe? = .init(update: { _ in })
+190 |     weak var weakProbe = probe
+    |              `- warning: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+191 |     probe?.viewDidMoveToWindow(); #expect(probe?.acceptsFirstResponder == false)
+192 |     probe?.detach(); probe = nil; #expect(weakProbe == nil)
+
+[#WeakMutability]: <https://docs.swift.org/compiler/documentation/diagnostics/weak-mutability>
+[10/21] Compiling GatorMacTests NativeMotionRenderTests.swift
+[11/21] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[12/21] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[13/21] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[14/21] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[15/22] Compiling GatorMacTests NotchGeometryTests.swift
+[16/22] Compiling GatorMacTests NativeMascotTests.swift
+[17/22] Compiling GatorMacTests NativeMotionGoTests.swift
+[18/22] Emitting module GatorMacTests
+[19/22] Compiling GatorMacTests NativeDesktopPetTests.swift
+[20/22] Compiling GatorMacTests NativeInputTests.swift
+[20/22] Write Objects.LinkFileList
+[21/22] Linking GatorNativePackageTests
+Build complete! (4.60s)
+Test Suite 'Selected tests' started at 2026-11-20 16:06:47.498.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 16:06:47.499.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 16:06:47.499.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 16:06:47.499.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() started.
+✔ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() passed after 0.724 seconds.
+◇ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() started.
+✔ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() passed after 0.082 seconds.
+◇ Test streamingNativeComponentEvidenceCapture() started.
+✔ Test streamingNativeComponentEvidenceCapture() passed after 0.121 seconds.
+◇ Test streamingHostedPresentationResourceTrial() started.
+✔ Test streamingHostedPresentationResourceTrial() passed after 0.006 seconds.
+◇ Test streamingGraphemesNeverSplitDuringReveal() started.
+✔ Test streamingGraphemesNeverSplitDuringReveal() passed after 0.005 seconds.
+◇ Test streamingProviderDeltaCanExtendPreviousGrapheme() started.
+✔ Test streamingProviderDeltaCanExtendPreviousGrapheme() passed after 0.001 seconds.
+◇ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() started.
+✔ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() passed after 0.011 seconds.
+◇ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() started.
+✔ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() passed after 0.001 seconds.
+◇ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() started.
+✔ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() passed after 0.001 seconds.
+◇ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() started.
+✔ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() passed after 0.001 seconds.
+◇ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() started.
+✔ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() passed after 0.001 seconds.
+◇ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() started.
+✔ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() passed after 0.001 seconds.
+◇ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() started.
+✔ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() passed after 0.001 seconds.
+◇ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() started.
+✔ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() passed after 0.001 seconds.
+◇ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() started.
+✔ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() passed after 0.001 seconds.
+◇ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() started.
+✔ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() passed after 0.001 seconds.
+◇ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() started.
+✔ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() passed after 0.001 seconds.
+◇ Test streamingRepeatedIndependentPresentationsCancelAllTasks() started.
+✔ Test streamingRepeatedIndependentPresentationsCancelAllTasks() passed after 0.006 seconds.
+◇ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() started.
+✔ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() passed after 0.001 seconds.
+◇ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() started.
+✔ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() passed after 0.001 seconds.
+◇ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() started.
+✔ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() passed after 0.001 seconds.
+◇ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() started.
+✔ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() passed after 0.001 seconds.
+◇ Test streamingPulseContrastRemainsReadableInNativeAppearances() started.
+✔ Test streamingPulseContrastRemainsReadableInNativeAppearances() passed after 0.001 seconds.
+◇ Test streamingNativeProsePreservesSelectionAndExactUnicodeThroughAppends() started.
+✘ Test streamingNativeProsePreservesSelectionAndExactUnicodeThroughAppends() recorded an issue at NativeStreamingTests.swift:219:5: Expectation failed: (view.selectedRange() → {23, 0}) == (NSRange(location: 0, length: 6) → {0, 6})
+✘ Test streamingNativeProsePreservesSelectionAndExactUnicodeThroughAppends() failed after 0.037 seconds with 1 issue.
+✘ Test run with 24 tests in 0 suites failed after 1.000 seconds with 1 issue.

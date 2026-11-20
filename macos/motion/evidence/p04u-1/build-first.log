@@ -1,0 +1,158 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/24] Compiling GatorCore NativeRecovery.swift
+[4/24] Compiling GatorCore NativeRecoveryPreparation.swift
+[5/24] Compiling GatorCore NativeProviderProtocol.swift
+[6/24] Compiling GatorCore NativeProviderSetup.swift
+[7/24] Compiling GatorCore NativeTaskReview.swift
+[8/24] Compiling GatorCore NativeTranscriptSearch.swift
+[9/26] Compiling GatorCore NativeUploadStore.swift
+[10/26] Compiling GatorCore NativeWorkspaceSelection.swift
+[11/26] Compiling GatorCore NativeCatalogProtocol.swift
+[12/26] Compiling GatorCore NativeConversationCatalog.swift
+[13/26] Compiling GatorCore NativeDraftAttachments.swift
+[14/26] Compiling GatorCore GoBridgeConnection.swift
+[15/26] Compiling GatorCore ManagedSessionCoordinator.swift
+[16/26] Compiling GatorCore ManagedSessionProtocol.swift
+[17/26] Compiling GatorCore NativeDraftStore.swift
+[18/26] Compiling GatorCore NativeMessageContent.swift
+[19/26] Compiling GatorCore NativePlanExecution.swift
+[20/26] Emitting module GatorCore
+[21/26] Compiling GatorCore BridgePipeIO.swift
+[22/26] Compiling GatorCore BridgeProtocol.swift
+[23/26] Compiling GatorCore GatorApplicationState.swift
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[24/63] Emitting module GatorMac
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[25/63] Compiling GatorMac ExactDecisionButton.swift
+[26/63] Compiling GatorMac ExactReviewContent.swift
+[27/63] Compiling GatorMac GatorApp.swift
+[28/63] Compiling GatorMac MenuBarVisibilityToggle.swift
+[29/63] Compiling GatorMac NativeAcceptanceDiagnostics.swift
+[30/68] Compiling GatorMac NativeTranscriptFind.swift
+[31/68] Compiling GatorMac NativeWindowConfiguration.swift
+[32/68] Compiling GatorMac NativeWorkspacePicker.swift
+[33/68] Compiling GatorMac NotchQuickAccess.swift
+[34/68] Compiling GatorMac PlanReviewContent.swift
+[35/68] Compiling GatorMac NativeMascotView.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[36/68] Compiling GatorMac NativeMessageBody.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[37/68] Compiling GatorMac NativeMotionPresentation.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[38/68] Compiling GatorMac NativeMotionVisibility.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[39/68] Compiling GatorMac NativeProviderSecretEntry.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMessageBody.swift:4:33: error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+ 2 | import GatorCore
+ 3 | 
+ 4 | struct NativeMessageBody: View, Equatable {
+   |        |                        |- error: conformance of 'NativeMessageBody' to protocol 'Equatable' crosses into main actor-isolated code and can cause data races [#ConformanceIsolation]
+   |        |                        |- note: isolate this conformance to the main actor with '@MainActor'
+   |        |                        `- note: turn data races into runtime errors with '@preconcurrency'
+   |        `- note: mark all declarations used in the conformance 'nonisolated'
+ 5 |     let text: String
+ 6 |     static func == (lhs: Self, rhs: Self) -> Bool { lhs.text.utf8.elementsEqual(rhs.text.utf8) }
+   |                 `- note: main actor-isolated operator function '==' cannot satisfy nonisolated requirement
+ 7 |     var body: some View {
+ 8 |         VStack(alignment: .leading, spacing: 10) {
+
+[#ConformanceIsolation]: <https://docs.swift.org/compiler/documentation/diagnostics/conformance-isolation>
+[40/68] Compiling GatorMac ProviderSetupView.swift
+[41/68] Compiling GatorMac RecentConversationsMenu.swift
+[42/68] Compiling GatorMac RecoveryInspectorContent.swift
+[43/68] Compiling GatorMac RecoveryPreparationView.swift
+[44/68] Compiling GatorMac TaskInspectorView.swift
+[45/68] Compiling GatorMac NativeAccessibilityStatus.swift
+[46/68] Compiling GatorMac NativeAttachmentActions.swift
+[47/68] Compiling GatorMac NativeComposer.swift
+[48/68] Compiling GatorMac NativeComposerPresentation.swift
+[49/68] Compiling GatorMac NativeDesktopPet.swift
+[50/68] Compiling GatorMac NativeReadingPositions.swift
+[51/68] Compiling GatorMac NativeStatusMessage.swift
+[52/68] Compiling GatorMac NativeStreamingPresentation.swift
+[53/68] Compiling GatorMac NativeStreamingReveal.swift
+[54/68] Compiling GatorMac NativeThinkingPulse.swift
+[55/68] Compiling GatorMac NativeDropInput.swift
+[56/68] Compiling GatorMac NativeErrorDisclosure.swift
+[57/68] Compiling GatorMac NativeMascotModel.swift
+[58/68] Compiling GatorMac NativeMascotPlayback.swift
+[59/68] Compiling GatorMac NativeMascotPreferences.swift
+[60/68] Compiling GatorMac AppDelegate.swift
+[61/68] Compiling GatorMac ApprovalReviewView.swift
+[62/68] Compiling GatorMac AttachmentSelectionView.swift
+[63/68] Compiling GatorMac ComposerView.swift
+[64/68] Compiling GatorMac ConversationCatalogView.swift
+[65/68] Compiling GatorMac ConversationView.swift

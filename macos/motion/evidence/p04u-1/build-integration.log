@@ -1,0 +1,72 @@
+[0/1] Planning build
+Building for debugging...
+[0/5] Write sources
+[1/5] Write swift-version--58304C5D6DBC2206.txt
+[3/13] Compiling GatorMac NativeMotionPresentation.swift
+[4/14] Compiling GatorMac NativeProviderSecretEntry.swift
+[5/14] Compiling GatorMac NativeMascotPreferences.swift
+[6/14] Compiling GatorMac NativeMotionVisibility.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMotionVisibility.swift:36:31: error: cannot access property 'tokens' with a non-Sendable type '[any NSObjectProtocol]' from nonisolated deinit
+34 |         func detach() { detached = true; publish(false); removeObservers() }
+35 |         private func removeObservers() { for token in tokens { NotificationCenter.default.removeObserver(token) }; tokens = [] }
+36 |         deinit { for token in tokens { NotificationCenter.default.removeObserver(token) } }
+   |                               `- error: cannot access property 'tokens' with a non-Sendable type '[any NSObjectProtocol]' from nonisolated deinit
+37 |     }
+38 | }
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/objc/NSObject.h:15:11: note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
+ 13 | @class NSString, NSMethodSignature, NSInvocation;
+ 14 | 
+ 15 | @protocol NSObject
+    |           `- note: protocol 'NSObjectProtocol' does not conform to the 'Sendable' protocol
+ 16 | 
+ 17 | - (BOOL)isEqual:(id)object;
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMotionVisibility.swift:1:1: warning: add '@preconcurrency' to treat 'Sendable'-related errors from module 'ObjectiveC' as warnings
+ 1 | import SwiftUI
+   | `- warning: add '@preconcurrency' to treat 'Sendable'-related errors from module 'ObjectiveC' as warnings
+ 2 | import AppKit
+ 3 | 
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeMotionVisibility.swift:22:33: error: sending 'note' risks causing data races [#SendingRisksDataRace]
+20 |                 tokens.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+21 |                     MainActor.assumeIsolated {
+22 |                         if note.name == NSWindow.willCloseNotification, let window = note.object as? NSWindow, window === self?.window { self?.publish(false) }
+   |                                 |- error: sending 'note' risks causing data races [#SendingRisksDataRace]
+   |                                 `- note: task-isolated 'note' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses
+23 |                         else { self?.refresh() }
+24 |                     }
+
+[#SendingRisksDataRace]: <https://docs.swift.org/compiler/documentation/diagnostics/sending-risks-data-race>
+[7/26] Compiling GatorMac NativeMessageBody.swift
+[8/29] Compiling GatorMac NativeMascotView.swift
+[9/32] Compiling GatorMac NativeStreamingPresentation.swift
+[10/35] Compiling GatorMac NativeMascotPlayback.swift
+[11/35] Compiling GatorMac NativeReadingPositions.swift
+[12/35] Compiling GatorMac NativeStatusMessage.swift
+[13/38] Compiling GatorMac NativeComposer.swift
+[14/38] Compiling GatorMac NativeDesktopPet.swift
+[15/38] Compiling GatorMac NativeDropInput.swift
+[16/38] Compiling GatorMac NativeMascotModel.swift
+[17/41] Compiling GatorMac NativeStreamingReveal.swift
+[18/41] Compiling GatorMac NativeThinkingPulse.swift
+[19/41] Compiling GatorMac NativeTranscriptFind.swift
+[20/41] Compiling GatorMac GatorApp.swift
+[21/41] Compiling GatorMac NativeAcceptanceDiagnostics.swift
+[22/41] Compiling GatorMac NativeAccessibilityStatus.swift
+[23/41] Compiling GatorMac NativeAttachmentActions.swift
+[24/41] Compiling GatorMac NativeWindowConfiguration.swift
+[25/41] Compiling GatorMac NativeWorkspacePicker.swift
+[26/41] Compiling GatorMac NotchQuickAccess.swift
+[27/41] Compiling GatorMac AppDelegate.swift
+[28/41] Compiling GatorMac ComposerView.swift
+[29/41] Compiling GatorMac ConversationCatalogView.swift
+[30/41] Compiling GatorMac ExactDecisionButton.swift
+[31/41] Compiling GatorMac RecoveryInspectorContent.swift
+[32/41] Compiling GatorMac RecoveryPreparationView.swift
+[33/41] Compiling GatorMac TaskInspectorView.swift
+[34/41] Compiling GatorMac PlanReviewContent.swift
+[35/41] Compiling GatorMac ProviderSetupView.swift
+[36/41] Compiling GatorMac RecentConversationsMenu.swift
+[37/41] Compiling GatorMac ConversationView.swift
+[38/41] Emitting module GatorMac

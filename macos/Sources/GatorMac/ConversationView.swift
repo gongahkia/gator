@@ -13,12 +13,18 @@ struct ConversationView: View {
     let compact: Bool
     let quit: () -> Void
     @AppStorage("gator.notch.enabled") private var notchEnabled = true
+    @AppStorage(NativeMotionPreference.streaming) private var streamingMotion = true
+    @State private var motionVisible = false
     @State private var contentSize = CGSize(width: 540, height: 480)
     @State private var sessionsExpanded = false
     @State private var connectionDetails = false
     @State private var noticesHeight: CGFloat = 24
     @State private var find = NativeTranscriptFind()
     @State private var readingHistory = false
+    private var motionPolicy: NativeMotionPolicy {
+        .init(enabled: streamingMotion, reduceMotion: reduceMotion, visible: motionVisible, reading: readingHistory || find.isPresented,
+              reviewing: application.review != nil || sessions.inspection != nil, closing: application.closing, connected: application.isConnected)
+    }
     private var searchScope: NativeTranscriptSearch.Scope { .init(context: application.context, generation: application.generation) }
     private var canFind: Bool { !compact && application.review == nil && sessions.inspection == nil }
 
@@ -50,14 +56,14 @@ struct ConversationView: View {
                 ApprovalReviewView(review: review, compact: compact).padding(12)
                 Spacer(minLength: 0)
             } else {
-                if application.transcript.isEmpty {
+                if NativeMotionPresentation.showsWelcome(empty: application.transcript.isEmpty, running: application.snapshot?.running == true, considering: application.snapshot?.value["dialogue_busy"].bool == true) {
                     VStack(spacing: 12) {
                         Image(systemName: "bubble.left.and.bubble.right").font(.system(size: 30, weight: .light)).foregroundStyle(gatorAccent).accessibilityHidden(true)
                         Text("What can I help with?").font(compact ? .title3.weight(.medium) : .title2.weight(.medium))
                         Text("Ask a question, make a plan, or pick up where you left off.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 330)
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    NativeTranscriptView(compact: compact, initialPosition: readingPositions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)))
+                    NativeTranscriptView(compact: compact, motion: motionPolicy, initialPosition: readingPositions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)))
                         .id(application.context)
                 }
             }
@@ -72,6 +78,7 @@ struct ConversationView: View {
             if application.review == nil && (!compact || sessions.inspection == nil) { ComposerView(compact: compact).padding(12) }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(NativeMotionVisibility(visible: $motionVisible).frame(width: 0, height: 0))
         .background(NativeWindowConfiguration(compact: compact).frame(width: 0, height: 0))
         .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
         .sheet(isPresented: Binding(get: { !compact && sessions.inspection != nil }, set: { if !$0 { sessions.closeTaskInspection() } })) {
@@ -260,7 +267,9 @@ struct ConversationView: View {
                     Text("Explicit retry uses the same admission ID. It does not repeat an external action.").font(.caption)
                 }.font(.caption)
             }
-            if application.snapshot?.value["dialogue_busy"].bool == true { Label("Considering your message…", systemImage: "clock").font(.caption) }
+            if application.snapshot?.running != true, let status = NativeMotionPresentation.status(snapshot: application.snapshot) {
+                NativeThinkingStatus(text: status.text, icon: status.icon, owner: application.context + application.generation.uuidString, pulsing: status.active && motionPolicy.allows).font(.caption)
+            }
             if !sessions.canSubmit, application.canSend, sessions.workingCount >= 3 { Text("Three tasks are working. Wait for conversation readiness or stop a task before starting more work.").font(.caption).foregroundStyle(.secondary) }
             if sessions.switching { Text("Opening chat… Original work continues.").font(.caption) }
             if !sessions.issue.isEmpty { NativeErrorDisclosure(text: sessions.issue) }
@@ -276,7 +285,8 @@ struct ConversationView: View {
             }
             if sessions.inspection == nil, application.review == nil, let notice = application.snapshot?.unsupportedNotice, application.snapshot?.value["dialogue_dispatch"] == .null, application.snapshot?.value["session_request"] == .null { NativeStatusMessage(text: notice, severity: .information).font(.caption) }
             if application.readiness["state"].string != "configured", application.isConnected {
-                NativeStatusMessage(text: "\(application.readiness["issue"].string) Provider setup is available in Gator’s terminal app; your draft stays here.").font(.caption)
+                NativeStatusMessage(text: NativeMotionPresentation.readinessMessage(application.readiness)).font(.caption)
+                ModelsAndProvidersButton(sessions: sessions).font(.caption)
             }
         }.popover(isPresented: $connectionDetails, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
@@ -321,7 +331,7 @@ private struct MessageRow: View, Equatable {
                         Text(verbatim: message.value.pretty).font(.system(.caption, design: .monospaced))
                     }
                 } else {
-                    NativeMessageBody(text: message.text)
+                    NativeMessageBody(text: message.text).equatable()
                 }
             }
             .textSelection(.enabled).padding(message.isUser ? 12 : 4)
@@ -344,6 +354,7 @@ private struct NativeTranscriptView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.controlActiveState) private var activeState
     let compact: Bool
+    let motion: NativeMotionPolicy
     let initialPosition: NativeReadingPositions.Position
     @State private var following = true
     @State private var nearBottom = true
@@ -354,19 +365,25 @@ private struct NativeTranscriptView: View {
     @State private var restorationAnchor: String?
     @State private var mascotReading = false
     private struct Layout: Equatable { let content: CGSize; let container: CGSize }
-    init(compact: Bool, initialPosition: NativeReadingPositions.Position) {
-        self.compact = compact; self.initialPosition = initialPosition
+    init(compact: Bool, motion: NativeMotionPolicy, initialPosition: NativeReadingPositions.Position) {
+        self.compact = compact; self.motion = motion; self.initialPosition = initialPosition
         _following = State(initialValue: initialPosition.following)
         _nearBottom = State(initialValue: initialPosition.following)
         _visibleMessage = State(initialValue: initialPosition.following ? "latest" : initialPosition.anchor)
         _restorationAnchor = State(initialValue: initialPosition.following ? nil : initialPosition.anchor)
         _mascotReading = State(initialValue: !initialPosition.following)
     }
+    private var textPolicy: NativeMotionPolicy {
+        var policy = motion
+        policy.reading = !following || userScrolling || find.isPresented
+        return policy
+    }
+    private var ownerIdentity: String { application.context + ":" + application.generation.uuidString }
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    if application.transcript.isEmpty {
+                    if NativeMotionPresentation.showsWelcome(empty: application.transcript.isEmpty, running: application.snapshot?.running == true, considering: application.snapshot?.value["dialogue_busy"].bool == true) {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What can I help with?").font(.title2.weight(.medium))
                             Text("Ask a question, work through an idea, or get something done.").foregroundStyle(.secondary)
@@ -380,26 +397,29 @@ private struct NativeTranscriptView: View {
                     }
                     if application.snapshot?.running == true {
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack { if reduceMotion { Image(systemName: "clock").accessibilityLabel(NativeInteractionSemantics.workingLabel(reduceMotion: true)) } else { ProgressView().controlSize(.small) }; Text(application.snapshot?.value["status"].string ?? "Working…").font(.callout).foregroundStyle(.secondary) }
-                            ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).enumerated()), id: \.offset) { _, entry in
-                                // Public assistant stream uses the same bounded native Markdown
-                                // presentation as retained prose, including incomplete code fences.
-                                // Structured tool activity and exact reviews remain literal.
-                                if entry["kind"].string == "text" { NativeMessageBody(text: entry["text"].string) }
+                            if let status = NativeMotionPresentation.status(snapshot: application.snapshot) {
+                                NativeThinkingStatus(text: status.text, icon: status.icon, owner: ownerIdentity,
+                                                     pulsing: status.active && textPolicy.allows).font(.callout)
                             }
-                            DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
-                                ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in
-                                    Text(verbatim: entry["tool"].string + " · " + entry["state"].string).textSelection(.enabled)
-                                }
-                                Button("Inspect Current Task") { sessions.inspectTask(application.conversationID) }
-                                Text("Public task status and retained evidence are available in the inspector.")
-                            }.font(.caption).foregroundStyle(.secondary)
+                            ForEach(NativeMotionPresentation.publicText(snapshot: application.snapshot, owner: ownerIdentity)) { entry in
+                                NativeStreamingTextView(entry: entry, policy: textPolicy)
+                            }
+                            if NativeMotionPresentation.hasPublicTools(application.snapshot) {
+                                DisclosureGroup("Work activity", isExpanded: $activityExpanded) {
+                                    ForEach(Array((application.snapshot?.value["activity"]["entries"].array ?? []).filter { $0["kind"].string == "tool" }.suffix(8).enumerated()), id: \.offset) { _, entry in
+                                        Text(verbatim: entry["tool"].string + " · " + entry["state"].string).textSelection(.enabled)
+                                    }
+                                    Button("Inspect Current Task") { sessions.inspectTask(application.conversationID) }
+                                    Text("Public task status and retained evidence are available in the inspector.")
+                                }.font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
                     Color.clear.frame(height: 1).id("latest")
                 }.scrollTargetLayout().padding(compact ? 16 : 24).frame(maxWidth: 780, alignment: .leading).frame(maxWidth: .infinity)
             }
             .defaultScrollAnchor(initialPosition.following ? .bottom : .top)
+            .defaultScrollAnchor(NativeMotionPolicy.followsLayout(following: following, scrolling: userScrolling, searching: find.isPresented) ? .bottom : nil, for: .sizeChanges)
             .scrollPosition(id: $visibleMessage, anchor: .top)
             .onScrollPhaseChange { _, new in
                 if new == .interacting || new == .decelerating || new == .tracking { userScrolling = true; restorationAnchor = nil }
@@ -430,7 +450,6 @@ private struct NativeTranscriptView: View {
                 if following { scrollToLatest(proxy) }
                 else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
             }
-            .onChange(of: application.snapshot?.value["activity"]) { _, _ in if following && !userScrolling { scrollToLatest(proxy) } }
             .onChange(of: find.reveal) { _, _ in revealMatch(proxy) }
             .task {
                 await Task.yield()

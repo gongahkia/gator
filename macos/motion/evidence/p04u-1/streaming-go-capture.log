@@ -1,0 +1,23 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Emitting module GatorMacTests
+[4/6] Compiling GatorMacTests NativeMotionGoTests.swift
+macro expansion #require:2:3: error: call can throw, but it is not marked with 'try' and the error is not handled
+`- /Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeMotionGoTests.swift:37:127: note: expanded code originates here
+35 |     let scope = context + generation.uuidString
+36 |     try await wait { NativeMotionPresentation.publicText(snapshot: app.snapshot, owner: scope).contains { $0.active && !$0.text.isEmpty } }
+37 |     let entry = try #require(NativeMotionPresentation.publicText(snapshot: app.snapshot, owner: scope).first(where: \.active))
+   |                     |- note: in expansion of macro 'require' here
+   |                     `- note: in expansion of macro 'require' here
+   +--- macro expansion #require ---------------------------------------
+   |1 | Testing.__checkFunctionCall(NativeMotionPresentation.publicText(snapshot: app.snapshot, owner: scope).self,calling: {
+   |2 |   $0.first(where: $1)
+   |  |   |               `- note: call is to 'rethrows' function, but argument function can throw
+   |  |   `- error: call can throw, but it is not marked with 'try' and the error is not handled
+   |3 | },\.active,expression: .__fromFunctionCall(.__fromSyntaxNode("NativeMotionPresentation.publicText(snapshot: app.snapshot, owner: scope)"),"first",("where",.__fromSyntaxNode(#"\.active"#))),comments: [],isRequired: true,sourceLocation: Testing.SourceLocation.__here()).__required()
+   +--------------------------------------------------------------------
+38 |     #expect(entry.hasExactIdentity && entry.text.contains("Native integration"))
+39 |     let presentation = NativeStreamingPresentation()
+error: fatalError

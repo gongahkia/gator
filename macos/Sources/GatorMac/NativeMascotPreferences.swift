@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NativeMascotPreferencesView: View {
+    @AppStorage(NativeMotionPreference.streaming) private var streamingMotion = true
     @AppStorage(NativeMascotPreference.shown) private var shown = true
     @AppStorage(NativeMascotPreference.animated) private var animated = true
     @AppStorage(NativeMascotPreference.mode) private var mode = NativePresenceMode.emoji.rawValue
@@ -9,6 +10,10 @@ struct NativeMascotPreferencesView: View {
     @State private var displays = NativeDesktopPetScreen.current()
     var body: some View {
         Form {
+            Section("Conversation Motion") {
+                Toggle("Animate Streaming Responses", isOn: $streamingMotion).accessibilityIdentifier("gator.motion.streaming")
+                Text("Gently reveal arriving prose and pulse active status. Reduce Motion shows text immediately. Reaction animation is controlled separately below.").font(.callout).foregroundStyle(.secondary)
+            }
             Section("Agent Presence") {
                 Toggle("Show In-Chat Presence", isOn: $shown).accessibilityIdentifier("gator.mascot.shown")
                 Picker("Agent Presence", selection: Binding(get: { NativeMascotPreference.presence(mode).rawValue }, set: { mode = $0 })) {

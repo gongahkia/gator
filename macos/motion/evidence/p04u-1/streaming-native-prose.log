@@ -1,0 +1,27 @@
+[0/1] Planning build
+Building for debugging...
+[0/8] Write sources
+[2/8] Write swift-version--58304C5D6DBC2206.txt
+[4/11] Emitting module GatorMac
+[5/11] Compiling GatorMac NativeStreamingPresentation.swift
+[6/11] Compiling GatorMac NativeStreamingProse.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Sources/GatorMac/NativeStreamingProse.swift:23:142: error: ambiguous use of 'greatestFiniteMagnitude'
+21 |         private var tail = NSRange(location: 0, length: 0)
+22 |         init() {
+23 |             let storage = NSTextStorage(), layout = NSLayoutManager(), container = NSTextContainer(containerSize: .init(width: 400, height: .greatestFiniteMagnitude))
+   |                                                                                                                                              `- error: ambiguous use of 'greatestFiniteMagnitude'
+24 |             storage.addLayoutManager(layout); layout.addTextContainer(container)
+25 |             super.init(frame: .zero, textContainer: container)
+
+CoreFoundation.CGFloat.greatestFiniteMagnitude:2:19: note: found this candidate in module 'CoreFoundation'
+1 | struct CGFloat {
+2 | public static var greatestFiniteMagnitude: CGFloat { get }}
+  |                   `- note: found this candidate in module 'CoreFoundation'
+3 | 
+
+Swift.Double.greatestFiniteMagnitude:2:30: note: found this candidate in module 'Swift'
+1 | struct Double {
+2 | @inlinable public static var greatestFiniteMagnitude: Double { get }}
+  |                              `- note: found this candidate in module 'Swift'
+3 | 
+error: fatalError

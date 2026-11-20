@@ -1,0 +1,145 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[2/6] Write swift-version--58304C5D6DBC2206.txt
+[4/8] Compiling GatorMac NativeStreamingPresentation.swift
+[5/8] Emitting module GatorMac
+[5/10] Write Objects.LinkFileList
+[6/10] Linking GatorMac
+[7/10] Applying GatorMac
+[9/12] Compiling GatorMacTests NativeStreamingTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:147:87: warning: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+145 | @Test @MainActor func streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() async {
+146 |     let positions = NativeReadingPositions(); positions.remember("A", anchor: "row-9", following: false)
+147 |     var model: NativeStreamingPresentation? = NativeStreamingPresentation(); weak var probe = model
+    |                                                                                       `- warning: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+148 |     model?.receive(motionEntry("One"), policy: .init(), now: 1)
+149 |     model?.receive(motionEntry("One two three four five"), policy: .init(), now: 2)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:190:14: warning: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+188 | @Test @MainActor func streamingVisibilityProbeHasNoFocusAndReleasesObservers() {
+189 |     var probe: NativeMotionVisibility.Probe? = .init(update: { _ in })
+190 |     weak var weakProbe = probe
+    |              `- warning: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+191 |     probe?.viewDidMoveToWindow(); #expect(probe?.acceptsFirstResponder == false)
+192 |     probe?.detach(); probe = nil; #expect(weakProbe == nil)
+
+[#WeakMutability]: <https://docs.swift.org/compiler/documentation/diagnostics/weak-mutability>
+[10/12] Emitting module GatorMacTests
+[10/12] Write Objects.LinkFileList
+[11/12] Linking GatorNativePackageTests
+Build complete! (3.35s)
+Test Suite 'Selected tests' started at 2026-11-20 16:12:17.171.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 16:12:17.172.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 16:12:17.172.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 16:12:17.172.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() started.
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() recorded an issue at NativeStreamingTests.swift:268:9: Expectation failed: (weakView == nil → false) && (weakStorage == nil → <not evaluated>)
+✘ Test streamingNativeTextViewLifetimesReleaseTheirTextStores() failed after 0.074 seconds with 100 issues.
+◇ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() started.
+✔ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() passed after 0.001 seconds.
+✘ Test run with 2 tests in 0 suites failed after 0.074 seconds with 100 issues.
