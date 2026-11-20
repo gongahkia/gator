@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NativeMascotPreferencesView: View {
+    @AppStorage(NativeQuickReactionMode.preference) private var quickReactions = NativeQuickReactionMode.subtle.rawValue
     @AppStorage(NativeMotionPreference.streaming) private var streamingMotion = true
     @AppStorage(NativeMascotPreference.shown) private var shown = true
     @AppStorage(NativeMascotPreference.animated) private var animated = true
@@ -10,6 +11,12 @@ struct NativeMascotPreferencesView: View {
     @State private var displays = NativeDesktopPetScreen.current()
     var body: some View {
         Form {
+            Section("Messages") {
+                Picker("Quick Message Reactions", selection: $quickReactions) {
+                    ForEach(NativeQuickReactionMode.allCases, id: \.rawValue) { mode in Text(mode.label).tag(mode.rawValue) }
+                }.accessibilityIdentifier("gator.messages.quickReactions")
+                Text("Acknowledgements attach to the original message. Off shows the saved text reply; Expressive also uses greeting reactions. Work and exact approvals keep their normal routing.").font(.callout).foregroundStyle(.secondary)
+            }
             Section("Conversation Motion") {
                 Toggle("Animate Streaming Responses", isOn: $streamingMotion).accessibilityIdentifier("gator.motion.streaming")
                 Text("Gently reveal arriving prose and pulse active status. Reduce Motion shows text immediately. Reaction animation is controlled separately below.").font(.callout).foregroundStyle(.secondary)

@@ -112,7 +112,7 @@ func (m Model) SubmitBridgeUploads(request BridgeUploadSubmission) (tea.Model, t
 			return fail(fmt.Sprintf("Couldn’t attach these files: %v", err))
 		}
 	}
-	if m.conversationActive() && !request.QueueOnly {
+	if (m.conversationActive() || m.canQuickAcknowledge(request, text)) && !request.QueueOnly {
 		return m.admitConversation(request, text)
 	}
 	oldPlanFirst := m.options.PlanFirst

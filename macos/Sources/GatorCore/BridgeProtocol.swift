@@ -107,9 +107,9 @@ public struct BridgeSnapshot: Sendable, Equatable {
         func time(_ value: JSONValue) -> Date? { fractional.date(from: value.string) ?? seconds.date(from: value.string) }
         func appendTurn(_ turn: JSONValue) {
             let prefix = "\(context):dialogue:\(turn["id"].string)"
-            result.append(BridgeMessage(id: prefix + ":user", value: .object(["role": .string("You"), "text": turn["text"], "input_ids": turn["input_ids"]])))
+            result.append(BridgeMessage(id: prefix + ":user", value: .object(["role": .string("You"), "text": turn["text"], "input_ids": turn["input_ids"], "reaction_turn": turn["reaction"] == .null ? .null : turn, "reaction_conversation": .string(conversationID)])))
             let response = turn["response"].string
-            if !response.isEmpty { result.append(BridgeMessage(id: prefix + ":response", value: .object(["role": .string("Gator"), "text": .string(response)]))) }
+            if !response.isEmpty { result.append(BridgeMessage(id: prefix + ":response", value: .object(["role": .string("Gator"), "text": .string(response), "reaction_for": .string(prefix + ":user")]))) }
             let peer = value["dialogue_peers"].array.first { $0["conversation_id"] == turn["task_chat"] && !turn["task_chat"].string.isEmpty }
             if let peer, !peer["summary"].string.isEmpty, peer["summary"].string != response {
                 result.append(BridgeMessage(id: prefix + ":summary", value: .object(["role": .string("Gator"), "text": peer["summary"]])))

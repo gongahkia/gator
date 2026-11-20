@@ -224,8 +224,8 @@ export type BackendState = {
   destination?: string;
 };
 
-export type DialogueMessage = {id:string;sequence:number;text:string;response?:string;state:string;issue?:string;task_chat?:string;input_ids?:string[];reply_to_update_id?:string;created_at:string;updated_at:string};
-export type DialoguePeer = {conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;can_revise_plan?:boolean;can_review_inputs?:boolean;can_correct_action?:boolean;review_control_id?:string;preparation_control_id?:string;summary?:string};
+export type DialogueMessage = {reaction?:{version:1;conversation_id:string;turn_id:string;revision:number;kind:string;emoji:string;level:"subtle"|"expressive"};revision?:number;id:string;sequence:number;text:string;response?:string;state:string;issue?:string;task_chat?:string;input_ids?:string[];reply_to_update_id?:string;created_at:string;updated_at:string};
+export type DialoguePeer = {needs_inspection?:boolean;conversation_id:string;turn_id:string;run_id?:string;state:string;can_guide:boolean;can_stop:boolean;can_revise_plan?:boolean;can_review_inputs?:boolean;can_correct_action?:boolean;review_control_id?:string;preparation_control_id?:string;summary?:string};
 export type PanelAction = {
   id: string; action: "select" | "activate" | "key" | "query" | "filter" | "next" | "previous" | "refresh" | "rename" | "pin" | "unpin" | "archive" | "restore";
   row?: number; fields?: Record<number, string>; text?: string;

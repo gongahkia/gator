@@ -1,0 +1,11 @@
+{
+  "admissionToReactionMilliseconds" : 31.135667000000002,
+  "conversation" : "work-20261120T085706-15451935b8b205cf",
+  "modelRequests" : 0,
+  "ownerCount" : 1,
+  "restoredDraft" : true,
+  "restoredReaction" : true,
+  "retainedVersion" : 1,
+  "revision" : 3,
+  "turn" : "c6641908549e8020a9ebdfeaf27a2b87705a5898a9bbc297c04df3f612f43d63"
+}

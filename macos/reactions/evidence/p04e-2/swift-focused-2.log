@@ -1,0 +1,47 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/7] Compiling GatorMacTests NativeMessageReactionTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeMessageReactionTests.swift:93:44: warning: '#require(_:_:)' is redundant because 'NSAppearance(named: name)' never equals 'nil' (from macro 'require')
+91 |         for reduced in [false, true] {
+92 |             let host = NSHostingView(rootView: NativeMessageReactionChip(reaction: reaction).transaction { $0.disablesAnimations = reduced })
+93 |             host.appearance = try #require(NSAppearance(named: name))
+   |                                            `- warning: '#require(_:_:)' is redundant because 'NSAppearance(named: name)' never equals 'nil' (from macro 'require')
+94 |             let size = host.fittingSize
+95 |             #expect(size.width >= 20 && size.width < 60 && size.height >= 16 && size.height < 45)
+[4/7] Compiling GatorMacTests NativeMascotTests.swift
+[5/7] Emitting module GatorMacTests
+[6/9] Compiling GatorNativePackageTests runner.swift
+[7/9] Emitting module GatorNativePackageTests
+[7/9] Write Objects.LinkFileList
+[8/9] Linking GatorNativePackageTests
+Build complete! (2.78s)
+Test Suite 'Selected tests' started at 2026-11-20 16:53:40.802.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 16:53:40.804.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 16:53:40.804.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 16:53:40.804.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.012 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test messageReactionBindsExactConversationTurnAndRevision() started.
+✔ Test messageReactionBindsExactConversationTurnAndRevision() passed after 0.002 seconds.
+◇ Test messageReactionRejectsUnconfirmedFailedAndMalformedOutcomes() started.
+✔ Test messageReactionRejectsUnconfirmedFailedAndMalformedOutcomes() passed after 0.001 seconds.
+◇ Test messageReactionModesPreserveFallbackAndStableOriginalIdentity() started.
+✔ Test messageReactionModesPreserveFallbackAndStableOriginalIdentity() passed after 0.001 seconds.
+◇ Test messageReactionPreferencePersistsWithoutChangingPresenceOrStreaming() started.
+✔ Test messageReactionPreferencePersistsWithoutChangingPresenceOrStreaming() passed after 0.002 seconds.
+◇ Test messageReactionSearchAndReadingAnchorsFollowPresentedMessagesOnly() started.
+✔ Test messageReactionSearchAndReadingAnchorsFollowPresentedMessagesOnly() passed after 0.001 seconds.
+◇ Test messageReactionDoesNotReplayOrMutateAnUnrelatedStream() started.
+✔ Test messageReactionDoesNotReplayOrMutateAnUnrelatedStream() passed after 0.001 seconds.
+◇ Test messageReactionNativeChipFitsCompactAndAllNativeAppearances() started.
+✔ Test messageReactionNativeChipFitsCompactAndAllNativeAppearances() passed after 0.054 seconds.
+✔ Test run with 9 tests in 0 suites passed after 0.076 seconds.

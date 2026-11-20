@@ -13,6 +13,8 @@ struct ConversationView: View {
     let compact: Bool
     let quit: () -> Void
     @AppStorage("gator.notch.enabled") private var notchEnabled = true
+    @AppStorage(NativeQuickReactionMode.preference) private var quickReactions = NativeQuickReactionMode.subtle.rawValue
+    private var presentedTranscript: [BridgeMessage] { NativeQuickReactionMode.transcript(application.transcript, mode: .resolve(quickReactions)) }
     @AppStorage(NativeMotionPreference.streaming) private var streamingMotion = true
     @State private var motionVisible = false
     @State private var contentSize = CGSize(width: 540, height: 480)
@@ -34,7 +36,7 @@ struct ConversationView: View {
             .environment(find)
             .focusedSceneValue(\.findInTranscript, findAction)
             .onChange(of: searchScope) { _, _ in find.close() }
-            .onChange(of: application.transcript) { _, messages in find.refresh(scope: searchScope, messages: messages) }
+            .onChange(of: presentedTranscript) { _, messages in find.refresh(scope: searchScope, messages: messages) }
             .onChange(of: canFind) { _, allowed in if !allowed { find.close() } }
             .onPreferenceChange(NativeMascotReadingKey.self) { readingHistory = $0 }
     }
@@ -63,7 +65,7 @@ struct ConversationView: View {
                         Text("Ask a question, make a plan, or pick up where you left off.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 330)
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    NativeTranscriptView(compact: compact, motion: motionPolicy, initialPosition: readingPositions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)))
+                    NativeTranscriptView(compact: compact, motion: motionPolicy, initialPosition: NativeQuickReactionMode.position(readingPositions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)), raw: application.transcript, mode: .resolve(quickReactions)))
                         .id(application.context)
                 }
             }
@@ -106,7 +108,7 @@ struct ConversationView: View {
         .accessibilityIdentifier(compact ? "gator.compact" : "gator.window")
     }
 
-    private func openFind() { find.open(scope: searchScope, messages: application.transcript) }
+    private func openFind() { find.open(scope: searchScope, messages: presentedTranscript) }
     private func closeFind() { find.close(); sessions.focusComposer() }
 
     private var header: some View {
@@ -301,8 +303,9 @@ struct ConversationView: View {
     }
 }
 
-private struct MessageRow: View, Equatable {
+struct MessageRow: View, Equatable {
     @Environment(ManagedSessionCoordinator.self) private var sessions
+    @AppStorage(NativeQuickReactionMode.preference) private var quickReactions = NativeQuickReactionMode.subtle.rawValue
     let message: BridgeMessage
     var searchSelected = false
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool { lhs.message == rhs.message && lhs.searchSelected == rhs.searchSelected }
@@ -335,9 +338,14 @@ private struct MessageRow: View, Equatable {
                 }
             }
             .textSelection(.enabled).padding(message.isUser ? 12 : 4)
+            .overlay(alignment: .bottomTrailing) {
+                if let reaction = message.messageReaction, NativeQuickReactionMode.resolve(quickReactions).displays(reaction) {
+                    NativeMessageReactionChip(reaction: reaction).offset(x: -6, y: 13).textSelection(.disabled)
+                }
+            }
             .background(message.isUser ? gatorAccent.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 12))
             if !message.isUser { Spacer(minLength: 20) }
-        }.frame(maxWidth: .infinity)
+        }.padding(.bottom, message.isUser ? 12 : 0).frame(maxWidth: .infinity)
             .overlay { if searchSelected { RoundedRectangle(cornerRadius: 8).strokeBorder(gatorAccent, lineWidth: 2).allowsHitTesting(false) } }
     }
     private var validTaskLink: Bool {
@@ -353,6 +361,8 @@ private struct NativeTranscriptView: View {
     @Environment(NativeTranscriptFind.self) private var find
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.controlActiveState) private var activeState
+    @AppStorage(NativeQuickReactionMode.preference) private var quickReactions = NativeQuickReactionMode.subtle.rawValue
+    private var presentedTranscript: [BridgeMessage] { NativeQuickReactionMode.transcript(application.transcript, mode: .resolve(quickReactions)) }
     let compact: Bool
     let motion: NativeMotionPolicy
     let initialPosition: NativeReadingPositions.Position
@@ -392,7 +402,7 @@ private struct NativeTranscriptView: View {
                     if application.snapshot?.value["dialogue_more"].bool == true {
                         Text("Earlier conversation history is available in the terminal app.").font(.caption).foregroundStyle(.secondary)
                     }
-                    ForEach(application.transcript.filter(\.hasVisibleContent)) { message in
+                    ForEach(presentedTranscript.filter(\.hasVisibleContent)) { message in
                         MessageRow(message: message, searchSelected: !compact && find.selected?.messageID == message.id).equatable()
                     }
                     if application.snapshot?.running == true {
@@ -445,10 +455,10 @@ private struct NativeTranscriptView: View {
                 guard !userScrolling, !following, layout.container.height > 0, let anchor = restorationAnchor else { return }
                 visibleMessage = anchor; proxy.scrollTo(anchor, anchor: .top)
             }
-            .onChange(of: application.transcript) { _, _ in
+            .onChange(of: presentedTranscript) { _, _ in
                 guard !userScrolling else { return }
                 if following { scrollToLatest(proxy) }
-                else if let visibleMessage, !application.transcript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
+                else if let visibleMessage, !presentedTranscript.contains(where: { $0.id == visibleMessage }) { restore(proxy) }
             }
             .onChange(of: find.reveal) { _, _ in revealMatch(proxy) }
             .task {
@@ -467,7 +477,7 @@ private struct NativeTranscriptView: View {
 
     private func revealMatch(_ proxy: ScrollViewProxy) {
         guard !compact, !userScrolling, let request = find.reveal, request.id != lastReveal,
-              let id = NativeTranscriptSearch.revealTarget(request.match, scope: .init(context: application.context, generation: application.generation), messages: application.transcript) else { return }
+              let id = NativeTranscriptSearch.revealTarget(request.match, scope: .init(context: application.context, generation: application.generation), messages: presentedTranscript) else { return }
         lastReveal = request.id
         following = false
         restorationAnchor = id
@@ -478,7 +488,7 @@ private struct NativeTranscriptView: View {
     }
 
     private func restore(_ proxy: ScrollViewProxy) {
-        let saved = positions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id))
+        let saved = NativeQuickReactionMode.position(positions.restored(application.context, available: application.transcript.filter(\.hasVisibleContent).map(\.id)), raw: application.transcript, mode: .resolve(quickReactions))
         following = saved.following
         restorationAnchor = saved.following ? nil : saved.anchor
         if saved.following { scrollToLatest(proxy) }

@@ -17,6 +17,7 @@ import (
 // ConversationTask is a host projection, not model-supplied authority. The host
 // must recheck its identity and live capability when applying a route decision.
 type ConversationTask struct {
+	NeedsInspection  bool   `json:"needs_inspection,omitempty"`
 	ID               string `json:"id"`
 	Title            string `json:"title"`
 	State            string `json:"state"`
@@ -44,18 +45,20 @@ type ConversationMessage struct {
 // Files, credentials, tool results and other chats are never implicitly fetched
 // by the conversational router. Requests needing them must become scoped work.
 type ConversationRequest struct {
-	Text      string                `json:"message"`
-	Recent    []ConversationMessage `json:"recent_messages,omitempty"`
-	Tasks     []ConversationTask    `json:"tasks,omitempty"`
-	HasFiles  bool                  `json:"has_new_files"`
-	PlanFirst bool                  `json:"plan_first"`
-	CanStart  bool                  `json:"can_start_task"`
+	AcknowledgementBlocked bool                  `json:"-"`
+	Text                   string                `json:"message"`
+	Recent                 []ConversationMessage `json:"recent_messages,omitempty"`
+	Tasks                  []ConversationTask    `json:"tasks,omitempty"`
+	HasFiles               bool                  `json:"has_new_files"`
+	PlanFirst              bool                  `json:"plan_first"`
+	CanStart               bool                  `json:"can_start_task"`
 }
 
 // Reply/clarify contain conversation text. Guide/stop/task contain intent only:
 // an acknowledgement is produced by the host after the action is accepted.
 // No decision grants approval, source access or permission to send externally.
 type ConversationDecision struct {
+	Reaction    string `json:"reaction,omitempty"`
 	Kind        string `json:"kind"`
 	Text        string `json:"text,omitempty"`
 	Target      string `json:"target,omitempty"`
@@ -70,6 +73,9 @@ var ErrConversationDecision = errors.New("the model returned an invalid conversa
 func RouteConversation(ctx context.Context, backend agent.Model, request ConversationRequest) (ConversationDecision, error) {
 	if err := ctx.Err(); err != nil {
 		return ConversationDecision{}, err
+	}
+	if decision, ok := QuickAcknowledgement(request); ok {
+		return decision, nil
 	}
 	if backend == nil || validateConversationRequest(request) != nil {
 		return ConversationDecision{}, errors.New("invalid conversation context")
@@ -147,6 +153,12 @@ func (decision ConversationDecision) Validate(request ConversationRequest) error
 	}
 	if !conversationText(decision.Text, 8192, true) || !conversationText(decision.Instruction, 64*1024, true) {
 		return ErrConversationDecision
+	}
+	if decision.Reaction != "" {
+		expected, ok := QuickAcknowledgement(request)
+		if !ok || decision != expected {
+			return ErrConversationDecision
+		}
 	}
 	switch decision.Kind {
 	case "reply", "clarify":

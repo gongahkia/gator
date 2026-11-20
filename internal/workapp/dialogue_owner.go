@@ -6,23 +6,35 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
 // DialogueMessage projects public content and input references, never captured
 // execution options or another owner's approval token.
+type DialogueReaction struct {
+	Kind           string `json:"kind"`
+	Version        int    `json:"version"`
+	ConversationID string `json:"conversation_id"`
+	TurnID         string `json:"turn_id"`
+	Revision       uint64 `json:"revision"`
+	Emoji          string `json:"emoji"`
+	Level          string `json:"level"`
+}
 type DialogueMessage struct {
-	ID              string    `json:"id"`
-	Sequence        uint64    `json:"sequence"`
-	Text            string    `json:"text"`
-	Response        string    `json:"response,omitempty"`
-	State           string    `json:"state"`
-	Issue           string    `json:"issue,omitempty"`
-	TaskChat        string    `json:"task_chat,omitempty"`
-	InputIDs        []string  `json:"input_ids,omitempty"`
-	ReplyToUpdateID string    `json:"reply_to_update_id,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	Revision        uint64            `json:"revision"`
+	Reaction        *DialogueReaction `json:"reaction,omitempty"`
+	ID              string            `json:"id"`
+	Sequence        uint64            `json:"sequence"`
+	Text            string            `json:"text"`
+	Response        string            `json:"response,omitempty"`
+	State           string            `json:"state"`
+	Issue           string            `json:"issue,omitempty"`
+	TaskChat        string            `json:"task_chat,omitempty"`
+	InputIDs        []string          `json:"input_ids,omitempty"`
+	ReplyToUpdateID string            `json:"reply_to_update_id,omitempty"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 type DialogueTaskState struct {
 	DialoguePeer
@@ -36,7 +48,7 @@ func (m Model) dialogueMessages() []DialogueMessage {
 		if json.Unmarshal(turn.Options, &input) != nil || input.Version != 1 {
 			continue
 		}
-		messages = append(messages, DialogueMessage{ID: turn.ID, Sequence: turn.Sequence, Text: turn.Text, Response: turn.Response, State: turn.State, Issue: turn.Issue, TaskChat: turn.TaskChat, InputIDs: append([]string(nil), input.RunOptions.Uploads...), ReplyToUpdateID: input.RunOptions.ReplyToUpdateID, CreatedAt: turn.CreatedAt, UpdatedAt: turn.UpdatedAt})
+		messages = append(messages, DialogueMessage{Revision: turn.Revision, Reaction: retainedReaction(turn, input), ID: turn.ID, Sequence: turn.Sequence, Text: turn.Text, Response: turn.Response, State: turn.State, Issue: turn.Issue, TaskChat: turn.TaskChat, InputIDs: append([]string(nil), input.RunOptions.Uploads...), ReplyToUpdateID: input.RunOptions.ReplyToUpdateID, CreatedAt: turn.CreatedAt, UpdatedAt: turn.UpdatedAt})
 	}
 	return messages
 }
@@ -49,7 +61,7 @@ func (m Model) dialogueTaskState() *DialogueTaskState {
 	if err != nil || origin == nil {
 		return nil
 	}
-	result := &DialogueTaskState{ParentID: origin.ParentConversationID, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: origin.TurnID, State: "unconfirmed"}}
+	result := &DialogueTaskState{ParentID: origin.ParentConversationID, DialoguePeer: DialoguePeer{ConversationID: m.conversation, TurnID: origin.TurnID, State: "unconfirmed", NeedsInspection: m.acknowledgementBlocked()}}
 	for _, r := range m.requests.Requests {
 		if r.ClientID != origin.TurnID {
 			continue
@@ -111,7 +123,7 @@ func (m Model) retainedDialoguePeer(turn worksession.DialogueTurn) *DialoguePeer
 	if err != nil || origin == nil || origin.ParentConversationID != m.conversation || origin.TurnID != turn.ID {
 		return nil
 	}
-	peer := &DialoguePeer{ConversationID: turn.TaskChat, TurnID: turn.ID, State: "unconfirmed"}
+	peer := &DialoguePeer{ConversationID: turn.TaskChat, TurnID: turn.ID, State: "unconfirmed", NeedsInspection: true}
 	journal, err := m.config.SessionStore.LoadRequests(turn.TaskChat)
 	if err != nil {
 		return peer
@@ -344,4 +356,20 @@ func (m Model) LoadOlderDialogue(before uint64) Model {
 	m.dialogueTurns = append(turns, m.dialogueTurns...)
 	m.dialogueMore = more
 	return m
+}
+
+func retainedReaction(turn worksession.DialogueTurn, input ConversationInput) *DialogueReaction {
+	if turn.State != "answered" || turn.Issue != "" || turn.TaskChat != "" {
+		return nil
+	}
+	var decision workrun.ConversationDecision
+	if json.Unmarshal(turn.Decision, &decision) != nil || decision.Reaction == "" || decision.Text != turn.Response {
+		return nil
+	}
+	request := workrun.ConversationRequest{Text: turn.Text, Recent: input.Recent, Tasks: input.TaskContext, HasFiles: len(input.RunOptions.Uploads) > 0 || len(input.RunOptions.Attachments) > 0 || input.RunOptions.ReplyToUpdateID != "", PlanFirst: input.RunOptions.PlanFirst, AcknowledgementBlocked: input.RunOptions.RefreshSource}
+	if decision.Validate(request) != nil {
+		return nil
+	}
+	emoji, level, _ := workrun.AcknowledgementPresentation(decision.Reaction)
+	return &DialogueReaction{Kind: decision.Reaction, Version: 1, ConversationID: turn.ConversationID, TurnID: turn.ID, Revision: turn.Revision, Emoji: emoji, Level: level}
 }

@@ -34,6 +34,7 @@ type ConversationInput struct {
 // DialoguePeer comes from another native owner through the host-only channel.
 // Every peer is checked against this conversation's durable task origin.
 type DialoguePeer struct {
+	NeedsInspection      bool   `json:"needs_inspection,omitempty"`
 	ConversationID       string `json:"conversation_id"`
 	TurnID               string `json:"turn_id"`
 	RunID                string `json:"run_id,omitempty"`
@@ -84,6 +85,7 @@ type DialogueControlResult struct {
 	control       DialogueControl
 }
 type conversationRouted struct {
+	Revision     uint64
 	Conversation string
 	TurnID       string
 	Request      workrun.ConversationRequest
@@ -228,7 +230,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 			if err != nil || turn.TaskChat != peer.ConversationID {
 				continue
 			}
-			tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", CanReviewInputs: peer.CanReviewInputs && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID, CanCorrectAction: peer.CanCorrectAction && peer.ReviewControlID != "", ReviewControlID: peer.ReviewControlID})
+			tasks = append(tasks, workrun.ConversationTask{NeedsInspection: peer.NeedsInspection, ID: peer.ConversationID, Title: boundedConversation(turn.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048), CanGuide: peer.CanGuide && peer.RunID != "", CanStop: peer.CanStop && peer.RunID != "", CanRevisePlan: peer.CanRevisePlan && peer.RunID != "", CanReviewInputs: peer.CanReviewInputs && peer.RunID != "", ControlID: peer.RunID, PreparationControlID: peer.PreparationControlID, CanCorrectAction: peer.CanCorrectAction && peer.ReviewControlID != "", ReviewControlID: peer.ReviewControlID})
 			seen[peer.ConversationID] = true
 		}
 	}
@@ -248,7 +250,7 @@ func (m Model) conversationTasks() []workrun.ConversationTask {
 		if err != nil || current.TaskChat != peer.ConversationID {
 			continue
 		}
-		tasks = append(tasks, workrun.ConversationTask{ID: peer.ConversationID, Title: boundedConversation(current.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048)})
+		tasks = append(tasks, workrun.ConversationTask{NeedsInspection: peer.NeedsInspection, ID: peer.ConversationID, Title: boundedConversation(current.Text, 256), State: peer.State, Summary: boundedConversation(peer.Summary, 2048)})
 		seen[peer.ConversationID] = true
 	}
 	return tasks
@@ -391,10 +393,14 @@ func (m Model) startConversationRoute() (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.dialogueCancel = cancel
 	request := workrun.ConversationRequest{Text: turn.Text, Recent: input.Recent, Tasks: m.conversationTasks(), HasFiles: len(input.RunOptions.Uploads) > 0 || len(input.RunOptions.Attachments) > 0 || input.RunOptions.ReplyToUpdateID != "", PlanFirst: input.RunOptions.PlanFirst, CanStart: m.dialogueCanStart}
+	request.AcknowledgementBlocked = input.RunOptions.RefreshSource || m.acknowledgementBlocked() || !workrun.AcknowledgementContextSafe(input.TaskContext, input.Recent)
 	route, conversation := m.config.RouteConversation, m.conversation
 	return m, func() tea.Msg {
+		if decision, ok := workrun.QuickAcknowledgement(request); ok && ctx.Err() == nil {
+			return conversationRouted{Conversation: conversation, TurnID: id, Revision: turn.Revision, Request: request, Decision: decision}
+		}
 		decision, err := route(ctx, request, input)
-		return conversationRouted{Conversation: conversation, TurnID: id, Request: request, Decision: decision, Err: err}
+		return conversationRouted{Conversation: conversation, TurnID: id, Revision: turn.Revision, Request: request, Decision: decision, Err: err}
 	}
 }
 func (m Model) failConversation(turn worksession.DialogueTurn, issue string) (tea.Model, tea.Cmd) {
@@ -419,12 +425,18 @@ func (m Model) finishConversationRoute(value conversationRouted) (tea.Model, tea
 		m.dialogueIssue = err.Error()
 		return m.startConversationRoute()
 	}
+	if turn.State != "routing" || turn.Revision != value.Revision || turn.Text != value.Request.Text {
+		m.rememberDialogue(turn)
+		m.dialogueIssue = "The retained message changed while routing. Inspect its current outcome; no decision was replayed."
+		return m.startConversationRoute()
+	}
 	if value.Err != nil {
 		return m.failConversation(turn, "Couldn't respond to this message: "+value.Err.Error()+". Your original message is retained; no task was changed.")
 	}
 	current := value.Request
 	current.Tasks = m.conversationTasks()
 	current.CanStart = m.dialogueCanStart
+	current.AcknowledgementBlocked = current.AcknowledgementBlocked || m.acknowledgementBlocked()
 	if err := value.Decision.Validate(current); err != nil {
 		return m.failConversation(turn, "The task or available controls changed while Gator considered this message. Send a new message after reviewing its current state.")
 	}
@@ -580,4 +592,16 @@ func (m Model) FinishDialogueDispatch(result DialogueDispatchResult) (tea.Model,
 		m.dialogueIssue = "The task owner accepted the request, but its receipt was not confirmed. Inspect it before retrying: " + err.Error()
 	}
 	return m.startConversationRoute()
+}
+
+// These gates do not authorize anything; they decline the shortcut and leave
+// existing inspection/routing/approval machinery in control.
+func (m Model) acknowledgementBlocked() bool {
+	return m.quitting || m.interaction != nil || len(m.pendingInteractions) > 0 || m.pendingConnection() != "" || m.bridgeExternal != nil || m.sessionRequest != nil || m.planPreparing != "" || m.planRevising != "" || m.receiptBusy || len(m.actionRecoveries) > 0 || len(m.requestRecoveryViews()) > 0 || m.dialogueIssue != ""
+}
+
+func (m Model) canQuickAcknowledge(request BridgeUploadSubmission, text string) bool {
+	options := m.submissionOptions()
+	_, ok := workrun.QuickAcknowledgement(workrun.ConversationRequest{Text: text, Recent: m.conversationRecent(), Tasks: m.conversationTasks(), HasFiles: len(request.Files) > 0 || len(options.Attachments) > 0 || request.ReplyToUpdateID != "", PlanFirst: request.PlanFirst, AcknowledgementBlocked: options.RefreshSource || m.acknowledgementBlocked()})
+	return m.conversationAvailable() && ok
 }

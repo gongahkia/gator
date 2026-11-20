@@ -38,3 +38,21 @@ test("restart preparation waits for the canonical application and never forces a
     await backend.prepareUpdate(); assert.equal(backend.closed, true);
   } finally { await backend.stop(); await rm(directory, { recursive: true, force: true }); }
 });
+
+test("dialogue reaction metadata preserves the legacy answered reply and exact turn", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gator-reaction-protocol-"));
+  const executable = join(directory, "fixture.cjs");
+  const turn = { id: "turn-fixture", revision: 3, sequence: 1, text: "Thanks!", response: "You're welcome.", state: "answered",
+    reaction: { version: 1, conversation_id: "chat-fixture", turn_id: "turn-fixture", revision: 3, kind: "appreciation", emoji: "❤️", level: "subtle" } };
+  await writeFile(executable, `const readline=require('node:readline');process.stdout.write(JSON.stringify({version:1,type:'state',state:{conversation_id:'chat-fixture',messages:[],dialogue:[${JSON.stringify(turn)}]}})+'\\n');readline.createInterface({input:process.stdin}).on('line',line=>{if(JSON.parse(line).type==='exit')process.exit(0)});`);
+  const backend = new Backend(process.execPath, directory, process.env, [executable]);
+  try {
+    const [state] = await once(backend, "state");
+    assert.deepEqual(state.dialogue[0], turn);
+    assert.equal(state.dialogue[0].response, "You're welcome."); // older renderers use this unchanged fallback
+    assert.equal(state.dialogue[0].state, "answered");
+    assert.equal(state.dialogue[0].reaction.turn_id, state.dialogue[0].id);
+    assert.equal(state.dialogue_dispatch, undefined);
+    assert.equal(state.pending_approval, undefined);
+  } finally { await backend.stop(); await rm(directory, { recursive: true, force: true }); }
+});

@@ -1,0 +1,79 @@
+[0/1] Planning build
+Building for debugging...
+[0/8] Write sources
+[3/8] Write swift-version--58304C5D6DBC2206.txt
+[5/10] Emitting module GatorCore
+[6/10] Compiling GatorCore NativeMessageReaction.swift
+[7/47] Compiling GatorMac NativeMessageReactionView.swift
+[8/49] Emitting module GatorMac
+[9/49] Compiling GatorMac GatorApp.swift
+[10/49] Compiling GatorMac NativeMascotPreferences.swift
+[11/49] Compiling GatorCoreTests NativeDraftStoreTests.swift
+[12/49] Compiling GatorCoreTests NativeInertApprovalIntegrationTests.swift
+[13/49] Compiling GatorCoreTests NativeMessageContentTests.swift
+[14/49] Compiling GatorCoreTests NativePerformanceTests.swift
+[15/49] Compiling GatorCoreTests NativePlanAuthorizationTests.swift
+[16/49] Emitting module GatorCoreTests
+[17/53] Compiling GatorCoreTests NativePlanIntegrationTests.swift
+[18/53] Compiling GatorCoreTests NativeProviderIntegrationTests.swift
+[19/53] Compiling GatorCoreTests NativeProviderTests.swift
+[20/53] Compiling GatorCoreTests NativeRecoveryIntegrationTests.swift
+[21/53] Compiling GatorCoreTests NativeRecoveryTests.swift
+[22/53] Compiling GatorCoreTests NativeReviewIntegrationTests.swift
+[23/53] Compiling GatorCoreTests NativeSnapshotPublicationTests.swift
+[24/53] Compiling GatorCoreTests NativeTaskReviewTests.swift
+[25/53] Compiling GatorCoreTests ApplicationStateTests.swift
+[26/53] Compiling GatorCoreTests BridgeProtocolTests.swift
+[27/53] Compiling GatorCoreTests BridgeShutdownSafetyTests.swift
+[28/53] Compiling GatorCoreTests GoIntegrationTests.swift
+[29/53] Compiling GatorCoreTests ManagedGoIntegrationTests.swift
+[30/53] Compiling GatorCoreTests NativeCatalogIntegrationTests.swift
+[31/53] Compiling GatorCoreTests NativeCatalogOwnerTests.swift
+[32/53] Compiling GatorCoreTests NativeCatalogTests.swift
+[33/53] Compiling GatorCoreTests NativeClosingSafetyTests.swift
+[34/53] Compiling GatorCoreTests NativeClosureAcceptanceTests.swift
+[35/53] Compiling GatorCoreTests NativeTranscriptSearchTests.swift
+[36/53] Compiling GatorCoreTests NativeUploadStoreTests.swift
+[37/53] Compiling GatorCoreTests NativeWorkspaceIntegrationTests.swift
+[38/53] Compiling GatorCoreTests NativeWorkspaceTests.swift
+[39/53] Compiling GatorCoreTests ManagedSessionTests.swift
+[40/53] Compiling GatorCoreTests NativeArchiveSafetyTests.swift
+[41/53] Compiling GatorCoreTests NativeAttachmentDisconnectTests.swift
+[42/53] Compiling GatorCoreTests NativeAttachmentDraftTests.swift
+[43/53] Compiling GatorCoreTests NativeAttachmentIntegrationTests.swift
+[44/53] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[45/53] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[46/53] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[47/53] Compiling GatorCoreTests resource_bundle_accessor.swift
+[48/53] Compiling GatorMac ConversationView.swift
+[48/53] Write Objects.LinkFileList
+[49/53] Linking GatorMac
+[50/53] Applying GatorMac
+[52/65] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[53/66] Compiling GatorMacTests NotchGeometryTests.swift
+[54/66] Compiling GatorMacTests NativeMotionGoTests.swift
+[55/66] Compiling GatorMacTests NativeMotionRenderTests.swift
+[56/66] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[57/66] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[58/66] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[59/66] Compiling GatorMacTests NativeStreamingTests.swift
+[60/66] Compiling GatorMacTests NativeDesktopPetTests.swift
+[61/66] Compiling GatorMacTests NativeInputTests.swift
+[62/66] Emitting module GatorMacTests
+[63/66] Compiling GatorMacTests NativeMascotTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeMessageReactionTests.swift:92:106: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'
+90 |     for name in [NSAppearance.Name.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua] {
+91 |         for reduced in [false, true] {
+92 |             let host = NSHostingView(rootView: NativeMessageReactionChip(reaction: reaction).environment(\.accessibilityReduceMotion, reduced))
+   |                                                                                                          `- error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'
+93 |             host.appearance = try #require(NSAppearance(named: name))
+94 |             let size = host.fittingSize
+[64/66] Compiling GatorMacTests NativeMessageReactionTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeMessageReactionTests.swift:92:106: error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'
+90 |     for name in [NSAppearance.Name.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua] {
+91 |         for reduced in [false, true] {
+92 |             let host = NSHostingView(rootView: NativeMessageReactionChip(reaction: reaction).environment(\.accessibilityReduceMotion, reduced))
+   |                                                                                                          `- error: cannot convert value of type 'any KeyPath<EnvironmentValues, Bool> & Sendable' to expected argument type 'WritableKeyPath<EnvironmentValues, Bool>'
+93 |             host.appearance = try #require(NSAppearance(named: name))
+94 |             let size = host.fittingSize
+error: fatalError

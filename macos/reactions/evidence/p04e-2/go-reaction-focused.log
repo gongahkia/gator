@@ -1,0 +1,6 @@
+ok  	github.com/gongahkia/gator/internal/workrun	0.604s
+--- FAIL: TestDialogueReactionRevalidatesReviewAndRetainedRevisionBeforeCompletion (0.06s)
+    dialogue_reaction_test.go:118: new review was hidden by a reaction
+FAIL
+FAIL	github.com/gongahkia/gator/internal/workapp	1.507s
+FAIL
