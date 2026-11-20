@@ -49,7 +49,7 @@ private struct MotionRenderFixture: View {
         for width: CGFloat in [400, 780] {
             for baseline in [false, true] {
                 let input = MotionRenderInput()
-                input.text = "## A useful answer\n\nKeep the public response accurate, readable and easy to copy.\n\nHere is a gentle plain-language continuation with cafe\u{301}, 👩🏽‍💻 and 中文.\n\n```swift\nlet scope = \"unchanged\"\n```\n\nThis plain prose tail uses the native selectable streaming component."
+                input.text = "## A useful answer\n\nKeep the public response accurate, readable and easy to copy.\n\nHere is a gentle plain-language continuation with cafe\u{301}, 👩🏽‍💻 and 中文.\n\n```swift\nlet scope = \"unchanged\"\n```\n\nThis plain prose tail uses the selectable streaming presentation."
                 let root = MotionRenderFixture(input: input, baseline: baseline).frame(width: width).environment(\.colorScheme, dark ? .dark : .light)
                 let host = NSHostingView(rootView: root)
                 host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
@@ -91,7 +91,7 @@ private struct MotionRenderFixture: View {
     input.visible = false; await Task.yield()
     try phase("hidden-component"); try await Task.sleep(for: .seconds(3))
     try phase("end")
-    let result: [String: Any] = ["mode": mode, "iterations": 240, "proposedCadenceMilliseconds": 42,
+    let result: [String: Any] = ["mode": mode, "iterations": 240, "fixtureLayoutCadenceMilliseconds": 42,
         "hostedLayoutMillisecondsMedian": latencies.sorted()[latencies.count / 2], "hostedLayoutMillisecondsMax": latencies.max() ?? 0,
         "scope": "headless NSHostingView; not window compositor, scrolling or whole-app responsiveness"]
     try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: motionEvidence.appendingPathComponent("hosted-\(mode)-layout.json"))

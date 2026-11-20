@@ -1,0 +1,103 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+[2/25] Compiling GatorCore NativeTaskReview.swift
+[3/25] Compiling GatorCore NativeTranscriptSearch.swift
+[4/27] Compiling GatorCore NativeRecovery.swift
+[5/27] Compiling GatorCore NativeRecoveryPreparation.swift
+[6/27] Compiling GatorCore NativeDraftStore.swift
+[7/27] Compiling GatorCore NativeMessageContent.swift
+[8/27] Compiling GatorCore NativePlanExecution.swift
+[9/27] Compiling GatorCore NativeProviderProtocol.swift
+[10/27] Compiling GatorCore NativeProviderSetup.swift
+[11/27] Compiling GatorCore NativeCatalogProtocol.swift
+[12/27] Compiling GatorCore NativeConversationCatalog.swift
+[13/27] Compiling GatorCore NativeDraftAttachments.swift
+[14/27] Compiling GatorCore NativeUploadStore.swift
+[15/27] Compiling GatorCore NativeWorkspaceSelection.swift
+[16/27] Compiling GatorCore GoBridgeConnection.swift
+[17/27] Compiling GatorCore ManagedSessionCoordinator.swift
+[18/27] Compiling GatorCore ManagedSessionProtocol.swift
+[19/27] Emitting module GatorCore
+[20/27] Compiling GatorCore BridgePipeIO.swift
+[21/27] Compiling GatorCore BridgeProtocol.swift
+[22/27] Compiling GatorCore GatorApplicationState.swift
+[23/97] Compiling GatorMac NativeReadingPositions.swift
+[24/97] Compiling GatorMac NativeStatusMessage.swift
+[25/97] Compiling GatorMac NativeStreamingPresentation.swift
+[26/97] Compiling GatorMac NativeStreamingReveal.swift
+[27/97] Compiling GatorMac NativeThinkingPulse.swift
+[28/102] Compiling GatorMac NativeDropInput.swift
+[29/102] Compiling GatorMac NativeErrorDisclosure.swift
+[30/102] Compiling GatorMac NativeMascotModel.swift
+[31/102] Compiling GatorMac NativeMascotPlayback.swift
+[32/102] Compiling GatorMac NativeMascotPreferences.swift
+[33/102] Emitting module GatorMac
+[34/102] Compiling GatorMac NativeMascotView.swift
+[35/102] Compiling GatorMac NativeMessageBody.swift
+[36/102] Compiling GatorMac NativeMotionPresentation.swift
+[37/102] Compiling GatorMac NativeMotionVisibility.swift
+[38/102] Compiling GatorMac NativeProviderSecretEntry.swift
+[39/102] Compiling GatorMac NativeAccessibilityStatus.swift
+[40/102] Compiling GatorMac NativeAttachmentActions.swift
+[41/102] Compiling GatorMac NativeComposer.swift
+[42/102] Compiling GatorMac NativeComposerPresentation.swift
+[43/102] Compiling GatorMac NativeDesktopPet.swift
+[44/102] Compiling GatorMac ExactDecisionButton.swift
+[45/102] Compiling GatorMac ExactReviewContent.swift
+[46/102] Compiling GatorMac GatorApp.swift
+[47/102] Compiling GatorMac MenuBarVisibilityToggle.swift
+[48/102] Compiling GatorMac NativeAcceptanceDiagnostics.swift
+[49/102] Compiling GatorMac NativeTranscriptFind.swift
+[50/102] Compiling GatorMac NativeWindowConfiguration.swift
+[51/102] Compiling GatorMac NativeWorkspacePicker.swift
+[52/102] Compiling GatorMac NotchQuickAccess.swift
+[53/102] Compiling GatorMac PlanReviewContent.swift
+[54/102] Emitting module GatorCoreTests
+[69/106] Compiling GatorMac ConversationView.swift
+[82/106] Compiling GatorMac AppDelegate.swift
+[83/106] Compiling GatorMac ApprovalReviewView.swift
+[84/106] Compiling GatorMac AttachmentSelectionView.swift
+[85/106] Compiling GatorMac ComposerView.swift
+[86/106] Compiling GatorMac ConversationCatalogView.swift
+[87/106] Compiling GatorCoreTests PresenceApprovalClosureTests.swift
+[88/106] Compiling GatorCoreTests RecoveryPreparationIntegrationTests.swift
+[89/106] Compiling GatorCoreTests RecoveryPreparationTests.swift
+[90/106] Compiling GatorCoreTests resource_bundle_accessor.swift
+[91/106] Compiling GatorMac ProviderSetupView.swift
+[92/106] Compiling GatorMac RecentConversationsMenu.swift
+[93/106] Compiling GatorMac RecoveryInspectorContent.swift
+[94/106] Compiling GatorMac RecoveryPreparationView.swift
+[95/106] Compiling GatorMac TaskInspectorView.swift
+[101/105] Linking GatorMac
+[102/105] Applying GatorMac
+[104/116] Compiling GatorMacTests NativeUIUXRemediationTests.swift
+[105/116] Compiling GatorMacTests NativeWorkspacePickerTests.swift
+[106/116] Compiling GatorMacTests NativeTranscriptFindTests.swift
+[107/116] Compiling GatorMacTests NativeStreamingTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:147:87: error: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+145 | @Test @MainActor func streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() async {
+146 |     let positions = NativeReadingPositions(); positions.remember("A", anchor: "row-9", following: false)
+147 |     var model: NativeStreamingPresentation? = NativeStreamingPresentation(); weak var probe = model
+    |                                                                                       `- error: weak variable 'probe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+148 |     model?.receive(motionEntry("One"), policy: .init(), now: 1)
+149 |     model?.receive(motionEntry("One two three four five"), policy: .init(), now: 2)
+
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeStreamingTests.swift:190:14: error: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+188 | @Test @MainActor func streamingVisibilityProbeHasNoFocusAndReleasesObservers() {
+189 |     var probe: NativeMotionVisibility.Probe? = .init(update: { _ in })
+190 |     weak var weakProbe = probe
+    |              `- error: weak variable 'weakProbe' was never mutated; consider changing to 'let' constant [#WeakMutability]
+191 |     probe?.viewDidMoveToWindow(); #expect(probe?.acceptsFirstResponder == false)
+192 |     probe?.detach(); probe = nil; #expect(weakProbe == nil)
+
+[#WeakMutability]: <https://docs.swift.org/compiler/documentation/diagnostics/weak-mutability>
+[108/117] Compiling GatorMacTests NotchGeometryTests.swift
+[109/117] Compiling GatorMacTests NativeMascotTests.swift
+[110/117] Compiling GatorMacTests NativeMotionGoTests.swift
+[111/117] Compiling GatorMacTests NativeMotionRenderTests.swift
+[112/117] Compiling GatorMacTests NativeProviderSecretEntryTests.swift
+[113/117] Emitting module GatorMacTests
+[114/117] Compiling GatorMacTests NativeDesktopPetTests.swift
+[115/117] Compiling GatorMacTests NativeInputTests.swift
+error: fatalError

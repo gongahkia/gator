@@ -1,0 +1,8 @@
+{
+  "fixtureLayoutCadenceMilliseconds" : 42,
+  "hostedLayoutMillisecondsMax" : 27.25825,
+  "hostedLayoutMillisecondsMedian" : 3.6633330000000002,
+  "iterations" : 240,
+  "mode" : "after",
+  "scope" : "headless NSHostingView; not window compositor, scrolling or whole-app responsiveness"
+}

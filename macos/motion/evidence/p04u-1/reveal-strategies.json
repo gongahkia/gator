@@ -1,182 +1,200 @@
 [
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "sparse",
     "iterations" : 10,
     "largestBacklogGraphemes" : 41,
+    "maximumCompletionMicroseconds" : 1.8340000000000001,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 81,
-    "wallMilliseconds" : 0.39720899999999998
+    "wallMilliseconds" : 0.421958
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "normal",
     "iterations" : 10,
     "largestBacklogGraphemes" : 1321,
+    "maximumCompletionMicroseconds" : 25.125,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 1441,
-    "wallMilliseconds" : 8.5955829999999995
+    "wallMilliseconds" : 9.6564580000000007
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "fast",
     "iterations" : 10,
     "largestBacklogGraphemes" : 2000,
+    "maximumCompletionMicroseconds" : 33.75,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 2001,
-    "wallMilliseconds" : 10.066041999999999
+    "wallMilliseconds" : 11.722958999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "burst",
     "iterations" : 10,
     "largestBacklogGraphemes" : 1680,
+    "maximumCompletionMicroseconds" : 20,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 1681,
-    "wallMilliseconds" : 0.34604200000000002
+    "wallMilliseconds" : 0.65312499999999996
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "CJK",
     "iterations" : 10,
     "largestBacklogGraphemes" : 991,
+    "maximumCompletionMicroseconds" : 40.915999999999997,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 1081,
-    "wallMilliseconds" : 9.3134589999999999
+    "wallMilliseconds" : 13.007999999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "long-bypass",
     "iterations" : 10,
     "largestBacklogGraphemes" : 0,
+    "maximumCompletionMicroseconds" : 149.042,
     "pendingAfterCompletion" : 0,
     "strategy" : "character",
     "ticks" : 0,
-    "wallMilliseconds" : 3.3344580000000001
+    "wallMilliseconds" : 4.7827080000000004
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "sparse",
     "iterations" : 10,
     "largestBacklogGraphemes" : 3,
+    "maximumCompletionMicroseconds" : 1.0409999999999999,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 42,
-    "wallMilliseconds" : 17.030041000000001
+    "wallMilliseconds" : 21.399833000000001
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "normal",
     "iterations" : 10,
     "largestBacklogGraphemes" : 727,
+    "maximumCompletionMicroseconds" : 9.8330000000000002,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 242,
-    "wallMilliseconds" : 49.004666
+    "wallMilliseconds" : 49.299374999999998
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "fast",
     "iterations" : 10,
     "largestBacklogGraphemes" : 2000,
+    "maximumCompletionMicroseconds" : 12.125,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 302,
-    "wallMilliseconds" : 60.499000000000002
+    "wallMilliseconds" : 58.480958999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "burst",
     "iterations" : 10,
     "largestBacklogGraphemes" : 1680,
+    "maximumCompletionMicroseconds" : 10.041,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 282,
-    "wallMilliseconds" : 50.517457999999998
+    "wallMilliseconds" : 50.117750000000001
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "CJK",
     "iterations" : 10,
     "largestBacklogGraphemes" : 903,
+    "maximumCompletionMicroseconds" : 20.582999999999998,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 542,
-    "wallMilliseconds" : 1028.8772919999999
+    "wallMilliseconds" : 904.36970799999995
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "long-bypass",
     "iterations" : 10,
     "largestBacklogGraphemes" : 0,
+    "maximumCompletionMicroseconds" : 101.834,
     "pendingAfterCompletion" : 0,
     "strategy" : "word",
     "ticks" : 0,
-    "wallMilliseconds" : 3.320125
+    "wallMilliseconds" : 3.3240419999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "sparse",
     "iterations" : 10,
     "largestBacklogGraphemes" : 2,
+    "maximumCompletionMicroseconds" : 0.70799999999999996,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
     "ticks" : 41,
-    "wallMilliseconds" : 10.802834000000001
+    "wallMilliseconds" : 10.508584000000001
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "normal",
     "iterations" : 10,
-    "largestBacklogGraphemes" : 25,
+    "largestBacklogGraphemes" : 19,
+    "maximumCompletionMicroseconds" : 9.125,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
-    "ticks" : 123,
-    "wallMilliseconds" : 27.312166999999999
+    "ticks" : 121,
+    "wallMilliseconds" : 24.534167
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "fast",
     "iterations" : 10,
     "largestBacklogGraphemes" : 2000,
+    "maximumCompletionMicroseconds" : 12.167,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
-    "ticks" : 19,
-    "wallMilliseconds" : 10.737208000000001
+    "ticks" : 18,
+    "wallMilliseconds" : 10.278124999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "burst",
     "iterations" : 10,
     "largestBacklogGraphemes" : 1680,
+    "maximumCompletionMicroseconds" : 10,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
     "ticks" : 5,
-    "wallMilliseconds" : 3.1630419999999999
+    "wallMilliseconds" : 3.0141249999999999
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "CJK",
     "iterations" : 10,
-    "largestBacklogGraphemes" : 46,
+    "largestBacklogGraphemes" : 20,
+    "maximumCompletionMicroseconds" : 20.582999999999998,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
-    "ticks" : 95,
-    "wallMilliseconds" : 192.14895799999999
+    "ticks" : 91,
+    "wallMilliseconds" : 153.76708300000001
   },
   {
-    "cadenceMilliseconds" : 42,
+    "cadenceMilliseconds" : 66,
     "fixture" : "long-bypass",
     "iterations" : 10,
     "largestBacklogGraphemes" : 0,
+    "maximumCompletionMicroseconds" : 95.792000000000002,
     "pendingAfterCompletion" : 0,
     "strategy" : "adaptive",
     "ticks" : 0,
-    "wallMilliseconds" : 3.3509169999999999
+    "wallMilliseconds" : 3.2240000000000002
   }
 ]

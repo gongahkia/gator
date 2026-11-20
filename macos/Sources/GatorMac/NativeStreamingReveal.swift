@@ -4,7 +4,8 @@ import NaturalLanguage
 /// Bounded presentation cursor. It never owns a transport, draft or execution.
 struct NativeStreamingReveal {
     enum Strategy: String, CaseIterable { case character, word, adaptive }
-    static let cadence: Duration = .milliseconds(42)
+    static let cadenceMilliseconds = 66
+    static let cadence: Duration = .milliseconds(cadenceMilliseconds)
     static let maximumCharacters = 8_192
     static let maximumBacklog = 2_048
     private(set) var source = ""
@@ -62,7 +63,7 @@ struct NativeStreamingReveal {
         switch strategy {
         case .character: budget = 1
         case .word: budget = 1
-        case .adaptive: budget = max(2, (pending + 4) / 5, Int(min(512, arrivalRate * 0.063)))
+        case .adaptive: budget = max(2, (pending + 4) / 5, Int(min(512, arrivalRate * Double(Self.cadenceMilliseconds) / 1000 * 1.5)))
         }
         budget = min(pending, budget)
         if strategy != .character {

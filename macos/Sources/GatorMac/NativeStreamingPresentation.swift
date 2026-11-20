@@ -49,7 +49,10 @@ struct NativeStreamingTextView: View {
             } else {
                 ForEach(presentation.blocks) { block in
                     if presentation.revealsTail && block.id == presentation.blocks.last?.id {
-                        NativeStreamingProse(cursor: presentation.cursor, response: entry.text)
+                        let cursor = presentation.cursor
+                        (Text(cursor.source[..<cursor.enteringIndex]) +
+                         Text(cursor.source[cursor.enteringIndex..<cursor.visibleIndex]).foregroundColor(.primary.opacity(0.88)))
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityLabel(Text(verbatim: block.text))
                     } else { NativeMessageBlockView(block: block).equatable() }
                 }

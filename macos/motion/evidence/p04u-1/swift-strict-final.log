@@ -1,0 +1,158 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version--58304C5D6DBC2206.txt
+[3/6] Emitting module GatorMacTests
+[4/6] Compiling GatorMacTests NativeStreamingTests.swift
+[5/8] Emitting module GatorNativePackageTests
+[6/8] Compiling GatorNativePackageTests runner.swift
+[6/8] Write Objects.LinkFileList
+[7/8] Linking GatorNativePackageTests
+Build complete! (2.36s)
+Test Suite 'Selected tests' started at 2026-11-20 16:24:46.747.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 16:24:46.748.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 16:24:46.748.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 16:24:46.748.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() started.
+✔ Test approvalGuardsExactIdentityAndNeverReplaysOnDisconnect() passed after 0.020 seconds.
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.010 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() started.
+✔ Test meaningfulSnapshotsStillPublishAndExpireExactReviewsAfterSpinnerTicks() passed after 0.007 seconds.
+◇ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() started.
+✔ Test identicalStateCanReconnectWithoutLosingTheOwnerGenerationGuard() passed after 0.007 seconds.
+◇ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() started.
+P04E1R2_HEADLESS_PENDING owner=work-20261120T082447-d06757d25b7c7f08 generation=431CC482-E883-4F31-8497-FC8985DDBD20 interaction=1 callbacks=0 durablePendingUnchanged=true shutdown=true nativeDesktopCycle=false
+✔ Test realGoSpinnerOnlySnapshotsKeepExactPendingReviewUndecided() passed after 0.685 seconds.
+◇ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() started.
+✔ Test realGoPresentationNavigationAndShutdownDoNotDecidePendingApproval() passed after 1.776 seconds.
+◇ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() started.
+✔ Test desktopPetPlacementUsesExistingExpandedNotchEnvelope() passed after 0.001 seconds.
+◇ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() started.
+✔ Test desktopPetGeometryHandlesNegativeOriginsAndMissingDisplays() passed after 0.001 seconds.
+◇ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() started.
+✔ Test desktopPetDefaultsOffAndDoesNotReadAnOwnerOrCreateAPresentation() passed after 0.020 seconds.
+◇ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() started.
+✔ Test desktopPetSettingsPersistSeparatelyFromInChatVisibility() passed after 0.001 seconds.
+◇ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() started.
+✔ Test desktopPetUsesOneSurfaceAndOnlyTheSelectedOwnersPublicSignal() passed after 0.002 seconds.
+◇ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() started.
+✔ Test desktopPetSharesStyleAndStaticPreferenceWithoutReadingChatVisibility() passed after 0.001 seconds.
+◇ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() started.
+✔ Test desktopPetTuckPersistsAndCannotBeUndoneByStateOrWake() passed after 0.001 seconds.
+◇ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() started.
+✔ Test desktopPetClosingAndStopReleaseTheSurfaceWithoutChangingEnablePreference() passed after 0.001 seconds.
+◇ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() started.
+✔ Test desktopPetDisplayFallbackDoesNotOverwriteTheChosenIdentity() passed after 0.001 seconds.
+◇ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() started.
+✔ Test desktopPetObservationUpdatesAfterCurrentOwnerReplacement() passed after 0.001 seconds.
+◇ Test desktopPetRepeatedTuckReleasesItsPresentation() started.
+✔ Test desktopPetRepeatedTuckReleasesItsPresentation() passed after 0.022 seconds.
+◇ Test desktopPetSleepAndWakeRespectThePersistedEnableState() started.
+✔ Test desktopPetSleepAndWakeRespectThePersistedEnableState() passed after 0.001 seconds.
+◇ Test desktopPresenceOffStopsOverlayWithoutReenablingOrClearingVisibilityChoices() started.
+✔ Test desktopPresenceOffStopsOverlayWithoutReenablingOrClearingVisibilityChoices() passed after 0.001 seconds.
+◇ Test mascotStatePrecedenceAndOwnerReplacement() started.
+✔ Test mascotStatePrecedenceAndOwnerReplacement() passed after 0.001 seconds.
+◇ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() started.
+✔ Test mascotDoesNotCelebrateUnconfirmedOrFailedWork() passed after 0.001 seconds.
+◇ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() started.
+✔ Test mascotProjectionReadsOnlyPublicSelectedOwnerContent() passed after 0.001 seconds.
+◇ Test mascotCompletionRequiresCanonicalFinishedOutcome() started.
+✔ Test mascotCompletionRequiresCanonicalFinishedOutcome() passed after 0.001 seconds.
+◇ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() started.
+✔ Test mascotProjectionDoesNotStartAnOwnerOrMutateItsDraft() passed after 0.001 seconds.
+◇ Test mascotCollapseDoesNotMutateReadingAnchors() started.
+✔ Test mascotCollapseDoesNotMutateReadingAnchors() passed after 0.001 seconds.
+◇ Test presenceModesAndEmojiAreNativeAndDoNotOfferLegacyArt() started.
+✔ Test presenceModesAndEmojiAreNativeAndDoNotOfferLegacyArt() passed after 0.001 seconds.
+◇ Test presenceMigrationPreservesOffAnimationTuckAndObsoleteStyle() started.
+✔ Test presenceMigrationPreservesOffAnimationTuckAndObsoleteStyle() passed after 0.001 seconds.
+◇ Test presenceUsesLatestConfirmedFailureInsteadOfOlderSuccess() started.
+✔ Test presenceUsesLatestConfirmedFailureInsteadOfOlderSuccess() passed after 0.001 seconds.
+◇ Test presenceReactionRevisionRequiresNewSelectedOwnerEvidence() started.
+✔ Test presenceReactionRevisionRequiresNewSelectedOwnerEvidence() passed after 0.001 seconds.
+◇ Test presenceSmallStableSlotsPreserveExactReadingAnchors() started.
+✔ Test presenceSmallStableSlotsPreserveExactReadingAnchors() passed after 0.001 seconds.
+◇ Test presenceGIFBoundsCacheAndAlpha() started.
+✔ Test presenceGIFBoundsCacheAndAlpha() passed after 0.003 seconds.
+◇ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() started.
+✔ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() passed after 0.001 seconds.
+◇ Test presenceStaticReduceMotionAndOffNeverDecodeAnAsset() started.
+✔ Test presenceStaticReduceMotionAndOffNeverDecodeAnAsset() passed after 0.001 seconds.
+◇ Test presenceOwnerSwitchStateChangeAndStaleDecodeCannotReplay() started.
+✔ Test presenceOwnerSwitchStateChangeAndStaleDecodeCannotReplay() passed after 0.001 seconds.
+◇ Test presenceMissingAndEmptyGIFsKeepNativeEmojiFallback() started.
+✔ Test presenceMissingAndEmptyGIFsKeepNativeEmojiFallback() passed after 0.001 seconds.
+◇ Test presenceRepeatedLifetimesAndCanvasNeverTakeFocus() started.
+✔ Test presenceRepeatedLifetimesAndCanvasNeverTakeFocus() passed after 0.030 seconds.
+◇ Test presenceProductionHasNoOldArtLoadingOrExecutionCapability() started.
+✔ Test presenceProductionHasNoOldArtLoadingOrExecutionCapability() passed after 0.006 seconds.
+◇ Test presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() started.
+✔ Test presenceReduceMotionStyleOffAndStateChangesCancelAnInFlightReaction() passed after 0.002 seconds.
+◇ Test presenceWritingRequiresAnActivePublicTextEntryAndEndsWhenGoClosesIt() started.
+✔ Test presenceWritingRequiresAnActivePublicTextEntryAndEndsWhenGoClosesIt() passed after 0.001 seconds.
+◇ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() started.
+✔ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() passed after 0.710 seconds.
+◇ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() started.
+✔ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() passed after 0.057 seconds.
+◇ Test streamingNativeComponentEvidenceCapture() started.
+✔ Test streamingNativeComponentEvidenceCapture() passed after 0.003 seconds.
+◇ Test streamingHostedPresentationResourceTrial() started.
+✔ Test streamingHostedPresentationResourceTrial() passed after 0.001 seconds.
+◇ Test streamingGraphemesNeverSplitDuringReveal() started.
+✔ Test streamingGraphemesNeverSplitDuringReveal() passed after 0.006 seconds.
+◇ Test streamingProviderDeltaCanExtendPreviousGrapheme() started.
+✔ Test streamingProviderDeltaCanExtendPreviousGrapheme() passed after 0.001 seconds.
+◇ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() started.
+✔ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() passed after 0.011 seconds.
+◇ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() started.
+✔ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() passed after 0.001 seconds.
+◇ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() started.
+✔ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() passed after 0.001 seconds.
+◇ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() started.
+✔ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() passed after 0.001 seconds.
+◇ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() started.
+✔ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() passed after 0.001 seconds.
+◇ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() started.
+✔ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() passed after 0.001 seconds.
+◇ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() started.
+✔ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() passed after 0.001 seconds.
+◇ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() started.
+✔ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() passed after 0.001 seconds.
+◇ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() started.
+✔ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() passed after 0.001 seconds.
+◇ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() started.
+✔ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() passed after 0.001 seconds.
+◇ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() started.
+✔ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() passed after 0.001 seconds.
+◇ Test streamingRepeatedIndependentPresentationsCancelAllTasks() started.
+✔ Test streamingRepeatedIndependentPresentationsCancelAllTasks() passed after 0.004 seconds.
+◇ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() started.
+✔ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() passed after 0.001 seconds.
+◇ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() started.
+✔ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() passed after 0.001 seconds.
+◇ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() started.
+✔ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() passed after 0.001 seconds.
+◇ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() started.
+✔ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() passed after 0.001 seconds.
+◇ Test streamingPulseContrastRemainsReadableInNativeAppearances() started.
+✔ Test streamingPulseContrastRemainsReadableInNativeAppearances() passed after 0.001 seconds.
+◇ Test streamingOwnerReplacementCancelsPreviousCadenceImmediately() started.
+✔ Test streamingOwnerReplacementCancelsPreviousCadenceImmediately() passed after 0.001 seconds.
+◇ Test streamingEquatableMarkdownDoesNotHideMeaningfulUnicodeReplacement() started.
+✔ Test streamingEquatableMarkdownDoesNotHideMeaningfulUnicodeReplacement() passed after 0.001 seconds.
+◇ Test streamingEmptyActivityDisclosureIsSuppressedWithoutHidingTools() started.
+✔ Test streamingEmptyActivityDisclosureIsSuppressedWithoutHidingTools() passed after 0.001 seconds.
+◇ Test streamingTwoPresentationsCannotCreateGoOwnersOrAdmitWork() started.
+✔ Test streamingTwoPresentationsCannotCreateGoOwnersOrAdmitWork() passed after 0.001 seconds.
+◇ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() started.
+✔ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() passed after 0.001 seconds.
+✔ Test run with 68 tests in 0 suites passed after 3.415 seconds.

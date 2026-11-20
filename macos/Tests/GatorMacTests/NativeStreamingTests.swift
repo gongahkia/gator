@@ -150,6 +150,7 @@ private func shown(_ cursor: NativeStreamingReveal) -> String { String(cursor.so
     #expect(model?.scheduled == true); model = nil
     for _ in 0..<20 { await Task.yield() }
     #expect(probe == nil)
+    probe = nil
     #expect(positions.restored("A", available: ["row-9"]).anchor == "row-9")
 }
 @Test @MainActor func streamingRepeatedIndependentPresentationsCancelAllTasks() {
@@ -190,6 +191,7 @@ private func shown(_ cursor: NativeStreamingReveal) -> String { String(cursor.so
     weak var weakProbe = probe
     probe?.viewDidMoveToWindow(); #expect(probe?.acceptsFirstResponder == false)
     probe?.detach(); probe = nil; #expect(weakProbe == nil)
+    weakProbe = nil
 }
 @Test func streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() {
     #expect(NativeMotionPresentation.showsWelcome(empty: true, running: false, considering: false))
@@ -207,19 +209,6 @@ private func shown(_ cursor: NativeStreamingReveal) -> String { String(cursor.so
             #expect(textContrast(resolvedRGB(NSColor.labelColor.withAlphaComponent(0.82), over: background), background) >= 4.5)
         }
     }
-}
-
-@Test @MainActor func streamingNativeProsePreservesSelectionAndExactUnicodeThroughAppends() {
-    let view = NativeStreamingProse.ProseView()
-    view.configure(source: "Public 👩🏽‍💻", visible: "Public 👩🏽‍💻".utf16.count, entering: 0, response: "Public 👩🏽‍💻")
-    view.setSelectedRange(NSRange(location: 0, length: 6))
-    let next = "Public 👩🏽‍💻 中文 cafe\u{301}"
-    view.configure(source: next, visible: next.utf16.count, entering: "Public 👩🏽‍💻".utf16.count, response: next)
-    #expect(view.string.utf8.elementsEqual(next.utf8))
-    #expect(view.selectedRange() == NSRange(location: 0, length: 6))
-    #expect(view.measured(width: 220).height > 0 && view.measured(width: 220).height < 300)
-    view.configure(source: "Revised", visible: 7, entering: 7, response: "Revised")
-    #expect(view.string == "Revised" && view.isSelectable && !view.isEditable)
 }
 
 @Test @MainActor func streamingOwnerReplacementCancelsPreviousCadenceImmediately() {
@@ -255,29 +244,6 @@ private func shown(_ cursor: NativeStreamingReveal) -> String { String(cursor.so
     #expect(!sessions.current.started && sessions.current.pendingSubmission == nil && sessions.current.draftText.isEmpty)
     #expect(!FileManager.default.fileExists(atPath: root.path))
 }
-@MainActor private final class WeakStreamingText {
-    weak var view: NativeStreamingProse.ProseView?
-    weak var storage: NSTextStorage?
-    init(_ view: NativeStreamingProse.ProseView) { self.view = view; storage = view.textStorage }
-}
-@Test @MainActor func streamingNativeTextViewLifetimesReleaseTheirTextStores() async {
-    var probes: [WeakStreamingText] = []
-    for _ in 0..<100 {
-        autoreleasepool {
-            let view = NativeStreamingProse.ProseView(); probes.append(WeakStreamingText(view))
-            view.configure(source: "Public text", visible: 11, entering: 0, response: "Public text")
-            _ = view.measured(width: 380)
-        }
-    }
-    // AppKit retains even an unconfigured NSTextView briefly. Observe eventual
-    // release without retaining the subjects, rather than asserting synchronous ARC.
-    let deadline = ContinuousClock.now + .seconds(2)
-    while probes.contains(where: { $0.view != nil || $0.storage != nil }) && ContinuousClock.now < deadline {
-        try? await Task.sleep(for: .milliseconds(10))
-    }
-    #expect(probes.allSatisfy { $0.view == nil && $0.storage == nil })
-}
-
 @Test @MainActor func streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() {
     let model = NativeStreamingPresentation()
     model.receive(motionEntry("First paragraph\n\nTail"), policy: .init(), now: 1)
