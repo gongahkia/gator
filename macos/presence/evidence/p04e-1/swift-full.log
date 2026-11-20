@@ -50,4 +50,84 @@ GATOR_SAFETY_SHUTDOWN mode=both elapsed=0.303338416 seconds
 ◇ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() started.
 ✔ Test safetyUnexpectedDirectExitIsDetectedDespiteInheritedStdoutAndStderr() passed after 0.662 seconds.
 ◇ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() started.
-✔ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenT
+✔ Test safetyPartialFrameAtExitRemainsUnconfirmedEvenThoughProcessIsReaped() passed after 0.413 seconds.
+◇ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() started.
+✔ Test safetyConcurrentShutdownSharesOneExitAndResourceCleanup() passed after 0.431 seconds.
+◇ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() started.
+✔ Test safetyOwnerTerminationWhileStreamingReapsAndReleasesReaderTasks() passed after 0.337 seconds.
+◇ Test safetyIndependentOwnersCanShutDownConcurrently() started.
+✔ Test safetyIndependentOwnersCanShutDownConcurrently() passed after 1.324 seconds.
+◇ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() started.
+✔ Test realGoBridgeSubmitsStreamsRestoresAndPreservesDraft() passed after 0.891 seconds.
+◇ Test subprocessAcknowledgementExitAndCleanup() started.
+✔ Test subprocessAcknowledgementExitAndCleanup() passed after 0.191 seconds.
+◇ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() started.
+✔ Test shutdownEscalatesEvenWhenAFullInputPipeBlocksWrites() passed after 5.489 seconds.
+◇ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() started.
+✔ Test realGoUnexpectedExitAndExplicitReconnectPreserveIdentityWithoutReplay() passed after 0.234 seconds.
+◇ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() started.
+✔ Test shutdownOfExternallyKilledOwnerDoesNotBlockFoundationExitNotification() passed after 0.199 seconds.
+◇ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() started.
+✔ Test actualGoManagedDialogueKeepsMainWorkIndependentAndRetainsChildResult() passed after 2.373 seconds.
+◇ Test managedSurfacesShareCoordinatorAndSwitchingReusesOriginalOwnerWithDrafts() started.
+✔ Test managedSurfacesShareCoordinatorAndSwitchingReusesOriginalOwnerWithDrafts() passed after 0.175 seconds.
+◇ Test transitionsAreSerializedAndFailedFocusRestoresOriginalExecution() started.
+✔ Test transitionsAreSerializedAndFailedFocusRestoresOriginalExecution() passed after 2.206 seconds.
+◇ Test hostSequencesAreDeduplicatedAndStaleNavigationCannotStealFocus() started.
+✔ Test hostSequencesAreDeduplicatedAndStaleNavigationCannotStealFocus() passed after 0.132 seconds.
+◇ Test dispatchBootstrapsExactChildOnceAndRoutesAllControlsWithoutMovingFocus() started.
+✔ Test dispatchBootstrapsExactChildOnceAndRoutesAllControlsWithoutMovingFocus() passed after 0.193 seconds.
+◇ Test uncertainBootstrapIsReportedAndNeverReplayedOrEvicted() started.
+✔ Test uncertainBootstrapIsReportedAndNeverReplayedOrEvicted() passed after 0.166 seconds.
+◇ Test staleControlsAndUnknownDispatchReturnErrorsWithoutAlternativeTargets() started.
+✔ Test staleControlsAndUnknownDispatchReturnErrorsWithoutAlternativeTargets() passed after 0.119 seconds.
+◇ Test lateAdmissionStaysWithOriginalDraftAndDisconnectDoesNotAffectOthers() started.
+✔ Test lateAdmissionStaysWithOriginalDraftAndDisconnectDoesNotAffectOthers() passed after 0.266 seconds.
+◇ Test capacityNeverEvictsBusyOrReviewOwnersAndWorkingLimitIsAuthoritative() started.
+✔ Test capacityNeverEvictsBusyOrReviewOwnersAndWorkingLimitIsAuthoritative() passed after 0.411 seconds.
+◇ Test backgroundCompletionAndApprovalAttentionNeverStealSelectionOrTokens() started.
+✔ Test backgroundCompletionAndApprovalAttentionNeverStealSelectionOrTokens() passed after 0.214 seconds.
+◇ Test failedOwnerStartupAndBootstrapCreationDoNotCancelOriginalOrReplay() started.
+✔ Test failedOwnerStartupAndBootstrapCreationDoNotCancelOriginalOrReplay() passed after 0.124 seconds.
+◇ Test localRevisionUsesOriginalOwnerTaskAndForegroundStopNeverTargetsBackground() started.
+✔ Test localRevisionUsesOriginalOwnerTaskAndForegroundStopNeverTargetsBackground() passed after 0.147 seconds.
+◇ Test independentUncertainAdmissionsPersistTogetherAndRestartNeverReplaysEither() started.
+✔ Test independentUncertainAdmissionsPersistTogetherAndRestartNeverReplaysEither() passed after 0.379 seconds.
+◇ Test safetySixteenIndependentActorsPreserveEveryDistinctDraftAndSelection() started.
+✔ Test safetySixteenIndependentActorsPreserveEveryDistinctDraftAndSelection() passed after 0.187 seconds.
+◇ Test safetyCrossProcessTransactionsPreserveSixteenLoadedBeforeWriteSnapshots() started.
+✔ Test safetyCrossProcessTransactionsPreserveSixteenLoadedBeforeWriteSnapshots() passed after 7.987 seconds.
+◇ Test safetyStaleSameContextWritersFailInsteadOfReplacingNewerDrafts() started.
+✔ Test safetyStaleSameContextWritersFailInsteadOfReplacingNewerDrafts() passed after 0.036 seconds.
+◇ Test safetyFullSnapshotSaveMergesUnrelatedContextsAndRejectsStaleSelection() started.
+✔ Test safetyFullSnapshotSaveMergesUnrelatedContextsAndRejectsStaleSelection() passed after 0.003 seconds.
+◇ Test safetyUnrelatedWritesPreservePendingPlanRecoveryReceiptAndApprovalCorrectionIdentity() started.
+✔ Test safetyUnrelatedWritesPreservePendingPlanRecoveryReceiptAndApprovalCorrectionIdentity() passed after 0.003 seconds.
+◇ Test safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+◇ Test case passing 1 argument stage → .beforeReplace to safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+◇ Test case passing 1 argument stage → .afterReplace to safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) started.
+✔ Test safetyInterruptedReplacementKeepsCompleteArchiveAndReleasesProcessLock(_:) with 2 test cases passed after 0.040 seconds.
+◇ Test safetyFailedEncodingOrWriteCannotReplaceTheExistingArchive() started.
+✔ Test safetyFailedEncodingOrWriteCannotReplaceTheExistingArchive() passed after 0.006 seconds.
+◇ Test safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 1 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 2 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 3 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 4 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 5 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 6 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+◇ Test case passing 1 argument version → 7 to safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) started.
+✔ Test safetyEveryExistingArchiveVersionMigratesWithoutLosingLegacyPendingIdentity(_:) with 7 test cases passed after 0.009 seconds.
+◇ Test safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+◇ Test case passing 1 argument text → "{broken" to safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+◇ Test case passing 1 argument text → "{"version":99,"selectedConversationID":"","drafts":{}}" to safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) started.
+✔ Test safetyEveryEntryPointProtectsCorruptAndFutureArchives(_:) with 2 test cases passed after 0.003 seconds.
+◇ Test realGoLostAttachmentAdmissionRetainsOriginalIdentityAndNeverReplaysAfterRestart() started.
+✔ Test realGoLostAttachmentAdmissionRetainsOriginalIdentityAndNeverReplaysAfterRestart() passed after 1.069 seconds.
+◇ Test attachmentDraftsShareSurfacesRemainOwnerScopedAndRestoreAcrossRestart() started.
+✔ Test attachmentDraftsShareSurfacesRemainOwnerScopedAndRestoreAcrossRestart() passed after 0.153 seconds.
+◇ Test attachmentAdmissionRequiresExactResultAndPreservesNewerDraftAndFiles() started.
+✔ Test attachmentAdmissionRequiresExactResultAndPreservesNewerDraftAndFiles() passed after 0.294 seconds.
+◇ Test missingAndRejectedUploadsRemainRepairableAndUncertainRequestsNeverReplay() started.
+✔ Test missingAndRejectedUploadsRemainRepairableAndUncertainRequestsNeverReplay() passed after 0.543 seconds.
+◇ Test cancelledOrStaleImpor
