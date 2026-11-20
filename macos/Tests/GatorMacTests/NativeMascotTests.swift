@@ -4,32 +4,8 @@ import Testing
 @testable import GatorMac
 @testable import GatorCore
 
-private var mascotAssetRoot: URL {
-    URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("mascot/2d/assets")
-}
-@Test func mascotOnlyOffersTheTwoSelectedAppearances() {
-    #expect(NativeMascotStyle.allCases.map(\.rawValue) == ["rendered","classic"])
-    #expect(NativeMascotStyle.allCases.map(\.label) == ["3D-rendered","Classic 2D"])
-    #expect(NativeMascotPreference.appearance("live-3d") == .rendered)
-}
-@Test @MainActor func mascotPreferencesPersistUsingNativeAppStorage() throws {
-    let name="gator.mascot.test."+UUID().uuidString
-    let defaults=try #require(UserDefaults(suiteName:name)); defer{defaults.removePersistentDomain(forName:name)}
-    struct Preferences {
-        @AppStorage var shown: Bool
-        @AppStorage var animated: Bool
-        @AppStorage var style: String
-        init(_ defaults: UserDefaults) {
-            _shown=AppStorage(wrappedValue:true,NativeMascotPreference.shown,store:defaults)
-            _animated=AppStorage(wrappedValue:true,NativeMascotPreference.animated,store:defaults)
-            _style=AppStorage(wrappedValue:NativeMascotStyle.rendered.rawValue,NativeMascotPreference.style,store:defaults)
-        }
-    }
-    let first=Preferences(defaults);#expect(first.shown && first.animated)
-    first.shown=false;first.animated=false;first.style="classic"
-    let reopened=Preferences(defaults)
-    #expect(!reopened.shown && !reopened.animated && reopened.style=="classic")
-    #expect((defaults.persistentDomain(forName:name) ?? [:]).keys.filter{$0.hasPrefix("gator.")}.sorted()==[NativeMascotPreference.animated,NativeMascotPreference.shown,NativeMascotPreference.style].sorted())
+private var presenceRoot: URL {
+    URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Presence")
 }
 @Test func mascotStatePrecedenceAndOwnerReplacement() {
     var state=NativeMascotStateMachine()
@@ -78,68 +54,171 @@ private var mascotAssetRoot: URL {
     #expect(NativeMascotStateMachine.collapsed(reading:false,reviewing:false,compact:false,height:480))
     #expect(!NativeMascotStateMachine.collapsed(reading:false,reviewing:false,compact:true,height:620))
 }
-@Test @MainActor func mascotReadingAnchorRemainsExactAcrossAppearanceChanges() {
-    let positions=NativeReadingPositions();positions.remember("A",anchor:"A:17",following:false)
-    for style in NativeMascotStyle.allCases {
-        _=NativeMascotRequest(owner:"A",style:style,expression:.working,animate:false)
-        #expect(positions.restored("A",available:["A:17","A:18"]).anchor=="A:17")
-        #expect(!positions.restored("A",available:["A:17"]).following)
+
+@Test func presenceModesAndEmojiAreNativeAndDoNotOfferLegacyArt() {
+    #expect(NativePresenceMode.allCases.map(\.label) == ["Emoji only", "Emoji + GIF reactions", "Off"])
+    for obsolete in ["rendered", "classic", "live-3d", "invalid"] { #expect(NativeMascotPreference.presence(obsolete) == .emoji) }
+    #expect(NativeMascotExpression.neutral.emoji == "🐊")
+    #expect(NativeMascotExpression.working.emoji == "⚙️")
+    #expect(NativeMascotExpression.responding.emoji == "📝")
+    #expect(NativeMascotExpression.failed.emoji == "⚠️")
+    #expect(NativeMascotExpression.attention.emoji == "👀")
+    #expect(NativeMascotExpression.completed.emoji == "✅")
+    #expect(NativeMascotExpression.disconnected.emoji == "🔌")
+}
+
+@Test @MainActor func presenceMigrationPreservesOffAnimationTuckAndObsoleteStyle() throws {
+    let name = "gator.presence.test." + UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: name)); defer { defaults.removePersistentDomain(forName: name) }
+    defaults.set(false, forKey: NativeMascotPreference.shown)
+    defaults.set(false, forKey: NativeMascotPreference.animated)
+    defaults.set(false, forKey: NativeDesktopPetPreference.shown)
+    defaults.set("classic", forKey: "gator.mascot.style")
+    let before = defaults.persistentDomain(forName: name)
+    #expect(NativeMascotPreference.presence(defaults.string(forKey: NativeMascotPreference.mode)) == .emoji)
+    #expect(defaults.persistentDomain(forName: name) as NSDictionary? == before as NSDictionary?)
+    struct Preferences {
+        @AppStorage var mode: String
+        @AppStorage var chat: Bool
+        @AppStorage var animated: Bool
+        init(_ defaults: UserDefaults) {
+            _mode = AppStorage(wrappedValue: NativePresenceMode.emoji.rawValue, NativeMascotPreference.mode, store: defaults)
+            _chat = AppStorage(wrappedValue: true, NativeMascotPreference.shown, store: defaults)
+            _animated = AppStorage(wrappedValue: true, NativeMascotPreference.animated, store: defaults)
+        }
+    }
+    let migrated = Preferences(defaults)
+    #expect(!migrated.chat && !migrated.animated && migrated.mode == "emoji")
+    for mode in NativePresenceMode.allCases {
+        migrated.mode = mode.rawValue
+        #expect(Preferences(try #require(UserDefaults(suiteName: name))).mode == mode.rawValue)
+        #expect(!defaults.bool(forKey: NativeDesktopPetPreference.shown))
+    }
+    #expect(defaults.string(forKey: "gator.mascot.style") == "classic")
+}
+
+@Test func presenceUsesLatestConfirmedFailureInsteadOfOlderSuccess() {
+    func message(_ state: String, _ run: String, _ date: String) -> BridgeMessage {
+        .init(id: run, value: .object(["run_id": .string(run), "activity": .object(["state": .string(state), "finished_at": .string(date)])]))
+    }
+    let signal = NativeMascotProjection.signal(snapshot: nil, messages: [message("completed", "old", "a"), message("failed", "new", "b")], owner: "A", connected: true, reviewing: false)
+    #expect(signal.completedRun.isEmpty && signal.failedRun == "new:b")
+    var state = NativeMascotStateMachine(); state.receive(signal)
+    #expect(state.expression == .failed)
+    state.receive(.init(owner: "A", connected: true, working: true, failedRun: "new:b")); #expect(state.expression == .working)
+    state.receive(.init(owner: "A", connected: true, attention: true, failedRun: "new:b")); #expect(state.expression == .attention)
+    let unconfirmed = NativeMascotProjection.signal(snapshot: nil, messages: [message("completed", "", "date"), message("failed", "new", "")], owner: "A", connected: true, reviewing: false)
+    #expect(unconfirmed.completedRun.isEmpty && unconfirmed.failedRun.isEmpty)
+}
+
+@Test func presenceReactionRevisionRequiresNewSelectedOwnerEvidence() {
+    var state = NativeMascotStateMachine()
+    state.receive(.init(owner: "A", connected: true, attention: true)); #expect(state.revision == 0)
+    state.receive(.init(owner: "A", connected: true))
+    state.receive(.init(owner: "A", connected: true, attention: true)); #expect(state.revision == 1)
+    state.receive(.init(owner: "B", connected: true, completedRun: "historical")); #expect(state.revision == 0 && state.expression == .neutral)
+    state.receive(.init(owner: "B", connected: true, completedRun: "confirmed-new")); #expect(state.revision == 1 && state.expression == .completed)
+    state.receive(.init(owner: "B", connected: true, completedRun: "confirmed-new")); #expect(state.revision == 1)
+}
+
+@Test @MainActor func presenceSmallStableSlotsPreserveExactReadingAnchors() {
+    let positions = NativeReadingPositions(); positions.remember("A", anchor: "A:17", following: false)
+    for compact in [false, true] {
+        let normal = NativePresenceLayout(compact: compact, collapsed: false)
+        let reading = NativePresenceLayout(compact: compact, collapsed: true)
+        #expect(normal.slot == reading.slot && normal.slot <= 48 && reading.size < normal.size)
+        for _ in NativePresenceMode.allCases {
+            #expect(positions.restored("A", available: ["A:17", "A:18"]).anchor == "A:17")
+            #expect(!positions.restored("A", available: ["A:17"]).following)
+        }
     }
 }
-@Test func mascotFrameCacheIsBoundedAndStaticDoesNotDecodeTheClip() async throws {
-    let store=NativeMascotFrameStore(root:mascotAssetRoot)
-    let still=try await store.load(style:.rendered,name:"working",animate:false,ticket:1)
-    #expect(still.images.count==1)
-    let motion=try await store.load(style:.classic,name:"working",animate:true,ticket:2)
-    #expect(motion.images.count==12 && motion.bytes<=NativeMascotFrameStore.maximumBytes)
-    #expect(await store.bytes==motion.bytes)
-    await store.clear(ticket:3);#expect(await store.bytes==0)
-    await #expect(throws:CancellationError.self){try await store.load(style:.rendered,name:"blink",animate:true,ticket:2)}
+
+@Test func presenceGIFBoundsCacheAndAlpha() async throws {
+    let store = NativeMascotFrameStore(root: presenceRoot)
+    for (index, name) in ["completed", "attention"].enumerated() {
+        let frames = try await store.load(name: name, ticket: index)
+        #expect(frames.images.count == 12 && frames.bytes <= NativeMascotFrameStore.maximumBytes)
+        #expect(abs(frames.duration - 0.72) < 0.001)
+        #expect(frames.images.allSatisfy { $0.width == 96 && $0.height == 96 && $0.alphaInfo != .none })
+        #expect(await store.bytes == frames.bytes)
+        let count = await store.decodeCount
+        _ = try await store.load(name: name, ticket: index)
+        #expect(await store.decodeCount == count)
+    }
+    await store.clear(ticket: 3); #expect(await store.bytes == 0)
+    await #expect(throws: CancellationError.self) { try await store.load(name: "completed", ticket: 2) }
+    await #expect(throws: (any Error).self) { try await store.load(name: "../Mascot", ticket: 4) }
 }
-@Test func mascotExportManifestMatchesFinitePlaybackSpecifications() throws {
-    let manifest=try JSONDecoder().decode(JSONValue.self,from:Data(contentsOf:mascotAssetRoot.appendingPathComponent("manifest.json")))
-    #expect(manifest["canonicalImportedMaterials"].int==26 && manifest["clips"].array.count==14)
-    for clip in manifest["clips"].array {
-        let style=try #require(NativeMascotStyle(rawValue:clip["style"].string))
-        let spec=try #require(NativeMascotClip.spec(style:style,name:clip["state"].string))
-        #expect(spec.count==clip["frames"].int)
-        #expect(abs(spec.duration-(Double(clip["duration"].pretty) ?? -1))<0.001)
+
+@Test @MainActor func presenceGIFIsFiniteAndCancellationClearsEveryFrame() async throws {
+    let frames = try await NativeMascotFrameStore(root: presenceRoot).load(name: "completed", ticket: 1)
+    let animation = NativeMascotPlayer.keyframes(frames)
+    #expect(animation.repeatCount == 0 && animation.values?.count == 12 && animation.keyTimes?.first == 0 && animation.keyTimes?.last == 1)
+    let player = NativeMascotPlayer(root: presenceRoot)
+    player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
+    player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1)); await player.settled()
+    #expect(player.animationStarts == 1 && player.activeFrameBytes > 0 && player.layer.animationKeys() != nil)
+    player.stop(); await player.settled()
+    #expect(player.layer.animationKeys() == nil && player.layer.contents == nil && player.activeFrameBytes == 0)
+    #expect(await player.store.bytes == 0)
+    player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1)); await player.settled()
+    #expect(player.animationStarts == 1)
+}
+
+@Test @MainActor func presenceStaticReduceMotionAndOffNeverDecodeAnAsset() async {
+    for request in [NativeMascotRequest(owner: "A", expression: .completed), .init(owner: "A", mode: .off, expression: .attention), .init(owner: "A", mode: .reactions, expression: .attention, reduceMotion: true), .init(owner: "A", mode: .reactions, expression: .completed, animate: false)] {
+        let player = NativeMascotPlayer(root: presenceRoot)
+        var old = request; old.expression = .working; player.configure(old); await player.settled()
+        var fresh = request; fresh.revision = 1; player.configure(fresh); await player.settled()
+        #expect(player.layer.animationKeys() == nil && player.animationStarts == 0)
+        #expect(await player.store.decodeCount == 0 && player.activeFrameBytes == 0)
     }
 }
-@Test @MainActor func mascotAnimationUsesFiniteNativeKeyframes() async throws {
-    let frames=try await NativeMascotFrameStore(root:mascotAssetRoot).load(style:.rendered,name:"responding",animate:true,ticket:1)
-    let animation=NativeMascotPlayer.keyframes(frames)
-    #expect(animation.values?.count==9 && animation.duration==0.55 && animation.repeatCount==0)
-    #expect(animation.calculationMode == .discrete && animation.keyTimes?.first==0 && animation.keyTimes?.last==1)
+
+@Test @MainActor func presenceOwnerSwitchStateChangeAndStaleDecodeCannotReplay() async {
+    let player = NativeMascotPlayer(root: presenceRoot)
+    player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
+    player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1))
+    player.configure(.init(owner: "B", mode: .reactions, expression: .attention, revision: 10)); await player.settled()
+    #expect(player.current?.owner == "B" && player.layer.animationKeys() == nil && player.activeFrameBytes == 0)
+    #expect(await player.store.bytes == 0)
 }
-@Test @MainActor func mascotHiddenAndReduceMotionCancelPlaybackAndReleaseFrames() async {
-    let player=NativeMascotPlayer(root:mascotAssetRoot)
-    player.configure(.init(owner:"A",style:.rendered,expression:.working));await player.settled()
-    player.configure(.init(owner:"A",style:.classic,expression:.attention,reduceMotion:true));await player.settled()
-    #expect(player.layer.animationKeys()==nil && player.layer.contents != nil)
-    player.stop();await player.settled()
-    #expect(player.layer.contents==nil && player.layer.animationKeys()==nil && player.activeFrameBytes==0)
-    #expect(await player.store.bytes==0)
-}
-@Test @MainActor func mascotStaleDecodeAndHiddenResponsesCannotReplay() async {
-    let player=NativeMascotPlayer(root:mascotAssetRoot)
-    player.configure(.init(owner:"A",style:.rendered,expression:.working))
-    player.configure(.init(owner:"B",style:.classic,expression:.disconnected,animate:false));await player.settled()
-    #expect(player.current?.owner=="B" && player.displayedStyle == .classic && player.animationStarts==0)
-    player.configure(.init(owner:"B",style:.classic,expression:.responding,revision:1,visible:false));await player.settled()
-    player.configure(.init(owner:"B",style:.classic,expression:.responding,revision:1));await player.settled()
-    #expect(player.animationStarts==0)
-}
-@Test @MainActor func mascotMissingAssetsRemainNonfatalAndDoNotLoop() async {
-    let player=NativeMascotPlayer(root:mascotAssetRoot.appendingPathComponent("missing"))
-    player.configure(.init(owner:"test",style:.rendered,expression:.working));await player.settled()
-    #expect(player.layer.contents==nil && player.layer.animationKeys()==nil && player.animationStarts==0)
-    #expect(await player.store.bytes==0)
-}
-@Test func mascotProductionSourceHasNoLive3DOrExecutionDependency() throws {
-    let sources=mascotAssetRoot.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources/GatorMac")
-    for name in ["NativeMascotModel.swift","NativeMascotPlayback.swift","NativeMascotView.swift","NativeMascotPreferences.swift"] {
-        let text=try String(contentsOf:sources.appendingPathComponent(name),encoding:.utf8)
-        for forbidden in ["import RealityKit","import SceneKit","import WebKit",".send(",".newConversation(",".respondToApproval("] { #expect(!text.contains(forbidden)) }
+
+@Test @MainActor func presenceMissingAndEmptyGIFsKeepNativeEmojiFallback() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); defer { try? FileManager.default.removeItem(at: root) }
+    for content in [Data(), Data("invalid gif".utf8), Data(repeating: 0, count: NativeMascotFrameStore.maximumFileBytes + 1)] {
+        try content.write(to: root.appendingPathComponent("completed.gif"))
+        let player = NativeMascotPlayer(root: root)
+        player.configure(.init(owner: "A", mode: .reactions, expression: .working)); await player.settled()
+        player.configure(.init(owner: "A", mode: .reactions, expression: .completed, revision: 1)); await player.settled()
+        #expect(player.current?.expression.emoji == "✅" && player.animationStarts == 0 && player.layer.animationKeys() == nil)
+        #expect(await player.store.bytes == 0)
     }
+}
+
+@Test @MainActor func presenceRepeatedLifetimesAndCanvasNeverTakeFocus() async {
+    for _ in 0..<30 {
+        weak var probe: NativeMascotPlayer?
+        do {
+            let canvas = NativeMascotCanvas(root: presenceRoot); probe = canvas.player
+            #expect(!canvas.acceptsFirstResponder && !canvas.emoji.isSelectable)
+            canvas.request = .init(owner: "A", mode: .reactions, expression: .working)
+            #expect(canvas.emoji.stringValue.isEmpty)
+            canvas.detach(); await canvas.player.settled()
+            #expect(await canvas.player.store.bytes == 0)
+        }
+        #expect(probe == nil)
+    }
+}
+
+@Test func presenceProductionHasNoOldArtLoadingOrExecutionCapability() throws {
+    let root = presenceRoot.deletingLastPathComponent().deletingLastPathComponent()
+    for name in ["NativeMascotModel.swift", "NativeMascotPlayback.swift", "NativeMascotView.swift", "NativeMascotPreferences.swift", "NativeDesktopPet.swift"] {
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/GatorMac/" + name), encoding: .utf8)
+        for forbidden in ["import RealityKit", "import SceneKit", "import WebKit", ".send(", ".newConversation(", ".respondToApproval(", "00.png", "NativeMascotStyle", "appendingPathComponent(\"Mascot\")"] { #expect(!source.contains(forbidden)) }
+    }
+    let build = try String(contentsOf: root.appendingPathComponent("scripts/build-dev-app.sh"), encoding: .utf8)
+    #expect(!build.contains("mascot/2d/assets") && build.contains("Resources/Presence"))
 }

@@ -25,7 +25,9 @@ func TestLocalFirstAuditLoopbackClientFollowsAnOffHostRedirect(t *testing.T) {
 		t.Fatal(err)
 	}
 	transport := &localAuditTransport{}
-	c.client = &http.Client{Transport: transport}
+	testClient := *c.client
+	testClient.Transport = transport
+	c.client = &testClient
 	v, err := c.Version(context.Background())
 	if err != nil || v != "fixture" || len(transport.hosts) != 2 || transport.hosts[1] != "off-host.invalid" {
 		t.Fatal("redirect reproduction changed; re-evaluate LF-03", err)

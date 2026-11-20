@@ -1,0 +1,284 @@
+{
+  "final-go-regression": {
+    "test_and_subtest_events": {
+      "pass": 1163,
+      "skip": 15
+    },
+    "packages": [
+      {
+        "name": "github.com/gongahkia/gator/internal/config",
+        "action": "pass",
+        "seconds": 1.572
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/localmodel",
+        "action": "pass",
+        "seconds": 1.9
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model",
+        "action": "pass",
+        "seconds": 2.375
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/modelcatalog",
+        "action": "pass",
+        "seconds": 2.791
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/anthropic",
+        "action": "pass",
+        "seconds": 3.156
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/chatcompletions",
+        "action": "pass",
+        "seconds": 3.3970000000000002
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/eval",
+        "action": "pass",
+        "seconds": 4.421
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/gemini",
+        "action": "pass",
+        "seconds": 2.883
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/openai",
+        "action": "pass",
+        "seconds": 3.003
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/providerhttp",
+        "action": "pass",
+        "seconds": 2.939
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/model/radius",
+        "action": "pass",
+        "seconds": 2.983
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/agent",
+        "action": "pass",
+        "seconds": 2.984
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/cliagent",
+        "action": "pass",
+        "seconds": 14.807
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/workrun",
+        "action": "pass",
+        "seconds": 26.317
+      },
+      {
+        "name": "github.com/gongahkia/gator/cmd/gator",
+        "action": "pass",
+        "seconds": 44.532
+      }
+    ],
+    "skips": [
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveAgentContinuity",
+        "reason": [
+          "=== RUN   TestLiveAgentContinuity",
+          "agent_continuity_live_test.go:29: set GATOR_LIVE_CONTINUITY_REPORT, GATOR_LIVE_MODEL and OPENAI_API_KEY",
+          "--- SKIP: TestLiveAgentContinuity (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestJobSystemdManagesOnlyItsUserUnit",
+        "reason": [
+          "=== RUN   TestJobSystemdManagesOnlyItsUserUnit",
+          "command_job_systemd_test.go:31: systemd user service is Linux-only",
+          "--- SKIP: TestJobSystemdManagesOnlyItsUserUnit (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/internal/cliagent",
+        "test": "TestLiveNativeConversation",
+        "reason": [
+          "=== RUN   TestLiveNativeConversation",
+          "native_live_test.go:19: opt-in native session evaluation",
+          "--- SKIP: TestLiveNativeConversation (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestNativeDesktopLocalVoice",
+        "reason": [
+          "=== RUN   TestNativeDesktopLocalVoice",
+          "desktop_speech_test.go:120: opt-in native public-sample voice helper acceptance",
+          "--- SKIP: TestNativeDesktopLocalVoice (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveDynamicAgents",
+        "reason": [
+          "=== RUN   TestLiveDynamicAgents",
+          "dynamic_agents_live_test.go:27: opt-in budgeted dynamic specialist evaluation",
+          "--- SKIP: TestLiveDynamicAgents (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveInternalAgentLifecycle",
+        "reason": [
+          "=== RUN   TestLiveInternalAgentLifecycle",
+          "internal_agent_live_test.go:29: set GATOR_LIVE_INTERNAL_REPORT, GATOR_LIVE_MODEL and OPENAI_API_KEY for a bounded live run",
+          "--- SKIP: TestLiveInternalAgentLifecycle (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestNativeLaunchAgentExecutableRelocation",
+        "reason": [
+          "=== RUN   TestNativeLaunchAgentExecutableRelocation",
+          "job_launchagent_native_test.go:25: requires macOS login session and GATOR_NATIVE_LAUNCHAGENT_BINARY",
+          "--- SKIP: TestNativeLaunchAgentExecutableRelocation (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLocalFirstAuditConfigWriterHelper",
+        "reason": [
+          "=== RUN   TestLocalFirstAuditConfigWriterHelper",
+          "local_first_audit_test.go:92: independent-process helper only",
+          "--- SKIP: TestLocalFirstAuditConfigWriterHelper (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveMemoryEvaluation",
+        "reason": [
+          "=== RUN   TestLiveMemoryEvaluation",
+          "memory_live_eval_test.go:27: set GATOR_LIVE_MEMORY_REPORT to a new file to opt into bounded provider calls",
+          "--- SKIP: TestLiveMemoryEvaluation (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveTinyfishSearch",
+        "reason": [
+          "=== RUN   TestLiveTinyfishSearch",
+          "project_followup_live_test.go:49: explicit opt-in live TinyFish search contract",
+          "--- SKIP: TestLiveTinyfishSearch (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveProjectFollowup",
+        "reason": [
+          "=== RUN   TestLiveProjectFollowup",
+          "project_followup_live_test.go:279: explicit opt-in synthetic, bounded live project workflow",
+          "--- SKIP: TestLiveProjectFollowup (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveDesktopUI",
+        "reason": [
+          "=== RUN   TestLiveDesktopUI",
+          "project_ui_live_test.go:31: explicit opt-in live Electron evaluation",
+          "--- SKIP: TestLiveDesktopUI (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLiveProjectWatch",
+        "reason": [
+          "=== RUN   TestLiveProjectWatch",
+          "project_watch_live_test.go:30: opt-in evolving recurring project evaluation",
+          "--- SKIP: TestLiveProjectWatch (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLivePublicWebResearch",
+        "reason": [
+          "=== RUN   TestLivePublicWebResearch",
+          "web_research_live_test.go:28: opt-in bounded public-web research acceptance",
+          "--- SKIP: TestLivePublicWebResearch (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/internal/workrun",
+        "test": "TestLiveSubagentManager",
+        "reason": [
+          "=== RUN   TestLiveSubagentManager",
+          "subagent_live_test.go:21: opt-in live evaluation",
+          "--- SKIP: TestLiveSubagentManager (0.00s)"
+        ]
+      }
+    ]
+  },
+  "final-race": {
+    "test_and_subtest_events": {
+      "pass": 57,
+      "skip": 3
+    },
+    "packages": [
+      {
+        "name": "github.com/gongahkia/gator/internal/eval",
+        "action": "pass",
+        "seconds": 1.9889999999999999
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/cliagent",
+        "action": "pass",
+        "seconds": 2.127
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/localmodel",
+        "action": "pass",
+        "seconds": 2.6310000000000002
+      },
+      {
+        "name": "github.com/gongahkia/gator/internal/config",
+        "action": "pass",
+        "seconds": 3.091
+      },
+      {
+        "name": "github.com/gongahkia/gator/cmd/gator",
+        "action": "pass",
+        "seconds": 12.82
+      }
+    ],
+    "skips": [
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestNativeDesktopLocalVoice",
+        "reason": [
+          "=== RUN   TestNativeDesktopLocalVoice",
+          "desktop_speech_test.go:120: opt-in native public-sample voice helper acceptance",
+          "--- SKIP: TestNativeDesktopLocalVoice (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestNativeLaunchAgentExecutableRelocation",
+        "reason": [
+          "=== RUN   TestNativeLaunchAgentExecutableRelocation",
+          "job_launchagent_native_test.go:25: requires macOS login session and GATOR_NATIVE_LAUNCHAGENT_BINARY",
+          "--- SKIP: TestNativeLaunchAgentExecutableRelocation (0.00s)"
+        ]
+      },
+      {
+        "package": "github.com/gongahkia/gator/cmd/gator",
+        "test": "TestLocalFirstAuditConfigWriterHelper",
+        "reason": [
+          "=== RUN   TestLocalFirstAuditConfigWriterHelper",
+          "local_first_audit_test.go:92: independent-process helper only",
+          "--- SKIP: TestLocalFirstAuditConfigWriterHelper (0.00s)"
+        ]
+      }
+    ]
+  }
+}

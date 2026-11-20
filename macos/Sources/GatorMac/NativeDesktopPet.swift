@@ -102,7 +102,7 @@ private final class DesktopPetObservers {
     func reconcile() {
         guard !stopped else { return }
         withObservationTracking {
-            guard defaults.bool(forKey: NativeDesktopPetPreference.shown), !sleeping, !isClosing(),
+            guard defaults.bool(forKey: NativeDesktopPetPreference.shown), NativeMascotPreference.presence(defaults.string(forKey: NativeMascotPreference.mode)) != .off, !sleeping, !isClosing(),
                   let frame = NativeDesktopPetScreen.selected(screens(), preferred: defaults.string(forKey: NativeDesktopPetPreference.display) ?? "")?.petFrame,
                   let signal = readSignal() else {
                 releaseSurface(); state = NativeMascotStateMachine(); return
@@ -110,7 +110,7 @@ private final class DesktopPetObservers {
             state.receive(signal)
             if surface == nil { surface = makeSurface() }
             surface?.show(.init(owner: signal.owner,
-                                style: NativeMascotPreference.appearance(defaults.string(forKey: NativeMascotPreference.style) ?? ""),
+                                mode: NativeMascotPreference.presence(defaults.string(forKey: NativeMascotPreference.mode)),
                                 expression: state.expression, revision: state.revision,
                                 animate: defaults.object(forKey: NativeMascotPreference.animated) as? Bool ?? true,
                                 reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion), frame: frame)
@@ -132,10 +132,10 @@ private final class DesktopPetObservers {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    init(root: URL = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Mascot")) {
+    init(root: URL = (Bundle.main.resourceURL ?? Bundle.main.bundleURL).appendingPathComponent("Presence")) {
         canvas = NativeMascotCanvas(root: root)
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        title = "Gator Desktop Pet"; identifier = NSUserInterfaceItemIdentifier("gator.desktopPet")
+        title = "Gator Desktop Presence"; identifier = NSUserInterfaceItemIdentifier("gator.desktopPet")
         backgroundColor = .clear; isOpaque = false; hasShadow = false; isReleasedWhenClosed = false
         isRestorable = false; isMovable = false; hidesOnDeactivate = false; ignoresMouseEvents = true
         isFloatingPanel = true; becomesKeyOnlyIfNeeded = true; worksWhenModal = false

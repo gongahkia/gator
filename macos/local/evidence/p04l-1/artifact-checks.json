@@ -1,0 +1,10 @@
+{
+  "rawRunFiles": 3536,
+  "rawRunBytes": 7143581,
+  "archiveBytes": 1093811,
+  "archiveSHA256": "c2da743aab0f092b91f041c5b601060208b4aa5b660b0a9d907f77dfabfe6da6",
+  "testCredentialMarkerLeakHits": [],
+  "evidenceFilesScanned": 105,
+  "markerValuesNotPrinted": true,
+  "allCopiedFinalReportFilesMode0600": true
+}

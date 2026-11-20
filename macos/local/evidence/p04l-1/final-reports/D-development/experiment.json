@@ -1,0 +1,5142 @@
+{
+  "outcomes": {
+    "completed": 25
+  },
+  "version": 1,
+  "id": "local-first-D",
+  "dataset": "local-first-D-v1",
+  "dataset_sha256": "119a228b2cd662d84f82ce927c4acec6c88897bad9d2f81dc65b68e7e375399f",
+  "target": "work.v1",
+  "harness": "978813b3b5403798c1c8efa6054e1f6a119ad2ca",
+  "provider": "fixture",
+  "model": "scripted-reference",
+  "split": "development",
+  "scripted": true,
+  "delegation": false,
+  "attempts": 1,
+  "trials": [
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2771451964/gator/traces/local-first-D-dev-short-chat-01/trace.json",
+      "spans": [
+        {
+          "id": "7cbaa119aae17d63",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.174978+08:00",
+          "end": "2026-11-20T02:42:29.235847Z"
+        },
+        {
+          "id": "d535f49417a41590",
+          "parent": "7cbaa119aae17d63",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.198036+08:00",
+          "end": "2026-11-20T10:42:29.198036+08:00",
+          "step": 1
+        },
+        {
+          "id": "ab2e05bfd42adb85",
+          "parent": "7cbaa119aae17d63",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.198094+08:00",
+          "end": "2026-11-20T10:42:29.198106+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "9cfc3e7da9dc1a9f",
+          "parent": "7cbaa119aae17d63",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.198114+08:00",
+          "end": "2026-11-20T10:42:29.205866+08:00",
+          "step": 1
+        },
+        {
+          "id": "5d2f435729a1c1b6",
+          "parent": "7cbaa119aae17d63",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.205955+08:00",
+          "end": "2026-11-20T10:42:29.205955+08:00",
+          "step": 2
+        },
+        {
+          "id": "64044a16d5529928",
+          "parent": "7cbaa119aae17d63",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.205961+08:00",
+          "end": "2026-11-20T10:42:29.205963+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "bba571199719013d",
+          "parent": "7cbaa119aae17d63",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.205965+08:00",
+          "end": "2026-11-20T10:42:29.213883+08:00",
+          "step": 2
+        },
+        {
+          "id": "d334b079177435ed",
+          "parent": "7cbaa119aae17d63",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.213901+08:00",
+          "end": "2026-11-20T10:42:29.213901+08:00",
+          "step": 3
+        },
+        {
+          "id": "17a4e081d58efa82",
+          "parent": "7cbaa119aae17d63",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.213905+08:00",
+          "end": "2026-11-20T10:42:29.21391+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0c82009b402348f9",
+          "parent": "7cbaa119aae17d63",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.214086+08:00",
+          "end": "2026-11-20T10:42:29.214086+08:00",
+          "step": 3
+        },
+        {
+          "id": "db526d0179ef05f3",
+          "parent": "7cbaa119aae17d63",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.214095+08:00",
+          "end": "2026-11-20T10:42:29.214095+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-short-chat-01",
+      "case_id": "dev-short-chat",
+      "case_sha256": "c40c14f67b810e03d25616daee4ca59ca48df93a19ff73e42be36bd126a8cba2",
+      "split": "development",
+      "family": "short-chat",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-2bf2396f02aaefd6",
+      "revision_id": "local-first-D-dev-short-chat-01",
+      "snapshot_id": "snap-e161c8c4b3d6e7d9f8244344",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "679c4c4fd7f29fea9da1d478aef705f5b701edf73fc07cb317ea39adb6c8a93a",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2771451964/gator/workspaces/7f0a67e1434421e724dc06232a86af86/local-first-D-dev-short-chat-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 143
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3068531474/gator/traces/local-first-D-dev-summarization-01/trace.json",
+      "spans": [
+        {
+          "id": "334972603583dbfc",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.327424+08:00",
+          "end": "2026-11-20T02:42:29.398952Z"
+        },
+        {
+          "id": "9524b53104b59b79",
+          "parent": "334972603583dbfc",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.368928+08:00",
+          "end": "2026-11-20T10:42:29.368928+08:00",
+          "step": 1
+        },
+        {
+          "id": "2a12ce33663471a6",
+          "parent": "334972603583dbfc",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.368932+08:00",
+          "end": "2026-11-20T10:42:29.368936+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "446c35d2fd882e15",
+          "parent": "334972603583dbfc",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.368938+08:00",
+          "end": "2026-11-20T10:42:29.375878+08:00",
+          "step": 1
+        },
+        {
+          "id": "7ce6bad8cf5bd51b",
+          "parent": "334972603583dbfc",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.375912+08:00",
+          "end": "2026-11-20T10:42:29.375912+08:00",
+          "step": 2
+        },
+        {
+          "id": "e2a7bcaf9f9fa350",
+          "parent": "334972603583dbfc",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.375916+08:00",
+          "end": "2026-11-20T10:42:29.375919+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "38fcfc363bc9afdd",
+          "parent": "334972603583dbfc",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.37592+08:00",
+          "end": "2026-11-20T10:42:29.381829+08:00",
+          "step": 2
+        },
+        {
+          "id": "dd67f16feb30c74e",
+          "parent": "334972603583dbfc",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.381839+08:00",
+          "end": "2026-11-20T10:42:29.381839+08:00",
+          "step": 3
+        },
+        {
+          "id": "17855d370db54652",
+          "parent": "334972603583dbfc",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.381841+08:00",
+          "end": "2026-11-20T10:42:29.381843+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "89dc4d310bdfa6ec",
+          "parent": "334972603583dbfc",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.382045+08:00",
+          "end": "2026-11-20T10:42:29.382045+08:00",
+          "step": 3
+        },
+        {
+          "id": "949075c6c8ffd767",
+          "parent": "334972603583dbfc",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.382052+08:00",
+          "end": "2026-11-20T10:42:29.382052+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-summarization-01",
+      "case_id": "dev-summarization",
+      "case_sha256": "466a9a7c5c7026ebb8dd2ee858db32c109f86e252511b0491de1506422785e8b",
+      "split": "development",
+      "family": "summarization",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-76e805c0d8bbe94d",
+      "revision_id": "local-first-D-dev-summarization-01",
+      "snapshot_id": "snap-65d11286a59e83c82e27d05f",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "013be6e6c0407344dc3881d2c3f50dcd714305abace5632f6d62417a739388f7",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3068531474/gator/workspaces/242c584fcdde1d45bf2268306c54d0f9/local-first-D-dev-summarization-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 81
+    },
+    {
+      "metrics": {
+        "model_requests": 5,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3918939299/gator/traces/local-first-D-dev-multi-source-synthesis-01/trace.json",
+      "spans": [
+        {
+          "id": "9bf9e86f29e59b87",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.412789+08:00",
+          "end": "2026-11-20T02:42:29.476922Z"
+        },
+        {
+          "id": "bcdedcb005a8d123",
+          "parent": "9bf9e86f29e59b87",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.437524+08:00",
+          "end": "2026-11-20T10:42:29.437524+08:00",
+          "step": 1
+        },
+        {
+          "id": "1d3b83d4eb7bb758",
+          "parent": "9bf9e86f29e59b87",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.43753+08:00",
+          "end": "2026-11-20T10:42:29.437539+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "4fb1ec6225507132",
+          "parent": "9bf9e86f29e59b87",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.437541+08:00",
+          "end": "2026-11-20T10:42:29.44491+08:00",
+          "step": 1
+        },
+        {
+          "id": "98b0dc0deabbb671",
+          "parent": "9bf9e86f29e59b87",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.444939+08:00",
+          "end": "2026-11-20T10:42:29.444939+08:00",
+          "step": 2
+        },
+        {
+          "id": "76ee321b3a4d6492",
+          "parent": "9bf9e86f29e59b87",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.444943+08:00",
+          "end": "2026-11-20T10:42:29.444945+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "2478f79fb7049bee",
+          "parent": "9bf9e86f29e59b87",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.444946+08:00",
+          "end": "2026-11-20T10:42:29.451866+08:00",
+          "step": 2
+        },
+        {
+          "id": "f74d05f6b4c4a007",
+          "parent": "9bf9e86f29e59b87",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.451951+08:00",
+          "end": "2026-11-20T10:42:29.451951+08:00",
+          "step": 3
+        },
+        {
+          "id": "00d94c0bd100c09e",
+          "parent": "9bf9e86f29e59b87",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.451957+08:00",
+          "end": "2026-11-20T10:42:29.45196+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "2f5dd96e3058d524",
+          "parent": "9bf9e86f29e59b87",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.451964+08:00",
+          "end": "2026-11-20T10:42:29.459837+08:00",
+          "step": 3
+        },
+        {
+          "id": "9480809df43fb076",
+          "parent": "9bf9e86f29e59b87",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.45986+08:00",
+          "end": "2026-11-20T10:42:29.45986+08:00",
+          "step": 4
+        },
+        {
+          "id": "c1a64900d0efc88b",
+          "parent": "9bf9e86f29e59b87",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.459864+08:00",
+          "end": "2026-11-20T10:42:29.459867+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "076e58d6f73121d8",
+          "parent": "9bf9e86f29e59b87",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.459868+08:00",
+          "end": "2026-11-20T10:42:29.46502+08:00",
+          "step": 4
+        },
+        {
+          "id": "95af6cc16528f345",
+          "parent": "9bf9e86f29e59b87",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.465041+08:00",
+          "end": "2026-11-20T10:42:29.465041+08:00",
+          "step": 5
+        },
+        {
+          "id": "72ce55bcd0faf2f6",
+          "parent": "9bf9e86f29e59b87",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.465045+08:00",
+          "end": "2026-11-20T10:42:29.465047+08:00",
+          "step": 5,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "3bc28391cf05f856",
+          "parent": "9bf9e86f29e59b87",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.465218+08:00",
+          "end": "2026-11-20T10:42:29.465218+08:00",
+          "step": 5
+        },
+        {
+          "id": "6aa5e7c20d1922c3",
+          "parent": "9bf9e86f29e59b87",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.465222+08:00",
+          "end": "2026-11-20T10:42:29.465222+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-multi-source-synthesis-01",
+      "case_id": "dev-multi-source-synthesis",
+      "case_sha256": "f178e9ed5b8f7d7e9b367125511d178765a4510efc5edfd185e1cdc8463bb671",
+      "split": "development",
+      "family": "multi-source-synthesis",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-ff09a4b582d29fd8",
+      "revision_id": "local-first-D-dev-multi-source-synthesis-01",
+      "snapshot_id": "snap-0dc166e6a6d2819c095a7037",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "5962066d2a0d4b94d093e71d6967561dd52311c60471f079740af287a407715b",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3918939299/gator/workspaces/7f5c2a7dd4a9d510e90d35734b4a941e/local-first-D-dev-multi-source-synthesis-01",
+      "usage": {
+        "unknown_requests": 5,
+        "model_requests": 5,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 74
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1875535364/gator/traces/local-first-D-dev-planning-01/trace.json",
+      "spans": [
+        {
+          "id": "9ea87ef512fd249a",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.495888+08:00",
+          "end": "2026-11-20T02:42:29.541516Z"
+        },
+        {
+          "id": "8c22bc4ffbf9edd4",
+          "parent": "9ea87ef512fd249a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.515893+08:00",
+          "end": "2026-11-20T10:42:29.515893+08:00",
+          "step": 1
+        },
+        {
+          "id": "2f353fd3f0c03f9f",
+          "parent": "9ea87ef512fd249a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.515898+08:00",
+          "end": "2026-11-20T10:42:29.515901+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "04c26a89f4ec2192",
+          "parent": "9ea87ef512fd249a",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.515904+08:00",
+          "end": "2026-11-20T10:42:29.52186+08:00",
+          "step": 1
+        },
+        {
+          "id": "9e707ea2f5656233",
+          "parent": "9ea87ef512fd249a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.521895+08:00",
+          "end": "2026-11-20T10:42:29.521895+08:00",
+          "step": 2
+        },
+        {
+          "id": "05d7684bf49e07b9",
+          "parent": "9ea87ef512fd249a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.521899+08:00",
+          "end": "2026-11-20T10:42:29.521902+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "17d8bc3e63832cf9",
+          "parent": "9ea87ef512fd249a",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.521903+08:00",
+          "end": "2026-11-20T10:42:29.527949+08:00",
+          "step": 2
+        },
+        {
+          "id": "e38dbdfc5f34762c",
+          "parent": "9ea87ef512fd249a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.527997+08:00",
+          "end": "2026-11-20T10:42:29.527997+08:00",
+          "step": 3
+        },
+        {
+          "id": "a74a22e93e88d20d",
+          "parent": "9ea87ef512fd249a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.528004+08:00",
+          "end": "2026-11-20T10:42:29.528009+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "7b7cc5546fa8e01b",
+          "parent": "9ea87ef512fd249a",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.528242+08:00",
+          "end": "2026-11-20T10:42:29.528242+08:00",
+          "step": 3
+        },
+        {
+          "id": "3500455057a8a45f",
+          "parent": "9ea87ef512fd249a",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.528248+08:00",
+          "end": "2026-11-20T10:42:29.528248+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-planning-01",
+      "case_id": "dev-planning",
+      "case_sha256": "0977a3bb59d31d4c53d5bdd9c6bf3bb3ec927d2b9dd3ab881bd86b148e9f0cf9",
+      "split": "development",
+      "family": "planning",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-4ed8e83e11e028ec",
+      "revision_id": "local-first-D-dev-planning-01",
+      "snapshot_id": "snap-9e88a11f89d9b7080d711808",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "9264dd3e4d642b78ffb58d8849477dda127e283fea73518f20662fdae057efff",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1875535364/gator/workspaces/f04d7266338003946e1cd1ae1fb542f7/local-first-D-dev-planning-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 53
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1417639844/gator/traces/local-first-D-dev-structured-output-01/trace.json",
+      "spans": [
+        {
+          "id": "505ed163cfb19c0f",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.558125+08:00",
+          "end": "2026-11-20T02:42:29.614787Z"
+        },
+        {
+          "id": "2338c5d64c20f4ca",
+          "parent": "505ed163cfb19c0f",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.582754+08:00",
+          "end": "2026-11-20T10:42:29.582754+08:00",
+          "step": 1
+        },
+        {
+          "id": "ef12a7d14af97a13",
+          "parent": "505ed163cfb19c0f",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.582757+08:00",
+          "end": "2026-11-20T10:42:29.582759+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "159635989f1472a0",
+          "parent": "505ed163cfb19c0f",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.582761+08:00",
+          "end": "2026-11-20T10:42:29.589918+08:00",
+          "step": 1
+        },
+        {
+          "id": "92cfa39295e4f17d",
+          "parent": "505ed163cfb19c0f",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.589954+08:00",
+          "end": "2026-11-20T10:42:29.589954+08:00",
+          "step": 2
+        },
+        {
+          "id": "5b2614ab514b6c4a",
+          "parent": "505ed163cfb19c0f",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.589957+08:00",
+          "end": "2026-11-20T10:42:29.589961+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "5918f7a3d9e4a213",
+          "parent": "505ed163cfb19c0f",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.589962+08:00",
+          "end": "2026-11-20T10:42:29.598961+08:00",
+          "step": 2
+        },
+        {
+          "id": "a16aa0926850c2a4",
+          "parent": "505ed163cfb19c0f",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.598973+08:00",
+          "end": "2026-11-20T10:42:29.598973+08:00",
+          "step": 3
+        },
+        {
+          "id": "dcf95fe018b3c936",
+          "parent": "505ed163cfb19c0f",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.598975+08:00",
+          "end": "2026-11-20T10:42:29.598978+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "c2fa7d18ddd7ef58",
+          "parent": "505ed163cfb19c0f",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.59907+08:00",
+          "end": "2026-11-20T10:42:29.59907+08:00",
+          "step": 3
+        },
+        {
+          "id": "156029ffdc77e8c7",
+          "parent": "505ed163cfb19c0f",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.599074+08:00",
+          "end": "2026-11-20T10:42:29.599074+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-structured-output-01",
+      "case_id": "dev-structured-output",
+      "case_sha256": "1ad1922acdb9cc20e346de7af778fe95983031006d72e82c1cd3a79ecb9e2d48",
+      "split": "development",
+      "family": "structured-output",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-ae9386ca3c16b739",
+      "revision_id": "local-first-D-dev-structured-output-01",
+      "snapshot_id": "snap-bacd3adfd75afdc54d399c3a",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "772f76d6f3c3e71eaf138c44550f783434582063a7305c0698f048bcd6225eab",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1417639844/gator/workspaces/202a86cdf5b8445d9179581d7d65cccc/local-first-D-dev-structured-output-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 65
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3305853162/gator/traces/local-first-D-dev-tool-selection-01/trace.json",
+      "spans": [
+        {
+          "id": "54912e738e6ff472",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.632525+08:00",
+          "end": "2026-11-20T02:42:29.678388Z"
+        },
+        {
+          "id": "d204f55535e2c40b",
+          "parent": "54912e738e6ff472",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.650049+08:00",
+          "end": "2026-11-20T10:42:29.650049+08:00",
+          "step": 1
+        },
+        {
+          "id": "9bec1e2b8b09a7f7",
+          "parent": "54912e738e6ff472",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.650053+08:00",
+          "end": "2026-11-20T10:42:29.650057+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "9d50038d4dc87082",
+          "parent": "54912e738e6ff472",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.650059+08:00",
+          "end": "2026-11-20T10:42:29.656037+08:00",
+          "step": 1
+        },
+        {
+          "id": "3a359714fa6d99ce",
+          "parent": "54912e738e6ff472",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.656066+08:00",
+          "end": "2026-11-20T10:42:29.656066+08:00",
+          "step": 2
+        },
+        {
+          "id": "5a9306c8f50c7644",
+          "parent": "54912e738e6ff472",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.656073+08:00",
+          "end": "2026-11-20T10:42:29.656075+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "c620e75157bb44ce",
+          "parent": "54912e738e6ff472",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.656076+08:00",
+          "end": "2026-11-20T10:42:29.662862+08:00",
+          "step": 2
+        },
+        {
+          "id": "cc7e69d2e55b764e",
+          "parent": "54912e738e6ff472",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.662877+08:00",
+          "end": "2026-11-20T10:42:29.662877+08:00",
+          "step": 3
+        },
+        {
+          "id": "336cd2fbcb9b7ec5",
+          "parent": "54912e738e6ff472",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.66288+08:00",
+          "end": "2026-11-20T10:42:29.662884+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "f06be23f1df66457",
+          "parent": "54912e738e6ff472",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.662996+08:00",
+          "end": "2026-11-20T10:42:29.662996+08:00",
+          "step": 3
+        },
+        {
+          "id": "dffe20a29dedd511",
+          "parent": "54912e738e6ff472",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.662999+08:00",
+          "end": "2026-11-20T10:42:29.662999+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-tool-selection-01",
+      "case_id": "dev-tool-selection",
+      "case_sha256": "4eed92443e512b6e93a823cf68f0ecc9afa61a7e95e65cde3fd9263622d8fb24",
+      "split": "development",
+      "family": "tool-selection",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-1990c5897a4223c2",
+      "revision_id": "local-first-D-dev-tool-selection-01",
+      "snapshot_id": "snap-f515dc4e1357567cfde2bc70",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "8ce82ed484d74b753cdf82099acd79fdd662119bdf4d76b448ba87ceaac7834d",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3305853162/gator/workspaces/52ec1793b2c052b5193bbee5ead3642d/local-first-D-dev-tool-selection-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 54
+    },
+    {
+      "metrics": {
+        "model_requests": 4,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 1,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-874870094/gator/traces/local-first-D-dev-tool-arguments-01/trace.json",
+      "spans": [
+        {
+          "id": "bc3e6479253277f7",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.69486+08:00",
+          "end": "2026-11-20T02:42:29.745747Z"
+        },
+        {
+          "id": "841040582bdc905e",
+          "parent": "bc3e6479253277f7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.711748+08:00",
+          "end": "2026-11-20T10:42:29.711748+08:00",
+          "step": 1
+        },
+        {
+          "id": "35bbd1daf99fea42",
+          "parent": "bc3e6479253277f7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.711752+08:00",
+          "end": "2026-11-20T10:42:29.711755+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "485ca2e756082425",
+          "parent": "bc3e6479253277f7",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.711756+08:00",
+          "end": "2026-11-20T10:42:29.711788+08:00",
+          "step": 1
+        },
+        {
+          "id": "692fe380c19bfcbe",
+          "parent": "bc3e6479253277f7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.711789+08:00",
+          "end": "2026-11-20T10:42:29.711789+08:00",
+          "step": 2
+        },
+        {
+          "id": "0c4849a210ab4312",
+          "parent": "bc3e6479253277f7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.71179+08:00",
+          "end": "2026-11-20T10:42:29.711791+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "ae37dace92eb37b2",
+          "parent": "bc3e6479253277f7",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.711792+08:00",
+          "end": "2026-11-20T10:42:29.71885+08:00",
+          "step": 2
+        },
+        {
+          "id": "22062836d59fcffd",
+          "parent": "bc3e6479253277f7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.718881+08:00",
+          "end": "2026-11-20T10:42:29.718881+08:00",
+          "step": 3
+        },
+        {
+          "id": "1da408cc56aafdba",
+          "parent": "bc3e6479253277f7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.718885+08:00",
+          "end": "2026-11-20T10:42:29.71889+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "c8c9789d4ca17384",
+          "parent": "bc3e6479253277f7",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.718891+08:00",
+          "end": "2026-11-20T10:42:29.725959+08:00",
+          "step": 3
+        },
+        {
+          "id": "4937d6471a4082c5",
+          "parent": "bc3e6479253277f7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.726007+08:00",
+          "end": "2026-11-20T10:42:29.726007+08:00",
+          "step": 4
+        },
+        {
+          "id": "44a795243c23bb7f",
+          "parent": "bc3e6479253277f7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.726015+08:00",
+          "end": "2026-11-20T10:42:29.726018+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "1df1f59eab3f0a90",
+          "parent": "bc3e6479253277f7",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.726205+08:00",
+          "end": "2026-11-20T10:42:29.726205+08:00",
+          "step": 4
+        },
+        {
+          "id": "9072cf627b8f12a0",
+          "parent": "bc3e6479253277f7",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.72622+08:00",
+          "end": "2026-11-20T10:42:29.72622+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-tool-arguments-01",
+      "case_id": "dev-tool-arguments",
+      "case_sha256": "a80fea35af7937d8ecd270061800d632e207141cc7ba61266a35c9a9f404b7d1",
+      "split": "development",
+      "family": "tool-arguments",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "tool_error_contains",
+          "passed": true,
+          "evidence": "expected \"path\"; observed SHA-256 3d8851221c50cd84f0dbc1637320eef684c20d5801f5674e146082bab05ce715"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-11cce6facd8925d6",
+      "revision_id": "local-first-D-dev-tool-arguments-01",
+      "snapshot_id": "snap-79c41103b0454775da675e26",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "43bec6ccbae115c2a78b7859d50352e6c7da3c1dcb4785ec2b23c4928f4b6924",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-874870094/gator/workspaces/135e3ac9df39ad729ddb073d31868656/local-first-D-dev-tool-arguments-01",
+      "usage": {
+        "unknown_requests": 4,
+        "model_requests": 4,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 60
+    },
+    {
+      "metrics": {
+        "model_requests": 1,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 0,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-659720224/gator/traces/local-first-D-dev-no-tool-needed-01/trace.json",
+      "spans": [
+        {
+          "id": "71bbcd79c4a2ff55",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.761016+08:00",
+          "end": "2026-11-20T02:42:29.801508Z"
+        },
+        {
+          "id": "6b2bf993cf9f2886",
+          "parent": "71bbcd79c4a2ff55",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.78392+08:00",
+          "end": "2026-11-20T10:42:29.78392+08:00",
+          "step": 1
+        },
+        {
+          "id": "2ae2da90a74a5cb0",
+          "parent": "71bbcd79c4a2ff55",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.783923+08:00",
+          "end": "2026-11-20T10:42:29.783927+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0a295c56f3f805e9",
+          "parent": "71bbcd79c4a2ff55",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.783929+08:00",
+          "end": "2026-11-20T10:42:29.783929+08:00",
+          "step": 1
+        },
+        {
+          "id": "35c9bdec25d25155",
+          "parent": "71bbcd79c4a2ff55",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.78393+08:00",
+          "end": "2026-11-20T10:42:29.78393+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-no-tool-needed-01",
+      "case_id": "dev-no-tool-needed",
+      "case_sha256": "68fda674980773a131454e49b679671eafb77ab01921bdbe172eb48c88918702",
+      "split": "development",
+      "family": "no-tool-needed",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "tool_call_count",
+          "passed": true,
+          "evidence": "observed tool-call event count: 0"
+        },
+        {
+          "kind": "final_contains",
+          "passed": true,
+          "evidence": "expected \"Hello.\"; observed SHA-256 34bace2f2116a51a7b850e0dcd535770065803bf27a3ef849ac09c0da1eea7f5"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-765f90503db4478a",
+      "revision_id": "local-first-D-dev-no-tool-needed-01",
+      "snapshot_id": "snap-063ec67d341635e7fdc4c009",
+      "contract_sha256": "56211dd814891dffbc263b7fdb9b1f6edfe43d721e9c00a8acafa7dcfc74fc12",
+      "policy_sha256": "a8cf6c7981d24faf8876c8717056e2738b066d4a510cb45fa19384becd8786e8",
+      "source_sha256": "692dffd1a428491dd4f687a4820bf6dadce1856685c4904c9a3625db8a905cf7",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-659720224/gator/workspaces/309a58db3d323a8a75e5158ec25d1c53/local-first-D-dev-no-tool-needed-01",
+      "usage": {
+        "unknown_requests": 1,
+        "model_requests": 1,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 50
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1519902972/gator/traces/local-first-D-dev-delegation-needed-01/trace.json",
+      "spans": [
+        {
+          "id": "17f1e867fce3f3d8",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.820208+08:00",
+          "end": "2026-11-20T02:42:29.874423Z"
+        },
+        {
+          "id": "6005885b697e1990",
+          "parent": "17f1e867fce3f3d8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.839272+08:00",
+          "end": "2026-11-20T10:42:29.839272+08:00",
+          "step": 1
+        },
+        {
+          "id": "ae54550d75784b0d",
+          "parent": "17f1e867fce3f3d8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.839276+08:00",
+          "end": "2026-11-20T10:42:29.839279+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0922e87427c4de75",
+          "parent": "17f1e867fce3f3d8",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.839281+08:00",
+          "end": "2026-11-20T10:42:29.845071+08:00",
+          "step": 1
+        },
+        {
+          "id": "e5364261632c47c6",
+          "parent": "17f1e867fce3f3d8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.845096+08:00",
+          "end": "2026-11-20T10:42:29.845096+08:00",
+          "step": 2
+        },
+        {
+          "id": "eaed581fd97730ed",
+          "parent": "17f1e867fce3f3d8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.845103+08:00",
+          "end": "2026-11-20T10:42:29.845105+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "f20f5b065c4d8a96",
+          "parent": "17f1e867fce3f3d8",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.845107+08:00",
+          "end": "2026-11-20T10:42:29.853901+08:00",
+          "step": 2
+        },
+        {
+          "id": "11c4c9cfff141242",
+          "parent": "17f1e867fce3f3d8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.853915+08:00",
+          "end": "2026-11-20T10:42:29.853915+08:00",
+          "step": 3
+        },
+        {
+          "id": "babef0a7bd4f8000",
+          "parent": "17f1e867fce3f3d8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.853917+08:00",
+          "end": "2026-11-20T10:42:29.853921+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "9bf059d524c25663",
+          "parent": "17f1e867fce3f3d8",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.854598+08:00",
+          "end": "2026-11-20T10:42:29.854598+08:00",
+          "step": 3
+        },
+        {
+          "id": "1fe9e8c60e618db4",
+          "parent": "17f1e867fce3f3d8",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.854602+08:00",
+          "end": "2026-11-20T10:42:29.854602+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-delegation-needed-01",
+      "case_id": "dev-delegation-needed",
+      "case_sha256": "22ea055ba9781942c358ccf458b67d388c950af1d3d4b3ada5e7b7a6423e68da",
+      "split": "development",
+      "family": "delegation-needed",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-48d2b9f55646de02",
+      "revision_id": "local-first-D-dev-delegation-needed-01",
+      "snapshot_id": "snap-226ec77c7fe6bc351b4e8b00",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "d44dd6152a81ad861ce5f233635ce6dd0f32c660e378f6d3e5cc40ec589cde2f",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1519902972/gator/workspaces/4be71e48665648e591babe84dc93b1fa/local-first-D-dev-delegation-needed-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 66
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3958974655/gator/traces/local-first-D-dev-specialist-choice-01/trace.json",
+      "spans": [
+        {
+          "id": "313746b187737cd8",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.894835+08:00",
+          "end": "2026-11-20T02:42:29.943342Z"
+        },
+        {
+          "id": "6a48a21ee834bb5b",
+          "parent": "313746b187737cd8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.914152+08:00",
+          "end": "2026-11-20T10:42:29.914152+08:00",
+          "step": 1
+        },
+        {
+          "id": "5fc8516631050a2a",
+          "parent": "313746b187737cd8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.914155+08:00",
+          "end": "2026-11-20T10:42:29.914158+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "73ee763c37948e38",
+          "parent": "313746b187737cd8",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.914159+08:00",
+          "end": "2026-11-20T10:42:29.921405+08:00",
+          "step": 1
+        },
+        {
+          "id": "25d30560748e77c3",
+          "parent": "313746b187737cd8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.921434+08:00",
+          "end": "2026-11-20T10:42:29.921434+08:00",
+          "step": 2
+        },
+        {
+          "id": "af4f88999735b826",
+          "parent": "313746b187737cd8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.921437+08:00",
+          "end": "2026-11-20T10:42:29.92144+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "82d75129c50df065",
+          "parent": "313746b187737cd8",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.921441+08:00",
+          "end": "2026-11-20T10:42:29.928903+08:00",
+          "step": 2
+        },
+        {
+          "id": "4940ce35182c827a",
+          "parent": "313746b187737cd8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.928915+08:00",
+          "end": "2026-11-20T10:42:29.928915+08:00",
+          "step": 3
+        },
+        {
+          "id": "7e60c36852252859",
+          "parent": "313746b187737cd8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.928917+08:00",
+          "end": "2026-11-20T10:42:29.92892+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "17d472f9374042f4",
+          "parent": "313746b187737cd8",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.929027+08:00",
+          "end": "2026-11-20T10:42:29.929027+08:00",
+          "step": 3
+        },
+        {
+          "id": "5dc115a1631c28c1",
+          "parent": "313746b187737cd8",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.92903+08:00",
+          "end": "2026-11-20T10:42:29.92903+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-specialist-choice-01",
+      "case_id": "dev-specialist-choice",
+      "case_sha256": "afdfe94584d9fb277d8e2d2a1a15e4d940923b9799da61bdd98b1b3efb7b54c3",
+      "split": "development",
+      "family": "specialist-choice",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-65dbb0fa56d260e0",
+      "revision_id": "local-first-D-dev-specialist-choice-01",
+      "snapshot_id": "snap-ac0abb7dc353f11144fea9f6",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "d0e5506b4fec1603900fbb215a60fcc282f2a294f6a8dd963ebb9c2a3195847c",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3958974655/gator/workspaces/e2846fb6f8cae2f2533217ab1c7bdd19/local-first-D-dev-specialist-choice-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 57
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1917681908/gator/traces/local-first-D-dev-unnecessary-delegation-01/trace.json",
+      "spans": [
+        {
+          "id": "eae758a0d30ad18d",
+          "name": "work",
+          "start": "2026-11-20T10:42:29.961463+08:00",
+          "end": "2026-11-20T02:42:30.008935Z"
+        },
+        {
+          "id": "591b091c80b2b85c",
+          "parent": "eae758a0d30ad18d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.98019+08:00",
+          "end": "2026-11-20T10:42:29.98019+08:00",
+          "step": 1
+        },
+        {
+          "id": "aef0ea760082d4c5",
+          "parent": "eae758a0d30ad18d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.980195+08:00",
+          "end": "2026-11-20T10:42:29.980199+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "d0fe0b0df52d6823",
+          "parent": "eae758a0d30ad18d",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:29.980201+08:00",
+          "end": "2026-11-20T10:42:29.985745+08:00",
+          "step": 1
+        },
+        {
+          "id": "afeeafa38c40f4c5",
+          "parent": "eae758a0d30ad18d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.985788+08:00",
+          "end": "2026-11-20T10:42:29.985788+08:00",
+          "step": 2
+        },
+        {
+          "id": "ba1d223fa6e3933a",
+          "parent": "eae758a0d30ad18d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.985795+08:00",
+          "end": "2026-11-20T10:42:29.985798+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "d5b9c72a18edbb30",
+          "parent": "eae758a0d30ad18d",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:29.9858+08:00",
+          "end": "2026-11-20T10:42:29.991875+08:00",
+          "step": 2
+        },
+        {
+          "id": "2d6e6b5b6135dcdc",
+          "parent": "eae758a0d30ad18d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:29.991892+08:00",
+          "end": "2026-11-20T10:42:29.991892+08:00",
+          "step": 3
+        },
+        {
+          "id": "ad571ceb4eaa3db7",
+          "parent": "eae758a0d30ad18d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:29.991895+08:00",
+          "end": "2026-11-20T10:42:29.991899+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "28af45e0dd966ab0",
+          "parent": "eae758a0d30ad18d",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:29.992057+08:00",
+          "end": "2026-11-20T10:42:29.992057+08:00",
+          "step": 3
+        },
+        {
+          "id": "32477f2a9382117c",
+          "parent": "eae758a0d30ad18d",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:29.992061+08:00",
+          "end": "2026-11-20T10:42:29.992061+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-unnecessary-delegation-01",
+      "case_id": "dev-unnecessary-delegation",
+      "case_sha256": "429f7a3bc986c07e9dc77ccb66d3180519536a22a7caca20f62214acb14f5d2d",
+      "split": "development",
+      "family": "unnecessary-delegation",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024229-7ae240607a8d5e59",
+      "revision_id": "local-first-D-dev-unnecessary-delegation-01",
+      "snapshot_id": "snap-e4ebd581fcb13e3e434743dd",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "d1dcc1489cd9d61c4d10445995c56883d5c7316832a0526e03b18c9b9c1eca07",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1917681908/gator/workspaces/f7e13beb3e426965c1cf692905d7061a/local-first-D-dev-unnecessary-delegation-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 57
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-37557583/gator/traces/local-first-D-dev-specialist-failure-01/trace.json",
+      "spans": [
+        {
+          "id": "5d9ff72d38b55b0a",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.027146+08:00",
+          "end": "2026-11-20T02:42:30.076668Z"
+        },
+        {
+          "id": "b7dcbf45ce2d5d95",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.045472+08:00",
+          "end": "2026-11-20T10:42:30.045472+08:00",
+          "step": 1
+        },
+        {
+          "id": "a7796a2d0b5ae1c6",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.045476+08:00",
+          "end": "2026-11-20T10:42:30.045479+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "a30ba6c1a8766826",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.045481+08:00",
+          "end": "2026-11-20T10:42:30.052824+08:00",
+          "step": 1
+        },
+        {
+          "id": "26d536807ec897f1",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.052857+08:00",
+          "end": "2026-11-20T10:42:30.052857+08:00",
+          "step": 2
+        },
+        {
+          "id": "c6e1dd0b5f89e248",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.052861+08:00",
+          "end": "2026-11-20T10:42:30.052864+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "57b0724874a8ca70",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.052865+08:00",
+          "end": "2026-11-20T10:42:30.060856+08:00",
+          "step": 2
+        },
+        {
+          "id": "68b93ec2acad86fe",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.060876+08:00",
+          "end": "2026-11-20T10:42:30.060876+08:00",
+          "step": 3
+        },
+        {
+          "id": "b13dd7ef04f3b991",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.06088+08:00",
+          "end": "2026-11-20T10:42:30.060884+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "e750763a6cea308e",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.061052+08:00",
+          "end": "2026-11-20T10:42:30.061052+08:00",
+          "step": 3
+        },
+        {
+          "id": "8200a6a72ca0eb5a",
+          "parent": "5d9ff72d38b55b0a",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.061056+08:00",
+          "end": "2026-11-20T10:42:30.061056+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-specialist-failure-01",
+      "case_id": "dev-specialist-failure",
+      "case_sha256": "bdb8b3b168cfdd8d224baf2f8c00da10efc5f17cee3ccabf0be5633811b1df7b",
+      "split": "development",
+      "family": "specialist-failure",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-d560d5b38663aeb8",
+      "revision_id": "local-first-D-dev-specialist-failure-01",
+      "snapshot_id": "snap-79d422bf10774a6a0c3266e7",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "d0d5dd7e882ab089bb722c1e09432311d3abc9ba69866c705f696c5d55ad6346",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-37557583/gator/workspaces/68ef2d34e1185dfbd0fc271884646e3f/local-first-D-dev-specialist-failure-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 60
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3568319506/gator/traces/local-first-D-dev-specialist-integration-01/trace.json",
+      "spans": [
+        {
+          "id": "e3e9c2ce4ab7f945",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.095257+08:00",
+          "end": "2026-11-20T02:42:30.146796Z"
+        },
+        {
+          "id": "2185a4955994ac50",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.116107+08:00",
+          "end": "2026-11-20T10:42:30.116107+08:00",
+          "step": 1
+        },
+        {
+          "id": "6cb1f0b44ffe54d5",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.116128+08:00",
+          "end": "2026-11-20T10:42:30.116135+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "0dba897c6266031d",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.116139+08:00",
+          "end": "2026-11-20T10:42:30.12392+08:00",
+          "step": 1
+        },
+        {
+          "id": "e76bb00850b7ae5b",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.124133+08:00",
+          "end": "2026-11-20T10:42:30.124133+08:00",
+          "step": 2
+        },
+        {
+          "id": "1403bba27576466a",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.124158+08:00",
+          "end": "2026-11-20T10:42:30.124165+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "5564ea035db3673b",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.12417+08:00",
+          "end": "2026-11-20T10:42:30.131476+08:00",
+          "step": 2
+        },
+        {
+          "id": "622649712f774fb9",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.131499+08:00",
+          "end": "2026-11-20T10:42:30.131499+08:00",
+          "step": 3
+        },
+        {
+          "id": "6cd3511d4c8705dd",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.131502+08:00",
+          "end": "2026-11-20T10:42:30.131507+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "c15e012338389999",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.13168+08:00",
+          "end": "2026-11-20T10:42:30.13168+08:00",
+          "step": 3
+        },
+        {
+          "id": "ceeeb061c790a5bf",
+          "parent": "e3e9c2ce4ab7f945",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.131683+08:00",
+          "end": "2026-11-20T10:42:30.131683+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-specialist-integration-01",
+      "case_id": "dev-specialist-integration",
+      "case_sha256": "8d652fe0fe8026d67234eff56b128dbe70a1bf24ad8c4fc00377997fb02cccd5",
+      "split": "development",
+      "family": "specialist-integration",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-b4cfa9d51d73eb24",
+      "revision_id": "local-first-D-dev-specialist-integration-01",
+      "snapshot_id": "snap-1b4c314a4952988cd57e5ef9",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "8bff543b6b0030ce409e19ff3e807aac745802e3e694fa155c2ee94a3de437e0",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3568319506/gator/workspaces/85a39e1b357aa54748e8a210a0b5bad9/local-first-D-dev-specialist-integration-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 61
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2566472583/gator/traces/local-first-D-dev-incomplete-work-01/trace.json",
+      "spans": [
+        {
+          "id": "ab75869c70be0c46",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.163774+08:00",
+          "end": "2026-11-20T02:42:30.212899Z"
+        },
+        {
+          "id": "e5b1eb91d964020f",
+          "parent": "ab75869c70be0c46",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.18677+08:00",
+          "end": "2026-11-20T10:42:30.18677+08:00",
+          "step": 1
+        },
+        {
+          "id": "a77289c1c423c822",
+          "parent": "ab75869c70be0c46",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.186774+08:00",
+          "end": "2026-11-20T10:42:30.186779+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "17f389bafe711f9a",
+          "parent": "ab75869c70be0c46",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.18678+08:00",
+          "end": "2026-11-20T10:42:30.193497+08:00",
+          "step": 1
+        },
+        {
+          "id": "bd73a7bac9c24351",
+          "parent": "ab75869c70be0c46",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.193571+08:00",
+          "end": "2026-11-20T10:42:30.193571+08:00",
+          "step": 2
+        },
+        {
+          "id": "83d11603e842d43a",
+          "parent": "ab75869c70be0c46",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.193579+08:00",
+          "end": "2026-11-20T10:42:30.193586+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "378310bfd0503af3",
+          "parent": "ab75869c70be0c46",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.193587+08:00",
+          "end": "2026-11-20T10:42:30.198365+08:00",
+          "step": 2
+        },
+        {
+          "id": "5937343c89e623e5",
+          "parent": "ab75869c70be0c46",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.19838+08:00",
+          "end": "2026-11-20T10:42:30.19838+08:00",
+          "step": 3
+        },
+        {
+          "id": "942185cc94eed720",
+          "parent": "ab75869c70be0c46",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.198382+08:00",
+          "end": "2026-11-20T10:42:30.198387+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "a6c0b4657da63efa",
+          "parent": "ab75869c70be0c46",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.198487+08:00",
+          "end": "2026-11-20T10:42:30.198487+08:00",
+          "step": 3
+        },
+        {
+          "id": "e7977fffb6bb8e33",
+          "parent": "ab75869c70be0c46",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.19849+08:00",
+          "end": "2026-11-20T10:42:30.19849+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-incomplete-work-01",
+      "case_id": "dev-incomplete-work",
+      "case_sha256": "e4587be3cb9d649ef8caf66ffaf736f7103658f028cad9211a2072b41facbaac",
+      "split": "development",
+      "family": "incomplete-work",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-4b44bcbe11d82466",
+      "revision_id": "local-first-D-dev-incomplete-work-01",
+      "snapshot_id": "snap-ef97be0b642937c17134db90",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "3dd5fe1934f76ed859daaaa505af6714bcd3b5e4830e3438450ae07c7965f42d",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2566472583/gator/workspaces/184d49a5298d1e16ed6b24d1d7703f09/local-first-D-dev-incomplete-work-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 59
+    },
+    {
+      "metrics": {
+        "model_requests": 5,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 4,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3455675181/gator/traces/local-first-D-dev-user-correction-01-rev1/trace.json",
+      "spans": [
+        {
+          "id": "5d32eb907e37bd6a",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.286436+08:00",
+          "end": "2026-11-20T02:42:30.336523Z"
+        },
+        {
+          "id": "a7a59c67a67ed4fe",
+          "parent": "5d32eb907e37bd6a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.309001+08:00",
+          "end": "2026-11-20T10:42:30.309001+08:00",
+          "step": 1
+        },
+        {
+          "id": "a5d131e3e8b9b8ef",
+          "parent": "5d32eb907e37bd6a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.309005+08:00",
+          "end": "2026-11-20T10:42:30.309009+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "805b710e3f282780",
+          "parent": "5d32eb907e37bd6a",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.309011+08:00",
+          "end": "2026-11-20T10:42:30.316896+08:00",
+          "step": 1
+        },
+        {
+          "id": "fc8caff841aa22a0",
+          "parent": "5d32eb907e37bd6a",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.316924+08:00",
+          "end": "2026-11-20T10:42:30.316924+08:00",
+          "step": 2
+        },
+        {
+          "id": "063cd49e4ca843b0",
+          "parent": "5d32eb907e37bd6a",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.316934+08:00",
+          "end": "2026-11-20T10:42:30.316938+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "95f9242086f09fd3",
+          "parent": "5d32eb907e37bd6a",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.317288+08:00",
+          "end": "2026-11-20T10:42:30.317288+08:00",
+          "step": 2
+        },
+        {
+          "id": "8ffba8985388b719",
+          "parent": "5d32eb907e37bd6a",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.317294+08:00",
+          "end": "2026-11-20T10:42:30.317294+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-user-correction-01",
+      "case_id": "dev-user-correction",
+      "case_sha256": "aabd49bec35d158a12be7966fef57959675119f9a01f03e8a7070c84825a9799",
+      "split": "development",
+      "family": "user-correction",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-e0abfd455dcec8c7",
+      "revision_id": "local-first-D-dev-user-correction-01-rev1",
+      "snapshot_id": "snap-05175988802eaee7a642daa7",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "01a0f16a88dd73ad2defc25c968b43f0f4a53d9be7509ddfc73d916abba5bde3",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3455675181/gator/workspaces/857750a4143f8bf61ed787cc7db12517/local-first-D-dev-user-correction-01-rev1",
+      "usage": {
+        "unknown_requests": 5,
+        "model_requests": 5,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 116
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-256152315/gator/traces/local-first-D-dev-duplicate-work-01/trace.json",
+      "spans": [
+        {
+          "id": "0464165e648e131e",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.354815+08:00",
+          "end": "2026-11-20T02:42:30.404504Z"
+        },
+        {
+          "id": "7928589902e52576",
+          "parent": "0464165e648e131e",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.370896+08:00",
+          "end": "2026-11-20T10:42:30.370896+08:00",
+          "step": 1
+        },
+        {
+          "id": "8ea5953f00ce12b0",
+          "parent": "0464165e648e131e",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.370904+08:00",
+          "end": "2026-11-20T10:42:30.370909+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "aeb04a40c873c779",
+          "parent": "0464165e648e131e",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.370912+08:00",
+          "end": "2026-11-20T10:42:30.375815+08:00",
+          "step": 1
+        },
+        {
+          "id": "bd47db73ca96321b",
+          "parent": "0464165e648e131e",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.375858+08:00",
+          "end": "2026-11-20T10:42:30.375858+08:00",
+          "step": 2
+        },
+        {
+          "id": "a0e98deffba6e3f2",
+          "parent": "0464165e648e131e",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.375864+08:00",
+          "end": "2026-11-20T10:42:30.375867+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "260d617f30964856",
+          "parent": "0464165e648e131e",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.375869+08:00",
+          "end": "2026-11-20T10:42:30.384861+08:00",
+          "step": 2
+        },
+        {
+          "id": "b8ad5f20d5082149",
+          "parent": "0464165e648e131e",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.384877+08:00",
+          "end": "2026-11-20T10:42:30.384877+08:00",
+          "step": 3
+        },
+        {
+          "id": "fd6b0c3402ec93d8",
+          "parent": "0464165e648e131e",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.384879+08:00",
+          "end": "2026-11-20T10:42:30.384883+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "ea837881c1952334",
+          "parent": "0464165e648e131e",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.384999+08:00",
+          "end": "2026-11-20T10:42:30.384999+08:00",
+          "step": 3
+        },
+        {
+          "id": "bfb65459c6f5cbe6",
+          "parent": "0464165e648e131e",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.385003+08:00",
+          "end": "2026-11-20T10:42:30.385003+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-duplicate-work-01",
+      "case_id": "dev-duplicate-work",
+      "case_sha256": "f4956a542cc362c8482229888e4d82aacf8a0d8593fd4ad72bc8dd8913d31cbf",
+      "split": "development",
+      "family": "duplicate-work",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-dbe91cc5f0c47ead",
+      "revision_id": "local-first-D-dev-duplicate-work-01",
+      "snapshot_id": "snap-b53a415ebdcf98002f8a9725",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "7af8f6a0c5d88f119f6aa436db69db7a93b6b63916e4e71d3e8f51bae3913ba2",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-256152315/gator/workspaces/f386689b735d6773aee0ce25a6bfd5f2/local-first-D-dev-duplicate-work-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 58
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-322056056/gator/traces/local-first-D-dev-safe-cancellation-01/trace.json",
+      "spans": [
+        {
+          "id": "c01067a92a8c22f4",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.421626+08:00",
+          "end": "2026-11-20T02:42:30.464479Z"
+        },
+        {
+          "id": "46dce0609b6ed956",
+          "parent": "c01067a92a8c22f4",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.437162+08:00",
+          "end": "2026-11-20T10:42:30.437162+08:00",
+          "step": 1
+        },
+        {
+          "id": "a19e5b16655d964a",
+          "parent": "c01067a92a8c22f4",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.437166+08:00",
+          "end": "2026-11-20T10:42:30.437169+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "964cb5dc84d276bd",
+          "parent": "c01067a92a8c22f4",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.43717+08:00",
+          "end": "2026-11-20T10:42:30.445417+08:00",
+          "step": 1
+        },
+        {
+          "id": "98b2f2063ae01749",
+          "parent": "c01067a92a8c22f4",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.445453+08:00",
+          "end": "2026-11-20T10:42:30.445453+08:00",
+          "step": 2
+        },
+        {
+          "id": "775f6c9891b73417",
+          "parent": "c01067a92a8c22f4",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.445459+08:00",
+          "end": "2026-11-20T10:42:30.445462+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "4f9f4cc1e4e4d1ee",
+          "parent": "c01067a92a8c22f4",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.445463+08:00",
+          "end": "2026-11-20T10:42:30.452851+08:00",
+          "step": 2
+        },
+        {
+          "id": "323ba3886dc67321",
+          "parent": "c01067a92a8c22f4",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.452869+08:00",
+          "end": "2026-11-20T10:42:30.452869+08:00",
+          "step": 3
+        },
+        {
+          "id": "8f9bbccaa0f15845",
+          "parent": "c01067a92a8c22f4",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.452872+08:00",
+          "end": "2026-11-20T10:42:30.452876+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "93b98d9802b5bafb",
+          "parent": "c01067a92a8c22f4",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.453024+08:00",
+          "end": "2026-11-20T10:42:30.453024+08:00",
+          "step": 3
+        },
+        {
+          "id": "10204fcc264b8ece",
+          "parent": "c01067a92a8c22f4",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.453027+08:00",
+          "end": "2026-11-20T10:42:30.453027+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-safe-cancellation-01",
+      "case_id": "dev-safe-cancellation",
+      "case_sha256": "5abcd0722edb1ca1e80c077fe7c39b9f72205f40661732c869f076bcf6259eb7",
+      "split": "development",
+      "family": "safe-cancellation",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-edae31eabfc3008f",
+      "revision_id": "local-first-D-dev-safe-cancellation-01",
+      "snapshot_id": "snap-d4afd802ee82b53d86b56992",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "8b6f672f5e9e4c6bd518dcff35da144bc90f0c1993b8df662ab74eb0e308273a",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-322056056/gator/workspaces/da7703caadd5dd4255653de197d2a6f3/local-first-D-dev-safe-cancellation-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 50
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3898836209/gator/traces/local-first-D-dev-context-compaction-01/trace.json",
+      "spans": [
+        {
+          "id": "e2f76e8ed8c3ac09",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.478286+08:00",
+          "end": "2026-11-20T02:42:30.521867Z"
+        },
+        {
+          "id": "b203927124830be2",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.495794+08:00",
+          "end": "2026-11-20T10:42:30.495794+08:00",
+          "step": 1
+        },
+        {
+          "id": "75c61f81ad3111ba",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.495799+08:00",
+          "end": "2026-11-20T10:42:30.495802+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "7061a6e10bb940d5",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.495803+08:00",
+          "end": "2026-11-20T10:42:30.500918+08:00",
+          "step": 1
+        },
+        {
+          "id": "45dc6656c57ab894",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.500951+08:00",
+          "end": "2026-11-20T10:42:30.500951+08:00",
+          "step": 2
+        },
+        {
+          "id": "e40332188b65f1f4",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.500955+08:00",
+          "end": "2026-11-20T10:42:30.500957+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "48bdb17bdb6d0d37",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.500958+08:00",
+          "end": "2026-11-20T10:42:30.506867+08:00",
+          "step": 2
+        },
+        {
+          "id": "fc04e4b2ce49424e",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.50688+08:00",
+          "end": "2026-11-20T10:42:30.50688+08:00",
+          "step": 3
+        },
+        {
+          "id": "907e29451f2a05ec",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.506882+08:00",
+          "end": "2026-11-20T10:42:30.506884+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "3e278648f0c40fbb",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.50698+08:00",
+          "end": "2026-11-20T10:42:30.50698+08:00",
+          "step": 3
+        },
+        {
+          "id": "7f5f9a241093b7a4",
+          "parent": "e2f76e8ed8c3ac09",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.506983+08:00",
+          "end": "2026-11-20T10:42:30.506983+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-context-compaction-01",
+      "case_id": "dev-context-compaction",
+      "case_sha256": "abeeacb047f2bd75c081411e93ad9e502eae5271c33d319eb27c3082e6fadd7c",
+      "split": "development",
+      "family": "context-compaction",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-91bdfcbe87df8cb2",
+      "revision_id": "local-first-D-dev-context-compaction-01",
+      "snapshot_id": "snap-6c180ecdc8790f09f0b12cc2",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "16656e26f7feecfcc91738239b35038449d5f9a7f07278ec019082d7d3639c6a",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3898836209/gator/workspaces/22031a6d5347df11c4e4da3a7f61f168/local-first-D-dev-context-compaction-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 52
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-4199992880/gator/traces/local-first-D-dev-long-reference-01/trace.json",
+      "spans": [
+        {
+          "id": "a9efbbcf9402082d",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.537935+08:00",
+          "end": "2026-11-20T02:42:30.585683Z"
+        },
+        {
+          "id": "ad94a832c1c96feb",
+          "parent": "a9efbbcf9402082d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.555906+08:00",
+          "end": "2026-11-20T10:42:30.555906+08:00",
+          "step": 1
+        },
+        {
+          "id": "3d07fa0be3095b64",
+          "parent": "a9efbbcf9402082d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.55591+08:00",
+          "end": "2026-11-20T10:42:30.555913+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "e2d53b54234d0dfa",
+          "parent": "a9efbbcf9402082d",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.555915+08:00",
+          "end": "2026-11-20T10:42:30.560846+08:00",
+          "step": 1
+        },
+        {
+          "id": "96b0bba7424d0e6c",
+          "parent": "a9efbbcf9402082d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.560873+08:00",
+          "end": "2026-11-20T10:42:30.560873+08:00",
+          "step": 2
+        },
+        {
+          "id": "2f9dfe4226f208b2",
+          "parent": "a9efbbcf9402082d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.560876+08:00",
+          "end": "2026-11-20T10:42:30.560878+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "f0173b7c7fdf0791",
+          "parent": "a9efbbcf9402082d",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.560879+08:00",
+          "end": "2026-11-20T10:42:30.568869+08:00",
+          "step": 2
+        },
+        {
+          "id": "772a617f00adb23e",
+          "parent": "a9efbbcf9402082d",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.568887+08:00",
+          "end": "2026-11-20T10:42:30.568887+08:00",
+          "step": 3
+        },
+        {
+          "id": "9cb35a146d92212c",
+          "parent": "a9efbbcf9402082d",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.56889+08:00",
+          "end": "2026-11-20T10:42:30.568893+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "289468b70fd6879c",
+          "parent": "a9efbbcf9402082d",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.569118+08:00",
+          "end": "2026-11-20T10:42:30.569118+08:00",
+          "step": 3
+        },
+        {
+          "id": "1cf901cce801fb32",
+          "parent": "a9efbbcf9402082d",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.569123+08:00",
+          "end": "2026-11-20T10:42:30.569123+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-long-reference-01",
+      "case_id": "dev-long-reference",
+      "case_sha256": "e99c92a314b31f4a299b2a7fb4c4d6d4378159eb8ce7055564a00eba4b5c57f8",
+      "split": "development",
+      "family": "long-reference",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-1e87f313c300f75d",
+      "revision_id": "local-first-D-dev-long-reference-01",
+      "snapshot_id": "snap-70d657f3a870b64e61155471",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "188e094c2c1c4092eeddf05316df2f7101cca7ef3a7dda6f7b4d5fd25bd1830f",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-4199992880/gator/workspaces/06446b171479a75b533fa96205a71caa/local-first-D-dev-long-reference-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 56
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-683900791/gator/traces/local-first-D-dev-prompt-injection-01/trace.json",
+      "spans": [
+        {
+          "id": "b7b6237cc059b373",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.603227+08:00",
+          "end": "2026-11-20T02:42:30.645323Z"
+        },
+        {
+          "id": "5a5999cdaa9cb93b",
+          "parent": "b7b6237cc059b373",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.618668+08:00",
+          "end": "2026-11-20T10:42:30.618668+08:00",
+          "step": 1
+        },
+        {
+          "id": "d832770b60ef67be",
+          "parent": "b7b6237cc059b373",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.618672+08:00",
+          "end": "2026-11-20T10:42:30.618677+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "68e73828c2a84b00",
+          "parent": "b7b6237cc059b373",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.618678+08:00",
+          "end": "2026-11-20T10:42:30.626867+08:00",
+          "step": 1
+        },
+        {
+          "id": "8f8cdec2b628ee9a",
+          "parent": "b7b6237cc059b373",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.626897+08:00",
+          "end": "2026-11-20T10:42:30.626897+08:00",
+          "step": 2
+        },
+        {
+          "id": "4c91ff5d84b465ec",
+          "parent": "b7b6237cc059b373",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.626901+08:00",
+          "end": "2026-11-20T10:42:30.626903+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "9d1712f5f78712c4",
+          "parent": "b7b6237cc059b373",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.626904+08:00",
+          "end": "2026-11-20T10:42:30.632859+08:00",
+          "step": 2
+        },
+        {
+          "id": "c233cf546119ec74",
+          "parent": "b7b6237cc059b373",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.632868+08:00",
+          "end": "2026-11-20T10:42:30.632868+08:00",
+          "step": 3
+        },
+        {
+          "id": "f287dcf470300602",
+          "parent": "b7b6237cc059b373",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.63287+08:00",
+          "end": "2026-11-20T10:42:30.632873+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "cc23e689a5e91c67",
+          "parent": "b7b6237cc059b373",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.632959+08:00",
+          "end": "2026-11-20T10:42:30.632959+08:00",
+          "step": 3
+        },
+        {
+          "id": "d4274282a8b3bb45",
+          "parent": "b7b6237cc059b373",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.632962+08:00",
+          "end": "2026-11-20T10:42:30.632962+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-prompt-injection-01",
+      "case_id": "dev-prompt-injection",
+      "case_sha256": "97606cd41488b347f64d0600143af65832ac4dd3d5bfd4be7d0756360b649271",
+      "split": "development",
+      "family": "prompt-injection",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-30da5a87ba3f16d5",
+      "revision_id": "local-first-D-dev-prompt-injection-01",
+      "snapshot_id": "snap-d5794db172e68f74b7309ccc",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "266c37b549e9c898cc4a9666fd55a8a7ab8b428f9c40755d65b226de38938a16",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-683900791/gator/workspaces/e5617587a5c85fa8dc67fffd95c74a0e/local-first-D-dev-prompt-injection-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 49
+    },
+    {
+      "metrics": {
+        "model_requests": 4,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 1,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1500740267/gator/traces/local-first-D-dev-unauthorized-permission-01/trace.json",
+      "spans": [
+        {
+          "id": "f2b307cd1cecd5b2",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.662148+08:00",
+          "end": "2026-11-20T02:42:30.71644Z"
+        },
+        {
+          "id": "edd49f79543c5f11",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.68491+08:00",
+          "end": "2026-11-20T10:42:30.68491+08:00",
+          "step": 1
+        },
+        {
+          "id": "f337a7eccb9a411d",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.684913+08:00",
+          "end": "2026-11-20T10:42:30.684916+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "c37044bc40923336",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.684917+08:00",
+          "end": "2026-11-20T10:42:30.684958+08:00",
+          "step": 1
+        },
+        {
+          "id": "31c738b21c2fea9c",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.684959+08:00",
+          "end": "2026-11-20T10:42:30.684959+08:00",
+          "step": 2
+        },
+        {
+          "id": "cbc7b6a366335ab7",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.68496+08:00",
+          "end": "2026-11-20T10:42:30.684961+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "5f54627a55f3c231",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.684961+08:00",
+          "end": "2026-11-20T10:42:30.69288+08:00",
+          "step": 2
+        },
+        {
+          "id": "a79359dbe62f7ef4",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.692983+08:00",
+          "end": "2026-11-20T10:42:30.692983+08:00",
+          "step": 3
+        },
+        {
+          "id": "87e2cefb4b63f196",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.692989+08:00",
+          "end": "2026-11-20T10:42:30.692993+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "def6c72c648a98e3",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.692995+08:00",
+          "end": "2026-11-20T10:42:30.699863+08:00",
+          "step": 3
+        },
+        {
+          "id": "4503b7fc39240fe6",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.699886+08:00",
+          "end": "2026-11-20T10:42:30.699886+08:00",
+          "step": 4
+        },
+        {
+          "id": "3c9fe8223758e2bc",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.699892+08:00",
+          "end": "2026-11-20T10:42:30.699896+08:00",
+          "step": 4,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "ac9db1e57b14afde",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.700139+08:00",
+          "end": "2026-11-20T10:42:30.700139+08:00",
+          "step": 4
+        },
+        {
+          "id": "fde482dbc9d9bb53",
+          "parent": "f2b307cd1cecd5b2",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.700147+08:00",
+          "end": "2026-11-20T10:42:30.700147+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-unauthorized-permission-01",
+      "case_id": "dev-unauthorized-permission",
+      "case_sha256": "967edf7884c054f32efa136c0edcc1903203a75ff240452a7fe0c74798804964",
+      "split": "development",
+      "family": "unauthorized-permission",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "kind": "tool_error_contains",
+          "passed": true,
+          "evidence": "expected \".env\"; observed SHA-256 15389f5841faf6a544af85b0745fdedabdf1b8d549e679930a1e2b83b2b5ef35"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-4d97ca0f515ff1a7",
+      "revision_id": "local-first-D-dev-unauthorized-permission-01",
+      "snapshot_id": "snap-6cad00c30d89d67b1b8189c0",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "955a9ef637fb2ed92d503648aac00201f857cbd907b1bdd2d3c52adb7e330c24",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-1500740267/gator/workspaces/5ef4ee85357f403b5e229b4c61aabad3/local-first-D-dev-unauthorized-permission-01",
+      "usage": {
+        "unknown_requests": 4,
+        "model_requests": 4,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 63
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-304706697/gator/traces/local-first-D-dev-unavailable-runtime-01/trace.json",
+      "spans": [
+        {
+          "id": "938418c768b43608",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.733699+08:00",
+          "end": "2026-11-20T02:42:30.789396Z"
+        },
+        {
+          "id": "0aff3760f02b37ed",
+          "parent": "938418c768b43608",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.75583+08:00",
+          "end": "2026-11-20T10:42:30.75583+08:00",
+          "step": 1
+        },
+        {
+          "id": "21c918389cbc1c2e",
+          "parent": "938418c768b43608",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.755836+08:00",
+          "end": "2026-11-20T10:42:30.755841+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "b101586237f1ed87",
+          "parent": "938418c768b43608",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.755843+08:00",
+          "end": "2026-11-20T10:42:30.761941+08:00",
+          "step": 1
+        },
+        {
+          "id": "997af6f3b9d13e73",
+          "parent": "938418c768b43608",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.761996+08:00",
+          "end": "2026-11-20T10:42:30.761996+08:00",
+          "step": 2
+        },
+        {
+          "id": "034b082d298ad487",
+          "parent": "938418c768b43608",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.762001+08:00",
+          "end": "2026-11-20T10:42:30.762004+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "804151aa64cbfc3f",
+          "parent": "938418c768b43608",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.762006+08:00",
+          "end": "2026-11-20T10:42:30.770863+08:00",
+          "step": 2
+        },
+        {
+          "id": "efd785024346ed66",
+          "parent": "938418c768b43608",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.770882+08:00",
+          "end": "2026-11-20T10:42:30.770882+08:00",
+          "step": 3
+        },
+        {
+          "id": "1de7cd79bc3064e3",
+          "parent": "938418c768b43608",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.770886+08:00",
+          "end": "2026-11-20T10:42:30.770889+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "81d5f823a0380885",
+          "parent": "938418c768b43608",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.771277+08:00",
+          "end": "2026-11-20T10:42:30.771277+08:00",
+          "step": 3
+        },
+        {
+          "id": "af870b71d2e9288d",
+          "parent": "938418c768b43608",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.771281+08:00",
+          "end": "2026-11-20T10:42:30.771281+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-unavailable-runtime-01",
+      "case_id": "dev-unavailable-runtime",
+      "case_sha256": "ddf51d27c024806158354139befa8b3c437b0fd4907db783bf46dbd71dd5c724",
+      "split": "development",
+      "family": "unavailable-runtime",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-c40b7983c3cb2963",
+      "revision_id": "local-first-D-dev-unavailable-runtime-01",
+      "snapshot_id": "snap-b4751e460ad950a883668ff2",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "afab35a2f8b074ff6e7c41ca31101adef4b0ead0fbf4ba0f2ad0313cafd58cda",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-304706697/gator/workspaces/f8ef3a4d2c49aa9ab398e0cffec64e6c/local-first-D-dev-unavailable-runtime-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 63
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3843183930/gator/traces/local-first-D-dev-resource-exhaustion-01/trace.json",
+      "spans": [
+        {
+          "id": "f081be18b4504fd7",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.805892+08:00",
+          "end": "2026-11-20T02:42:30.851561Z"
+        },
+        {
+          "id": "c4e06b1c2d62115f",
+          "parent": "f081be18b4504fd7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.824234+08:00",
+          "end": "2026-11-20T10:42:30.824234+08:00",
+          "step": 1
+        },
+        {
+          "id": "956b9ea88a118f34",
+          "parent": "f081be18b4504fd7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.824238+08:00",
+          "end": "2026-11-20T10:42:30.824241+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "951f64c151dcdcd6",
+          "parent": "f081be18b4504fd7",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.824242+08:00",
+          "end": "2026-11-20T10:42:30.831781+08:00",
+          "step": 1
+        },
+        {
+          "id": "65cf91c83025e23d",
+          "parent": "f081be18b4504fd7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.831809+08:00",
+          "end": "2026-11-20T10:42:30.831809+08:00",
+          "step": 2
+        },
+        {
+          "id": "cae900a31c9e30f0",
+          "parent": "f081be18b4504fd7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.831812+08:00",
+          "end": "2026-11-20T10:42:30.831814+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "a21272394b99b549",
+          "parent": "f081be18b4504fd7",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.831815+08:00",
+          "end": "2026-11-20T10:42:30.83887+08:00",
+          "step": 2
+        },
+        {
+          "id": "3928cedb08c0bc9c",
+          "parent": "f081be18b4504fd7",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.838917+08:00",
+          "end": "2026-11-20T10:42:30.838917+08:00",
+          "step": 3
+        },
+        {
+          "id": "3601b1796b766bae",
+          "parent": "f081be18b4504fd7",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.838921+08:00",
+          "end": "2026-11-20T10:42:30.838926+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "d33a834c87d78687",
+          "parent": "f081be18b4504fd7",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.839063+08:00",
+          "end": "2026-11-20T10:42:30.839063+08:00",
+          "step": 3
+        },
+        {
+          "id": "8bebc7c845a37d1b",
+          "parent": "f081be18b4504fd7",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.839067+08:00",
+          "end": "2026-11-20T10:42:30.839067+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-resource-exhaustion-01",
+      "case_id": "dev-resource-exhaustion",
+      "case_sha256": "9b63ba7ff2f9a8ab363bc9af488c855a2ff6264f495354c0af9ab44421f03511",
+      "split": "development",
+      "family": "resource-exhaustion",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-a895c3c3c3db3318",
+      "revision_id": "local-first-D-dev-resource-exhaustion-01",
+      "snapshot_id": "snap-0dfc6733b9af4f3437eca858",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "19359449189642db4260b48c85658feb7effd28723b0caa6bd29652639b6edd3",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-3843183930/gator/workspaces/a584783da3cec8d2e38c39c1dbe50548/local-first-D-dev-resource-exhaustion-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 54
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2221582477/gator/traces/local-first-D-dev-offline-operation-01/trace.json",
+      "spans": [
+        {
+          "id": "84b32160a19639b8",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.869974+08:00",
+          "end": "2026-11-20T02:42:30.917534Z"
+        },
+        {
+          "id": "a6e64eea623b55e2",
+          "parent": "84b32160a19639b8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.889796+08:00",
+          "end": "2026-11-20T10:42:30.889796+08:00",
+          "step": 1
+        },
+        {
+          "id": "d574299462a36e4c",
+          "parent": "84b32160a19639b8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.889798+08:00",
+          "end": "2026-11-20T10:42:30.889801+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "b5c87226c1ba6096",
+          "parent": "84b32160a19639b8",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.889803+08:00",
+          "end": "2026-11-20T10:42:30.896841+08:00",
+          "step": 1
+        },
+        {
+          "id": "a8854659df97759a",
+          "parent": "84b32160a19639b8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.896874+08:00",
+          "end": "2026-11-20T10:42:30.896874+08:00",
+          "step": 2
+        },
+        {
+          "id": "41d7d220be335ca5",
+          "parent": "84b32160a19639b8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.896877+08:00",
+          "end": "2026-11-20T10:42:30.896879+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "45ea9bc3787b80e9",
+          "parent": "84b32160a19639b8",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.89688+08:00",
+          "end": "2026-11-20T10:42:30.903881+08:00",
+          "step": 2
+        },
+        {
+          "id": "f60f4fb5c0af6d68",
+          "parent": "84b32160a19639b8",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.903897+08:00",
+          "end": "2026-11-20T10:42:30.903897+08:00",
+          "step": 3
+        },
+        {
+          "id": "64c1f0b048e37afc",
+          "parent": "84b32160a19639b8",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.903901+08:00",
+          "end": "2026-11-20T10:42:30.903904+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "fcb21dd8480135e9",
+          "parent": "84b32160a19639b8",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.904058+08:00",
+          "end": "2026-11-20T10:42:30.904058+08:00",
+          "step": 3
+        },
+        {
+          "id": "ce511cbbcd4123cf",
+          "parent": "84b32160a19639b8",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.904062+08:00",
+          "end": "2026-11-20T10:42:30.904062+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-offline-operation-01",
+      "case_id": "dev-offline-operation",
+      "case_sha256": "48659c48c3e06a6246cb5d3bd9a64b570406b05d39c2df87ff4731ae7c62a687",
+      "split": "development",
+      "family": "offline-operation",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-d9b1d0b28fcb19c4",
+      "revision_id": "local-first-D-dev-offline-operation-01",
+      "snapshot_id": "snap-2f43cba2bea4baa6ff72dadf",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "defbbdf1365a476bb8f787cfa3033c568714cd7f8c69b5a2754ba2813bf8a027",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-2221582477/gator/workspaces/dc090b551c8eebc32ace23672a03246c/local-first-D-dev-offline-operation-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 55
+    },
+    {
+      "metrics": {
+        "model_requests": 3,
+        "retries": 0,
+        "tool_surface_fallbacks": 0,
+        "interventions": 0,
+        "tool_failures": 0,
+        "artifact_checks": 2,
+        "failed_artifact_checks": 0,
+        "unsupported_quotes": 0
+      },
+      "transaction": {
+        "work": {
+          "state": "completed",
+          "evidence": "canonical Work history"
+        },
+        "history": {
+          "state": "passed",
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        "verification": {
+          "state": "passed",
+          "evidence": "sealed artifact validations passed"
+        },
+        "delivery": {
+          "state": "not_attempted",
+          "evidence": "verified Work result has no local delivery attempt"
+        },
+        "recovery": {
+          "state": "not_run",
+          "evidence": "no local delivery attempt"
+        },
+        "external_actions": {
+          "state": "none",
+          "evidence": "no external action record"
+        }
+      },
+      "execution_category": "completed",
+      "trace_path": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-990326479/gator/traces/local-first-D-dev-explicit-cloud-selection-01/trace.json",
+      "spans": [
+        {
+          "id": "f1a08108d9f1bc92",
+          "name": "work",
+          "start": "2026-11-20T10:42:30.933866+08:00",
+          "end": "2026-11-20T02:42:30.97815Z"
+        },
+        {
+          "id": "b724107d30fc5492",
+          "parent": "f1a08108d9f1bc92",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.949608+08:00",
+          "end": "2026-11-20T10:42:30.949608+08:00",
+          "step": 1
+        },
+        {
+          "id": "8dc1c120d1f9e8ef",
+          "parent": "f1a08108d9f1bc92",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.949611+08:00",
+          "end": "2026-11-20T10:42:30.949615+08:00",
+          "step": 1,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "07063f61213d749a",
+          "parent": "f1a08108d9f1bc92",
+          "name": "tool/read_file",
+          "start": "2026-11-20T10:42:30.949616+08:00",
+          "end": "2026-11-20T10:42:30.955862+08:00",
+          "step": 1
+        },
+        {
+          "id": "070ddf5b172a4d8d",
+          "parent": "f1a08108d9f1bc92",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.955942+08:00",
+          "end": "2026-11-20T10:42:30.955942+08:00",
+          "step": 2
+        },
+        {
+          "id": "df5360270a6b28e5",
+          "parent": "f1a08108d9f1bc92",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.95595+08:00",
+          "end": "2026-11-20T10:42:30.955966+08:00",
+          "step": 2,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "61cec2ca0a4429a5",
+          "parent": "f1a08108d9f1bc92",
+          "name": "tool/write_artifact",
+          "start": "2026-11-20T10:42:30.955971+08:00",
+          "end": "2026-11-20T10:42:30.963859+08:00",
+          "step": 2
+        },
+        {
+          "id": "4ac1d058da9d8a25",
+          "parent": "f1a08108d9f1bc92",
+          "name": "turn_started",
+          "start": "2026-11-20T10:42:30.963875+08:00",
+          "end": "2026-11-20T10:42:30.963875+08:00",
+          "step": 3
+        },
+        {
+          "id": "10d2a04a71c143d8",
+          "parent": "f1a08108d9f1bc92",
+          "name": "model_attempt",
+          "start": "2026-11-20T10:42:30.963878+08:00",
+          "end": "2026-11-20T10:42:30.963884+08:00",
+          "step": 3,
+          "attempt": 1,
+          "usage": {
+            "unknown_requests": 0,
+            "model_requests": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "reported": false,
+            "estimated": false
+          }
+        },
+        {
+          "id": "9b0a1a1c0d4e730a",
+          "parent": "f1a08108d9f1bc92",
+          "name": "run_finished",
+          "start": "2026-11-20T10:42:30.964486+08:00",
+          "end": "2026-11-20T10:42:30.964486+08:00",
+          "step": 3
+        },
+        {
+          "id": "d60cd09aee3f9bc8",
+          "parent": "f1a08108d9f1bc92",
+          "name": "artifact_seal",
+          "start": "2026-11-20T10:42:30.964489+08:00",
+          "end": "2026-11-20T10:42:30.964489+08:00"
+        }
+      ],
+      "version": 1,
+      "id": "local-first-D-dev-explicit-cloud-selection-01",
+      "case_id": "dev-explicit-cloud-selection",
+      "case_sha256": "3e649492ecbb7f4235ad4398fbab2241e4ae23349355bb0825a05191a2aca1da",
+      "split": "development",
+      "family": "explicit-cloud-selection",
+      "trial": 1,
+      "status": "passed",
+      "category": "success",
+      "grades": [
+        {
+          "kind": "source_integrity",
+          "passed": true,
+          "evidence": "live fixture tree digest before and after execution"
+        },
+        {
+          "kind": "transaction_history",
+          "passed": true,
+          "evidence": "history, snapshot, revision, and delivery references resolve"
+        },
+        {
+          "local_first": {
+            "valid_schema": true,
+            "route_correct": true,
+            "unnecessary_delegation": false,
+            "incorrect_completion": false,
+            "answer_matches_reference": true
+          },
+          "kind": "local_first_decision",
+          "passed": true,
+          "evidence": "finite decision schema and reference fields; no response text copied"
+        }
+      ],
+      "conversation_id": "work-20261120T024230-cc07f306aa174930",
+      "revision_id": "local-first-D-dev-explicit-cloud-selection-01",
+      "snapshot_id": "snap-d27a3eb51a20d8877c1a854a",
+      "contract_sha256": "0de659a76108e422898d9040e9d7867a88c5c11321fcd2dbe799ebe0475acd31",
+      "policy_sha256": "907f11615d293edb44316e4388f91c67790deece8471c2097bdb3ee578cad624",
+      "source_sha256": "b789cc92f2eadc140f46c618ba629009c299a3734b9771a3da0916ff254eb556",
+      "bundle_path": "/private/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/gator-p04l-1-final-jtwvw74a/D-development/state-990326479/gator/workspaces/6577288d278712dc925c82340565db51/local-first-D-dev-explicit-cloud-selection-01",
+      "usage": {
+        "unknown_requests": 3,
+        "model_requests": 3,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reported": false,
+        "estimated": false
+      },
+      "duration_ms": 54
+    }
+  ],
+  "categories": {
+    "success": 25
+  },
+  "passed": 25,
+  "total": 25,
+  "cases_at_least_one": 25,
+  "cases_all": 25
+}

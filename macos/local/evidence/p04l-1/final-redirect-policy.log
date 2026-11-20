@@ -1,0 +1,5 @@
+=== RUN   TestLocalFirstAuditLoopbackClientFollowsAnOffHostRedirect
+    local_first_audit_test.go:35: LF-03 reproduced without network: initial loopback validation does not constrain redirected requests
+--- PASS: TestLocalFirstAuditLoopbackClientFollowsAnOffHostRedirect (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/internal/localmodel	1.535s

@@ -1,0 +1,41 @@
+[
+  {
+    "name": "final-go-regression",
+    "command": [
+      "go",
+      "test",
+      "-json",
+      "-count=1",
+      "./internal/eval",
+      "./internal/localmodel",
+      "./internal/modelcatalog",
+      "./internal/cliagent",
+      "./internal/config",
+      "./internal/model/...",
+      "./internal/agent",
+      "./internal/workrun",
+      "./cmd/gator"
+    ],
+    "exit": 0,
+    "seconds": 51.09829512500437
+  },
+  {
+    "name": "final-race",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-json",
+      "-count=1",
+      "./internal/eval",
+      "./internal/localmodel",
+      "./internal/config",
+      "./internal/cliagent",
+      "./cmd/gator",
+      "-run",
+      "TestLocalFirst|TestSettingsUpdates|TestNativeProvider|TestCloud|TestNative"
+    ],
+    "exit": 0,
+    "seconds": 20.24397254199721
+  }
+]

@@ -1,0 +1,17 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.15s)
+Test Suite 'Selected tests' started at 2026-11-20 10:59:23.170.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 10:59:23.170.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 10:59:23.170.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 10:59:23.170.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() started.
+✘ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() recorded an issue at NativeMascotTests.swift:161:5: Expectation failed: (player.animationStarts == 1 && player.activeFrameBytes > 0 → true) && (player.layer.animationKeys() != nil → false)
+✘ Test presenceGIFIsFiniteAndCancellationClearsEveryFrame() failed after 0.004 seconds with 1 issue.
+✘ Test run with 1 test in 0 suites failed after 0.004 seconds with 1 issue.

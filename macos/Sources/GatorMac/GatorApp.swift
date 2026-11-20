@@ -49,7 +49,7 @@ struct GatorApp: App {
                 AllConversationsButton(sessions: application).keyboardShortcut("o", modifiers: [.command, .shift])
                 Menu("Recent Conversations") { RecentConversationItems(sessions: application) }
                 MenuBarVisibilityToggle()
-                SettingsLink { Text("Mascot Appearance…") }
+                SettingsLink { Text("Agent Presence…") }
                 NativeDesktopPetMenu()
                 Button("Show Notch Quick Access") { delegate.quickAccess?.show() }.keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(delegate.quickAccess?.canShow != true)

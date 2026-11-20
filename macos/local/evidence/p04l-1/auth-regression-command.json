@@ -1,0 +1,10 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./internal/auth"
+  ],
+  "exit": 0,
+  "seconds": 1.4216925830114633
+}

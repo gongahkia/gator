@@ -107,11 +107,11 @@ private func petScreen(_ id: String = "primary", x: Double = 0, y: Double = 0) -
     defaults.set(true, forKey: NativeDesktopPetPreference.shown)
     defaults.set(false, forKey: NativeMascotPreference.shown)
     defaults.set(false, forKey: NativeMascotPreference.animated)
-    defaults.set("classic", forKey: NativeMascotPreference.style)
+    defaults.set("classic", forKey: "gator.mascot.style")
     let surface = PetSurfaceFixture()
     let pet = NativeDesktopPet(defaults: defaults, readSignal: { .init(owner: "A", connected: true) }, isClosing: { false }, screens: { [petScreen()] }, makeSurface: { surface })
     defer { pet.stop() }
-    #expect(surface.requests.last?.style == .classic)
+    #expect(surface.requests.last?.mode == .emoji)
     #expect(surface.requests.last?.motionAllowed == false)
     #expect(surface.requests.last?.reduceMotion == NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
 }
@@ -208,4 +208,23 @@ private func petScreen(_ id: String = "primary", x: Double = 0, y: Double = 0) -
     defaults.set(false, forKey: NativeDesktopPetPreference.shown); pet.reconcile()
     NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidWakeNotification, object: nil); pet.reconcile()
     #expect(surface.requests.count == 2 && !defaults.bool(forKey: NativeDesktopPetPreference.shown))
+}
+
+@Test @MainActor func desktopPresenceOffStopsOverlayWithoutReenablingOrClearingVisibilityChoices() throws {
+    let (defaults, suite) = try petDefaults(); defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set(true, forKey: NativeDesktopPetPreference.shown)
+    defaults.set(false, forKey: NativeMascotPreference.shown)
+    defaults.set("off", forKey: NativeMascotPreference.mode)
+    var reads = 0, creates = 0
+    let surface = PetSurfaceFixture()
+    let pet = NativeDesktopPet(defaults: defaults, readSignal: { reads += 1; return .init(owner: "A", connected: true) }, isClosing: { false }, screens: { [petScreen()] }, makeSurface: { creates += 1; return surface })
+    defer { pet.stop() }
+    #expect(reads == 0 && creates == 0)
+    defaults.set("reactions", forKey: NativeMascotPreference.mode); pet.reconcile()
+    #expect(surface.requests.last?.mode == .reactions && creates == 1)
+    defaults.set("off", forKey: NativeMascotPreference.mode); pet.reconcile()
+    #expect(surface.closes == 1 && defaults.bool(forKey: NativeDesktopPetPreference.shown))
+    defaults.set(false, forKey: NativeDesktopPetPreference.shown)
+    defaults.set("emoji", forKey: NativeMascotPreference.mode); pet.reconcile()
+    #expect(creates == 1 && !defaults.bool(forKey: NativeDesktopPetPreference.shown))
 }

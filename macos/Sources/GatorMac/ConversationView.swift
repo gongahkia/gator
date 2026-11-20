@@ -177,7 +177,7 @@ struct ConversationView: View {
             }
             Toggle("Notch Quick Access", isOn: $notchEnabled)
             MenuBarVisibilityToggle()
-            SettingsLink { Text("Mascot Appearance…") }
+            SettingsLink { Text("Agent Presence…") }
             NativeDesktopPetMenu()
             Button("Connection & Model Details") { connectionDetails = true }
             Divider()
