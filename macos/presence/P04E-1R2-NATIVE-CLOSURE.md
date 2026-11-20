@@ -6,7 +6,7 @@ Development candidate: `/tmp/Gator-Native-P04E1R2-Verified.app`. This is the req
 
 ## Source identity and preservation
 
-Starting HEAD: `c34735f0bc49d7a920c354e7bb10a94cecbfedcc`. The starting worktree already contained P04E-1R changes and evidence; these were preserved. No commit, checkout or reset was made. [Starting status and hashes](evidence/p04e-1r2/starting-state.json), [final source/bundle manifest](evidence/p04e-1r2/final-manifest.json).
+Starting HEAD: `c34735f0bc49d7a920c354e7bb10a94cecbfedcc`. The starting worktree already contained P04E-1R changes and evidence; these were preserved. HEAD advanced through concurrent external commits; this task issued no commit, checkout or reset command. File hashes identify the tested source independently of that moving HEAD. [Starting status and hashes](evidence/p04e-1r2/starting-state.json), [final source/bundle manifest](evidence/p04e-1r2/final-manifest.json).
 
 Host: Apple M3, 16 GiB, macOS 26.5.2 (25F84). The package remains macOS 15+. Development/debug build; no signing or notarization operation.
 
