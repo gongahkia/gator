@@ -1,0 +1,13 @@
+{
+  "time": "2026-11-21T09:29:51.179337",
+  "head": "abffb85385411245780c1339eb56043d7caa5a09",
+  "status": "",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "hashes": {
+    "cmd/gator/local_manager.go": "e91693e5d2c90f6e4549b9e4b477a78fdcfa82b0bc5417e17a625144aa29d40e",
+    "internal/localmodel/ollama.go": "2648636daeb8d28cd321961069d983b5c44afe303c6bbdb03dda0e2dd5ee8492",
+    "internal/model/compatible.go": "55bcf8387e5b2be27eddd6eb0a767b88870480875aae29990993095b9cc66b2d",
+    "macos/Sources/GatorMac/ProviderSetupView.swift": "057f43b216abc8867db84e738f1bef50ad6894fa964cc75945d39cfcc62e33a0",
+    "macos/Sources/GatorCore/NativeProviderSetup.swift": "15a932f07e182ef8562a9df0eed87a924bf0eada2ac3a9827efb5fa92085c8b9"
+  }
+}
