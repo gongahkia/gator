@@ -1,0 +1,88 @@
+{
+  "before": {
+    "empty-host": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 45.578125,
+      "footprintMiBMedian": 10.203765869140625,
+      "largestPeakMiB": 10.235015869140625
+    },
+    "visible-static": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 56.8046875,
+      "footprintMiBMedian": 17.383499145507812,
+      "largestPeakMiB": 17.48503875732422
+    },
+    "preference-switch-stress": {
+      "cpuMedian": 1.4143555842670805,
+      "rssMiBMedian": 57.0703125,
+      "footprintMiBMedian": 17.633499145507812,
+      "largestPeakMiB": 17.76628875732422
+    },
+    "settled": {
+      "cpuMedian": 0.019263580371370655,
+      "rssMiBMedian": 57.078125,
+      "footprintMiBMedian": 17.641311645507812,
+      "largestPeakMiB": 17.78191375732422
+    },
+    "hidden-component": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.125,
+      "footprintMiBMedian": 17.672561645507812,
+      "largestPeakMiB": 17.81316375732422
+    },
+    "released-content": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.125,
+      "footprintMiBMedian": 17.67253875732422,
+      "largestPeakMiB": 17.81316375732422
+    },
+    "layout": {
+      "reloadProjectionMilliseconds": 22.456708,
+      "reactionFilterMedianMilliseconds": 3.563917,
+      "hostedInsertionMilliseconds": 18.438041
+    }
+  },
+  "after": {
+    "empty-host": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 45.515625,
+      "footprintMiBMedian": 10.203765869140625,
+      "largestPeakMiB": 10.313163757324219
+    },
+    "visible-static": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.6640625,
+      "footprintMiBMedian": 17.64910125732422,
+      "largestPeakMiB": 17.969436645507812
+    },
+    "preference-switch-stress": {
+      "cpuMedian": 4.949069896701321,
+      "rssMiBMedian": 58.0390625,
+      "footprintMiBMedian": 17.97722625732422,
+      "largestPeakMiB": 18.031936645507812
+    },
+    "settled": {
+      "cpuMedian": 0.026322696057623256,
+      "rssMiBMedian": 58.046875,
+      "footprintMiBMedian": 17.98503875732422,
+      "largestPeakMiB": 18.031936645507812
+    },
+    "hidden-component": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 58.03125,
+      "footprintMiBMedian": 17.95378875732422,
+      "largestPeakMiB": 18.047561645507812
+    },
+    "released-content": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 58.03125,
+      "footprintMiBMedian": 17.95378875732422,
+      "largestPeakMiB": 18.047561645507812
+    },
+    "layout": {
+      "reloadProjectionMilliseconds": 22.620708,
+      "reactionFilterMedianMilliseconds": 3.613625,
+      "hostedInsertionMilliseconds": 22.323416
+    }
+  }
+}

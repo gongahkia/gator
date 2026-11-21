@@ -5,7 +5,7 @@ import "strings"
 // QuickAcknowledgement recognizes whole messages, never actionable fragments.
 // Missing confidence costs an ordinary route, not a suppressed useful answer.
 func QuickAcknowledgement(request ConversationRequest) (ConversationDecision, bool) {
-	if validateConversationRequest(request) != nil || request.AcknowledgementBlocked || request.HasFiles || request.PlanFirst || !AcknowledgementContextSafe(request.Tasks, request.Recent) || len(request.Text) > 160 {
+	if len(request.Text) > 160 || request.AcknowledgementBlocked || request.HasFiles || request.PlanFirst || validateConversationRequest(request) != nil || !AcknowledgementContextSafe(request.Tasks, request.Recent) {
 		return ConversationDecision{}, false
 	}
 	text := strings.ToLower(strings.TrimSpace(request.Text))
@@ -36,7 +36,7 @@ func QuickAcknowledgement(request ConversationRequest) (ConversationDecision, bo
 // outstanding question may be asking for a consequential confirmation.
 func AcknowledgementContextSafe(tasks []ConversationTask, recent []ConversationMessage) bool {
 	for _, task := range tasks {
-		if task.NeedsInspection || task.CanCorrectAction || task.CanRevisePlan || task.CanReviewInputs || task.State == "review" || task.State == "unconfirmed" || task.State == "interrupted" {
+		if task.NeedsInspection || task.CanCorrectAction || task.CanRevisePlan || task.CanReviewInputs || (task.State != "running" && task.State != "completed") {
 			return false
 		}
 	}
@@ -62,7 +62,7 @@ func AcknowledgementPresentation(kind string) (emoji, level, fallback string) {
 	case "appreciation":
 		return "❤️", "subtle", "You're welcome."
 	case "laughter":
-		return "😂", "subtle", "Glad that made you smile."
+		return "😂", "subtle", "Haha!"
 	case "praise":
 		return "🙌", "subtle", "Thanks for the kind words."
 	case "farewell":

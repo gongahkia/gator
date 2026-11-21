@@ -1,11 +1,11 @@
 {
-  "admissionToReactionMilliseconds" : 31.135667000000002,
-  "conversation" : "work-20261120T085706-15451935b8b205cf",
+  "admissionToReactionMilliseconds" : 29.636917,
+  "conversation" : "work-20261120T093435-13fb626fb0acd68c",
   "modelRequests" : 0,
   "ownerCount" : 1,
   "restoredDraft" : true,
   "restoredReaction" : true,
   "retainedVersion" : 1,
   "revision" : 3,
-  "turn" : "c6641908549e8020a9ebdfeaf27a2b87705a5898a9bbc297c04df3f612f43d63"
+  "turn" : "64096eaa52edf377a793f4c4a0b442d9984a10e6d8eed71ea69f388412d70589"
 }

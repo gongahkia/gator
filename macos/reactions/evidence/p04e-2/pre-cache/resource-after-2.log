@@ -1,0 +1,12 @@
+Test Suite 'Selected tests' started at 2026-11-20 17:08:52.594.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 17:08:52.595.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 17:08:52.595.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 17:08:52.595.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test messageReactionResourceTrial() started.
+✔ Test messageReactionResourceTrial() passed after 18.023 seconds.
+✔ Test run with 1 test in 0 suites passed after 18.024 seconds.

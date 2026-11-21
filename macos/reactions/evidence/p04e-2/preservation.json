@@ -1,0 +1,12 @@
+{
+  "spinnerComparisonByteIdentical": true,
+  "protectedFilesUnchanged": [
+    "macos/Sources/GatorCore/GatorApplicationState.swift",
+    "macos/Sources/GatorCore/ManagedSessionCoordinator.swift",
+    "macos/Sources/GatorMac/NativeStreamingReveal.swift",
+    "macos/Sources/GatorMac/NativeMotionPresentation.swift",
+    "macos/Sources/GatorMac/NativeThinkingPulse.swift",
+    "macos/Sources/GatorMac/NativeReadingPositions.swift",
+    "internal/worksession/dialogue.go"
+  ]
+}

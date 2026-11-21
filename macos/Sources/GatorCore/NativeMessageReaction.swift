@@ -25,7 +25,7 @@ public struct NativeMessageReaction: Equatable, Sendable, Identifiable {
         let expected: (String, String, String, String)
         switch kind {
         case "appreciation": expected = ("❤️", "subtle", "Gator reacted with a heart: appreciation", "You're welcome.")
-        case "laughter": expected = ("😂", "subtle", "Gator reacted with laughter", "Glad that made you smile.")
+        case "laughter": expected = ("😂", "subtle", "Gator reacted with laughter", "Haha!")
         case "praise": expected = ("🙌", "subtle", "Gator reacted with raised hands: appreciation", "Thanks for the kind words.")
         case "farewell": expected = ("👋", "subtle", "Gator reacted with a farewell wave", "Take care!")
         case "greeting": expected = ("👋", "expressive", "Gator reacted with a greeting wave", "Hello!")
@@ -37,10 +37,12 @@ public struct NativeMessageReaction: Equatable, Sendable, Identifiable {
     }
 }
 
-public extension BridgeMessage {
-    var messageReaction: NativeMessageReaction? {
-        guard isUser, let reaction = NativeMessageReaction(turn: value["reaction_turn"], conversation: value["reaction_conversation"].string),
-              id.utf8.elementsEqual(("conversation:" + reaction.conversation + ":dialogue:" + reaction.turn + ":user").utf8) else { return nil }
+extension NativeMessageReaction {
+    static func bound(messageID: String, value: JSONValue) -> NativeMessageReaction? {
+        let role = value["role"].string
+        guard role == "You" || role.lowercased() == "user",
+              let reaction = NativeMessageReaction(turn: value["reaction_turn"], conversation: value["reaction_conversation"].string),
+              messageID.utf8.elementsEqual(("conversation:" + reaction.conversation + ":dialogue:" + reaction.turn + ":user").utf8) else { return nil }
         return reaction
     }
 }

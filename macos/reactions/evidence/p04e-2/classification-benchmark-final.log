@@ -1,0 +1,9 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/gongahkia/gator/internal/workrun
+cpu: Apple M3
+BenchmarkQuickAcknowledgement-8   	 8897607	       131.1 ns/op	      32 B/op	       1 allocs/op
+BenchmarkQuickAcknowledgement-8   	 9192290	       131.0 ns/op	      32 B/op	       1 allocs/op
+BenchmarkQuickAcknowledgement-8   	 9136658	       131.2 ns/op	      32 B/op	       1 allocs/op
+PASS
+ok  	github.com/gongahkia/gator/internal/workrun	4.153s

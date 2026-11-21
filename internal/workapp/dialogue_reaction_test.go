@@ -4,20 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
-func TestDialogueReactionPersistsWithoutModelWorkOrDuplicateAdmission(t *testing.T) {
+func reactionConfig(t *testing.T) (Config, worksession.Store) {
 	config, store := dialogueConfig(t)
+	ordinary := config.RouteConversation
+	config.RouteConversation = reactionRoute(ordinary)
+	return config, store
+}
+func reactionRoute(ordinary func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error)) func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+	return func(ctx context.Context, request workrun.ConversationRequest, input ConversationInput) (workrun.ConversationDecision, error) {
+		if err := ctx.Err(); err != nil {
+			return workrun.ConversationDecision{}, err
+		}
+		if decision, ok := workrun.QuickAcknowledgement(request); ok {
+			return decision, nil
+		}
+		return ordinary(ctx, request, input)
+	}
+}
+
+func TestDialogueReactionPersistsWithoutModelWorkOrDuplicateAdmission(t *testing.T) {
+	config, store := reactionConfig(t)
 	calls := 0
-	config.RouteConversation = func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+	config.RouteConversation = reactionRoute(func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
 		calls++
 		return workrun.ConversationDecision{Kind: "reply", Text: "ordinary"}, nil
-	}
+	})
 	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 	before, _ := json.Marshal(m.requests)
 	m, cmd := dialogueSubmit(t, m, "reaction-message-0001", "Thanks!")
@@ -56,12 +77,12 @@ func TestDialogueReactionPersistsWithoutModelWorkOrDuplicateAdmission(t *testing
 func TestDialogueReactionExclusionsUseOrdinaryRouterAndKeepApprovalExact(t *testing.T) {
 	for _, text := range []string{"Approved", "Okay, send it", "Thanks, now stop that task", "Haha, can you fix the bug?", "Thanks"} {
 		t.Run(text, func(t *testing.T) {
-			config, _ := dialogueConfig(t)
+			config, _ := reactionConfig(t)
 			calls := 0
-			config.RouteConversation = func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+			config.RouteConversation = reactionRoute(func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
 				calls++
 				return workrun.ConversationDecision{Kind: "reply", Text: "Please use the exact review controls."}, nil
-			}
+			})
 			m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 			m.running = true
 			m.interaction = &workrun.Interaction{ID: 23}
@@ -75,12 +96,12 @@ func TestDialogueReactionExclusionsUseOrdinaryRouterAndKeepApprovalExact(t *test
 		})
 	}
 	for _, plan := range []bool{false, true} {
-		config, _ := dialogueConfig(t)
+		config, _ := reactionConfig(t)
 		calls := 0
-		config.RouteConversation = func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+		config.RouteConversation = reactionRoute(func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
 			calls++
 			return workrun.ConversationDecision{Kind: "reply", Text: "Inspect those inputs."}, nil
-		}
+		})
 		m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 		m.running = true
 		m.options.PlanFirst = plan
@@ -94,7 +115,7 @@ func TestDialogueReactionExclusionsUseOrdinaryRouterAndKeepApprovalExact(t *test
 	}
 }
 func TestDialogueReactionRevalidatesReviewAndRetainedRevisionBeforeCompletion(t *testing.T) {
-	config, store := dialogueConfig(t)
+	config, store := reactionConfig(t)
 	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 	m, cmd := dialogueSubmit(t, m, "stale-reaction-0001", "Thanks")
 	event := cmd()
@@ -121,7 +142,7 @@ func TestDialogueReactionRevalidatesReviewAndRetainedRevisionBeforeCompletion(t 
 	}
 }
 func TestDialogueReactionFailureAndUnconfirmedRoutesStayUnacknowledged(t *testing.T) {
-	config, store := dialogueConfig(t)
+	config, _ := reactionConfig(t)
 	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 	m, cmd := dialogueSubmit(t, m, "unconfirmed-ack-0001", "Thanks")
 	config.StartConversationID = m.conversation
@@ -135,16 +156,15 @@ func TestDialogueReactionFailureAndUnconfirmedRoutesStayUnacknowledged(t *testin
 	if m.BridgeState().Dialogue[0].Reaction != nil || m.dialogueTurns[0].State != "failed" {
 		t.Fatal("failed route manufactured an acknowledgement")
 	}
-	_ = store
 }
 
 func TestDialogueReactionOlderPageRetainsExactOutcomes(t *testing.T) {
-	config, _ := dialogueConfig(t)
+	config, _ := reactionConfig(t)
 	calls := 0
-	config.RouteConversation = func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+	config.RouteConversation = reactionRoute(func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
 		calls++
 		return workrun.ConversationDecision{Kind: "reply", Text: "ordinary"}, nil
-	}
+	})
 	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
 	var first string
 	for i := 0; i < 104; i++ {
@@ -163,5 +183,57 @@ func TestDialogueReactionOlderPageRetainsExactOutcomes(t *testing.T) {
 	m = m.LoadOlderDialogue(m.dialogueTurns[0].Sequence)
 	if len(m.dialogueTurns) != 104 || m.dialogueTurns[0].ID != first || m.BridgeState().Dialogue[0].Reaction == nil || calls != 0 {
 		t.Fatal("older page lost reaction or replayed inference")
+	}
+}
+
+func TestDialogueReactionStorageFailureNeverProjectsSuccess(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("directory permission probe requires an unprivileged process")
+	}
+	config, _ := reactionConfig(t)
+	dir := t.TempDir()
+	store, err := worksession.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chat, err := store.CreateChat(config.CurrentFolder, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.SessionStore = &store
+	config.StartConversationID = chat.ID
+	config.LoadConversation = func(id string) (ConversationState, error) {
+		c, err := store.Load(id)
+		return ConversationState{Title: c.Title, SourcePath: c.SourcePath}, err
+	}
+	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
+	m, cmd := dialogueSubmit(t, m, "failed-save-0001", "Thanks")
+	event := cmd()
+	path := filepath.Join(dir, "gator", "conversations", chat.ID, "dialogue")
+	if err = os.Chmod(path, 0500); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(path, 0700)
+	next, _ := m.Update(event)
+	m = next.(Model)
+	if m.dialogueIssue == "" || m.BridgeState().Dialogue[0].Reaction != nil || m.dialogueTurns[0].Response != "" {
+		t.Fatal("storage failure appeared as a confirmed reaction")
+	}
+	persisted, err := store.ReadDialogue(chat.ID, m.dialogueTurns[0].ID)
+	if err != nil || persisted.State != "routing" || persisted.Response != "" {
+		t.Fatal("failed commit changed durable outcome", err)
+	}
+}
+
+func TestDialogueReactionCannotSkipCanonicalRouteValidation(t *testing.T) {
+	config, _ := reactionConfig(t)
+	config.RouteConversation = func(context.Context, workrun.ConversationRequest, ConversationInput) (workrun.ConversationDecision, error) {
+		return workrun.ConversationDecision{}, fmt.Errorf("inert processing scope changed")
+	}
+	m := New(config).ConfigureDialogueHost(DialogueHost{CanStart: true})
+	m, cmd := dialogueSubmit(t, m, "scope-reaction-0001", "Thanks!")
+	m = routeDialogue(t, m, cmd)
+	if m.dialogueTurns[0].State != "failed" || m.BridgeState().Dialogue[0].Reaction != nil {
+		t.Fatal("reaction bypassed canonical route validation")
 	}
 }

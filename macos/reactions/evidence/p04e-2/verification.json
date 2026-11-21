@@ -1,0 +1,145 @@
+[
+  {
+    "name": "host-node26",
+    "command": [
+      "npm",
+      "test",
+      "--prefix",
+      "app-host"
+    ],
+    "startedUTC": "2026-11-20T09:26:59.734887+00:00",
+    "seconds": 8.695271165983286,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "go-all",
+    "command": [
+      "go",
+      "test",
+      "-count=1",
+      "-json",
+      "./internal/workrun",
+      "./internal/worksession",
+      "./internal/workapp",
+      "./cmd/gator"
+    ],
+    "startedUTC": "2026-11-20T09:26:59.734677+00:00",
+    "seconds": 61.606466291996185,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "go-race",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-json",
+      "./internal/workrun",
+      "./internal/worksession",
+      "./internal/workapp"
+    ],
+    "startedUTC": "2026-11-20T09:28:01.363640+00:00",
+    "seconds": 52.193161458999384,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "classifier-benchmark",
+    "command": [
+      "go",
+      "test",
+      "./internal/workrun",
+      "-run",
+      "^$",
+      "-bench",
+      "BenchmarkQuickAcknowledgement",
+      "-benchmem",
+      "-count=3"
+    ],
+    "startedUTC": "2026-11-20T09:28:53.590458+00:00",
+    "seconds": 4.9103729580238,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "swift-build",
+    "command": [
+      "swift",
+      "build",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build"
+    ],
+    "startedUTC": "2026-11-20T09:26:59.734396+00:00",
+    "seconds": 1.389582125004381,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "swift-full",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel"
+    ],
+    "startedUTC": "2026-11-20T09:27:01.148620+00:00",
+    "seconds": 174.9834228749969,
+    "exit": 0,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "swift-full-strict",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors"
+    ],
+    "startedUTC": "2026-11-20T09:29:56.152416+00:00",
+    "seconds": 17.23358704097336,
+    "exit": 1,
+    "runtime": "/tmp/Gator-Native-P04E2-Reactions.app/Contents/Resources/gator-runtime",
+    "runtimeSHA256": "30ebddf63efb4d5c154fe3a97bb62efc7789c8e0f7e6cf116951f4341ab138e1"
+  },
+  {
+    "name": "swift-full-strict-final",
+    "command": [
+      "swift",
+      "test",
+      "--package-path",
+      "macos",
+      "--scratch-path",
+      "/tmp/gator-native-build",
+      "--no-parallel",
+      "-Xswiftc",
+      "-strict-concurrency=complete",
+      "-Xswiftc",
+      "-warnings-as-errors"
+    ],
+    "startedUTC": "2026-11-20T09:32:07.725682+00:00",
+    "seconds": 148.12770116698812,
+    "exit": 0,
+    "note": "Same production source/bundle; appearance test retains its nonnil assertion in a local binding to avoid optional context inference."
+  }
+]

@@ -1,0 +1,117 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[2/6] Write swift-version--58304C5D6DBC2206.txt
+[4/8] Compiling GatorMac NativeMessageReactionView.swift
+[5/8] Emitting module GatorMac
+[6/11] Compiling GatorMac GatorApp.swift
+[7/11] Compiling GatorMac NativeMascotPreferences.swift
+[8/11] Compiling GatorMac ConversationView.swift
+[8/13] Write Objects.LinkFileList
+[9/13] Linking GatorMac
+[10/13] Applying GatorMac
+[12/16] Emitting module GatorMacTests
+[13/16] Compiling GatorMacTests NativeMessageReactionTests.swift
+/Users/gongahkia/Desktop/coding/projects/gator/macos/Tests/GatorMacTests/NativeMessageReactionTests.swift:93:44: warning: '#require(_:_:)' is redundant because 'NSAppearance(named: name)' never equals 'nil' (from macro 'require')
+ 91 |         for reduced in [false, true] {
+ 92 |             let host = NSHostingView(rootView: NativeMessageReactionChip(reaction: reaction).transaction { $0.disablesAnimations = reduced })
+ 93 |             host.appearance = try #require(NSAppearance(named: name))
+    |                                            `- warning: '#require(_:_:)' is redundant because 'NSAppearance(named: name)' never equals 'nil' (from macro 'require')
+ 94 |             let size = host.fittingSize
+ 95 |             #expect(size.width >= 20 && size.width < 60 && size.height >= 16 && size.height < 45)
+[14/16] Compiling GatorMacTests NativeReactionGoTests.swift
+[14/16] Write Objects.LinkFileList
+[15/16] Linking GatorNativePackageTests
+Build complete! (10.26s)
+Test Suite 'Selected tests' started at 2026-11-20 17:24:50.957.
+Test Suite 'GatorNativePackageTests.xctest' started at 2026-11-20 17:24:50.958.
+Test Suite 'GatorNativePackageTests.xctest' passed at 2026-11-20 17:24:50.958.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-20 17:24:50.958.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() started.
+✔ Test terminalSpinnerFramesDoNotInvalidateNativeStateOrOwnerCallbacks() passed after 0.012 seconds.
+◇ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() started.
+✔ Test nativeSnapshotComparisonRetainsEveryNonSpinnerField() passed after 0.001 seconds.
+◇ Test messageReactionBindsExactConversationTurnAndRevision() started.
+✔ Test messageReactionBindsExactConversationTurnAndRevision() passed after 0.002 seconds.
+◇ Test messageReactionRejectsUnconfirmedFailedAndMalformedOutcomes() started.
+✔ Test messageReactionRejectsUnconfirmedFailedAndMalformedOutcomes() passed after 0.001 seconds.
+◇ Test messageReactionModesPreserveFallbackAndStableOriginalIdentity() started.
+✔ Test messageReactionModesPreserveFallbackAndStableOriginalIdentity() passed after 0.001 seconds.
+◇ Test messageReactionPreferencePersistsWithoutChangingPresenceOrStreaming() started.
+✔ Test messageReactionPreferencePersistsWithoutChangingPresenceOrStreaming() passed after 0.003 seconds.
+◇ Test messageReactionSearchAndReadingAnchorsFollowPresentedMessagesOnly() started.
+✔ Test messageReactionSearchAndReadingAnchorsFollowPresentedMessagesOnly() passed after 0.001 seconds.
+◇ Test messageReactionDoesNotReplayOrMutateAnUnrelatedStream() started.
+✔ Test messageReactionDoesNotReplayOrMutateAnUnrelatedStream() passed after 0.001 seconds.
+◇ Test messageReactionNativeChipFitsCompactAndAllNativeAppearances() started.
+✔ Test messageReactionNativeChipFitsCompactAndAllNativeAppearances() passed after 0.040 seconds.
+◇ Test messageReactionActualRowLayoutAndHeadlessCaptures() started.
+✔ Test messageReactionActualRowLayoutAndHeadlessCaptures() passed after 0.048 seconds.
+◇ Test messageReactionResourceTrial() started.
+✔ Test messageReactionResourceTrial() passed after 0.001 seconds.
+◇ Test messageReactionNeverHidesAnUnrelatedOrStructuredMessage() started.
+✔ Test messageReactionNeverHidesAnUnrelatedOrStructuredMessage() passed after 0.001 seconds.
+◇ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() started.
+✔ Test streamingRealGoPublicDeltasRetainExactIdentityAndSettleWithoutAdmission() passed after 0.784 seconds.
+◇ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() started.
+✔ Test streamingNativeComponentFitsFullCompactAndLongStatusWithoutFocus() passed after 0.051 seconds.
+◇ Test streamingNativeComponentEvidenceCapture() started.
+✔ Test streamingNativeComponentEvidenceCapture() passed after 0.004 seconds.
+◇ Test streamingHostedPresentationResourceTrial() started.
+✔ Test streamingHostedPresentationResourceTrial() passed after 0.001 seconds.
+◇ Test messageReactionRealGoPersistsWithoutInferenceAndRestoresDraft() started.
+✔ Test messageReactionRealGoPersistsWithoutInferenceAndRestoresDraft() passed after 0.456 seconds.
+◇ Test streamingGraphemesNeverSplitDuringReveal() started.
+✔ Test streamingGraphemesNeverSplitDuringReveal() passed after 0.049 seconds.
+◇ Test streamingProviderDeltaCanExtendPreviousGrapheme() started.
+✔ Test streamingProviderDeltaCanExtendPreviousGrapheme() passed after 0.001 seconds.
+◇ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() started.
+✔ Test streamingAdaptiveBatchingBoundsBacklogAndAcceleratesBursts() passed after 0.012 seconds.
+◇ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() started.
+✔ Test streamingReplacementTruncationClearAndRawUnicodeAreAuthoritative() passed after 0.001 seconds.
+◇ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() started.
+✔ Test streamingHistoryOwnerGenerationReconnectionAndCompletionBypassReplay() passed after 0.001 seconds.
+◇ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() started.
+✔ Test streamingProjectionRequiresExactPublicIdentityAndSelectedGeneration() passed after 0.001 seconds.
+◇ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() started.
+✔ Test streamingAmbiguousMultipleTextEntriesStayStaticWithUniqueRowIDs() passed after 0.001 seconds.
+◇ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() started.
+✔ Test streamingPolicyDisablesMotionForEverySafetyAndVisibilityBoundary() passed after 0.001 seconds.
+◇ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() started.
+✔ Test streamingPreferencePersistsIndependentlyWithoutReenablingPresence() passed after 0.001 seconds.
+◇ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() started.
+✔ Test streamingMarkdownBlocksRemainNativeAndFormattedContentBypassesCadence() passed after 0.001 seconds.
+◇ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() started.
+✔ Test streamingCopyPreservesExactConfirmedMarkdownAndUnicode() passed after 0.001 seconds.
+◇ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() started.
+✔ Test streamingCompletionAndHiddenCancellationFlushWithoutRetainingCadence() passed after 0.001 seconds.
+◇ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() started.
+✔ Test streamingCadenceDoesNotRetainReleasedViewModelOrReadingAnchors() passed after 0.001 seconds.
+◇ Test streamingRepeatedIndependentPresentationsCancelAllTasks() started.
+✔ Test streamingRepeatedIndependentPresentationsCancelAllTasks() passed after 0.005 seconds.
+◇ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() started.
+✔ Test streamingStatusPrecedenceNeverPulsesAnExactReviewOrClaimsSuccess() passed after 0.001 seconds.
+◇ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() started.
+✔ Test streamingPulseHasBoundedOpacityAndTerminatesOnOwnerOrPolicyChanges() passed after 0.001 seconds.
+◇ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() started.
+✔ Test streamingVisibilityProbeHasNoFocusAndReleasesObservers() passed after 0.001 seconds.
+◇ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() started.
+✔ Test streamingWelcomeAndReadinessRemediationReflectExistingNativeWorkflow() passed after 0.001 seconds.
+◇ Test streamingPulseContrastRemainsReadableInNativeAppearances() started.
+✔ Test streamingPulseContrastRemainsReadableInNativeAppearances() passed after 0.001 seconds.
+◇ Test streamingOwnerReplacementCancelsPreviousCadenceImmediately() started.
+✔ Test streamingOwnerReplacementCancelsPreviousCadenceImmediately() passed after 0.001 seconds.
+◇ Test streamingEquatableMarkdownDoesNotHideMeaningfulUnicodeReplacement() started.
+✔ Test streamingEquatableMarkdownDoesNotHideMeaningfulUnicodeReplacement() passed after 0.001 seconds.
+◇ Test streamingEmptyActivityDisclosureIsSuppressedWithoutHidingTools() started.
+✔ Test streamingEmptyActivityDisclosureIsSuppressedWithoutHidingTools() passed after 0.001 seconds.
+◇ Test streamingTwoPresentationsCannotCreateGoOwnersOrAdmitWork() started.
+✔ Test streamingTwoPresentationsCannotCreateGoOwnersOrAdmitWork() passed after 0.001 seconds.
+◇ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() started.
+✔ Test streamingEarlierBlockReplacementFlushesTheWholeConfirmedTail() passed after 0.001 seconds.
+✔ Test run with 41 tests in 0 suites passed after 1.484 seconds.

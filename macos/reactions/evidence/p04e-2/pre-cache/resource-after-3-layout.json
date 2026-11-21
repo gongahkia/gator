@@ -1,0 +1,9 @@
+{
+  "additionalGoOwners" : 0,
+  "hostedInsertionMilliseconds" : 32.423665999999997,
+  "mode" : "after",
+  "reactionFilterMedianMilliseconds" : 7.9224170000000003,
+  "reloadProjectionMilliseconds" : 8.5138750000000005,
+  "scope" : "headless NSHostingView; no compositor\/physical scrolling or typing measurement",
+  "userRows" : 1000
+}

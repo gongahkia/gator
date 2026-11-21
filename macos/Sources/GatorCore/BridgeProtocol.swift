@@ -59,6 +59,11 @@ private extension JSONValue {
 public struct BridgeMessage: Identifiable, Sendable, Equatable {
     public let id: String
     public let value: JSONValue
+    public let messageReaction: NativeMessageReaction?
+    public init(id: String, value: JSONValue) {
+        self.id = id; self.value = value
+        messageReaction = NativeMessageReaction.bound(messageID: id, value: value)
+    }
     public var role: String { value["role"].string }
     public var text: String { value["text"].string }
     public var result: JSONValue { value["result"] }

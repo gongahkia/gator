@@ -1,7 +1,7 @@
-{"pid":92415,"phase":"empty-host","epoch":1795165423.8433781}
-{"pid":92415,"epoch":1795165427.227411,"phase":"visible-static"}
-{"pid":92415,"epoch":1795165431.487422,"phase":"preference-switch-stress"}
-{"pid":92415,"phase":"settled","epoch":1795165433.5206041}
-{"phase":"hidden-component","epoch":1795165436.7245231,"pid":92415}
-{"phase":"released-content","epoch":1795165439.825032,"pid":92415}
-{"phase":"end","epoch":1795165441.9558959,"pid":92415}
+{"epoch":1795166713.2047679,"pid":445,"phase":"empty-host"}
+{"pid":445,"phase":"visible-static","epoch":1795166716.537919}
+{"pid":445,"phase":"preference-switch-stress","epoch":1795166720.779413}
+{"phase":"settled","epoch":1795166722.7267261,"pid":445}
+{"phase":"hidden-component","epoch":1795166725.7902842,"pid":445}
+{"phase":"released-content","epoch":1795166728.984766,"pid":445}
+{"phase":"end","epoch":1795166731.0083499,"pid":445}

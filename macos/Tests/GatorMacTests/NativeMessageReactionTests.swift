@@ -90,7 +90,8 @@ private func reactionSnapshot(_ turns: [JSONValue], conversation: String = "chat
     for name in [NSAppearance.Name.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua] {
         for reduced in [false, true] {
             let host = NSHostingView(rootView: NativeMessageReactionChip(reaction: reaction).transaction { $0.disablesAnimations = reduced })
-            host.appearance = try #require(NSAppearance(named: name))
+            let appearance = try #require(NSAppearance(named: name))
+            host.appearance = appearance
             let size = host.fittingSize
             #expect(size.width >= 20 && size.width < 60 && size.height >= 16 && size.height < 45)
         }
@@ -106,7 +107,7 @@ private var reactionEvidence: URL {
     defaults.set("subtle", forKey: NativeQuickReactionMode.preference)
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let sessions = ManagedSessionCoordinator(configuration: .init(runtime: root.appendingPathComponent("not-a-runtime"), workspace: root), nativeDraftDirectory: root.appendingPathComponent("drafts"), profile: "render")
-    let laughter = reactionTurn(id: "turn-B", kind: "laughter", overrides: ["text": .string("Haha that's hilarious"), "response": .string("Glad that made you smile.")], metadata: ["emoji": .string("😂")])
+    let laughter = reactionTurn(id: "turn-B", kind: "laughter", overrides: ["text": .string("Haha that's hilarious"), "response": .string("Haha!")], metadata: ["emoji": .string("😂")])
     let messages = NativeQuickReactionMode.transcript(reactionSnapshot([reactionTurn(), laughter]).transcript, mode: .subtle)
     for dark in [false, true] {
         for width: CGFloat in [380, 780] {
@@ -116,7 +117,8 @@ private var reactionEvidence: URL {
             }.padding(20).frame(width: width).background(Color(nsColor: .windowBackgroundColor))
                 .environment(sessions).defaultAppStorage(defaults).environment(\.colorScheme, dark ? .dark : .light)
             let host = NSHostingView(rootView: view)
-            host.appearance = try #require(NSAppearance(named: dark ? .darkAqua : .aqua))
+            let appearance = try #require(NSAppearance(named: dark ? .darkAqua : .aqua))
+            host.appearance = appearance
             host.frame = CGRect(origin: .zero, size: host.fittingSize); host.layoutSubtreeIfNeeded()
             #expect(host.fittingSize.height < 380 && host.fittingSize.width <= width + 1)
             if ProcessInfo.processInfo.environment["GATOR_REACTION_CAPTURE"] == "1" {
@@ -200,4 +202,18 @@ private struct ReactionResourceRows: View {
     func ms(_ duration: Duration) -> Double { Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15 }
     let metrics: [String: Any] = ["mode": mode, "userRows": 1000, "reloadProjectionMilliseconds": ms(reload), "reactionFilterMedianMilliseconds": times.sorted()[times.count / 2], "hostedInsertionMilliseconds": ms(layout), "additionalGoOwners": 0, "scope": "headless NSHostingView; no compositor/physical scrolling or typing measurement"]
     try JSONSerialization.data(withJSONObject: metrics, options: [.prettyPrinted, .sortedKeys]).write(to: reactionEvidence.appendingPathComponent("resource-\(mode)-layout.json"))
+}
+
+@Test @MainActor func messageReactionNeverHidesAnUnrelatedOrStructuredMessage() {
+    let raw = reactionSnapshot([reactionTurn()]).transcript
+    let unrelated = [
+        BridgeMessage(id: "conversation:chat-A:work:approval", value: .object(["role": .string("Approval"), "text": .string("Exact review"), "reaction_for": .string(raw[0].id)])),
+        BridgeMessage(id: "conversation:chat-A:work:other", value: .object(["role": .string("Gator"), "text": .string("Substantive answer"), "reaction_for": .string(raw[0].id)]))
+    ]
+    let visible = NativeQuickReactionMode.transcript(raw + unrelated, mode: .subtle)
+    #expect(visible.map(\.id) == [raw[0].id] + unrelated.map(\.id))
+    for message in unrelated {
+        let saved = NativeReadingPositions.Position(anchor: message.id, following: false)
+        #expect(NativeQuickReactionMode.position(saved, raw: raw + unrelated, mode: .subtle) == saved)
+    }
 }

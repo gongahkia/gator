@@ -1,0 +1,115 @@
+{
+  "go-all": {
+    "github.com/gongahkia/gator/cmd/gator": {
+      "includingSubtests": {
+        "pass": 477,
+        "skip": 13,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 365,
+        "skip": 13,
+        "fail": 0
+      },
+      "skipped": [
+        "TestLiveAgentContinuity",
+        "TestJobSystemdManagesOnlyItsUserUnit",
+        "TestNativeDesktopLocalVoice",
+        "TestLiveDynamicAgents",
+        "TestLiveInternalAgentLifecycle",
+        "TestNativeLaunchAgentExecutableRelocation",
+        "TestLocalFirstAuditConfigWriterHelper",
+        "TestLiveMemoryEvaluation",
+        "TestLiveTinyfishSearch",
+        "TestLiveProjectFollowup",
+        "TestLiveDesktopUI",
+        "TestLiveProjectWatch",
+        "TestLivePublicWebResearch"
+      ]
+    },
+    "github.com/gongahkia/gator/internal/workapp": {
+      "includingSubtests": {
+        "pass": 358,
+        "skip": 0,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 259,
+        "skip": 0,
+        "fail": 0
+      },
+      "skipped": []
+    },
+    "github.com/gongahkia/gator/internal/workrun": {
+      "includingSubtests": {
+        "pass": 231,
+        "skip": 1,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 157,
+        "skip": 1,
+        "fail": 0
+      },
+      "skipped": [
+        "TestLiveSubagentManager"
+      ]
+    },
+    "github.com/gongahkia/gator/internal/worksession": {
+      "includingSubtests": {
+        "pass": 100,
+        "skip": 0,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 71,
+        "skip": 0,
+        "fail": 0
+      },
+      "skipped": []
+    }
+  },
+  "go-race": {
+    "github.com/gongahkia/gator/internal/workapp": {
+      "includingSubtests": {
+        "pass": 358,
+        "skip": 0,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 259,
+        "skip": 0,
+        "fail": 0
+      },
+      "skipped": []
+    },
+    "github.com/gongahkia/gator/internal/workrun": {
+      "includingSubtests": {
+        "pass": 231,
+        "skip": 1,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 157,
+        "skip": 1,
+        "fail": 0
+      },
+      "skipped": [
+        "TestLiveSubagentManager"
+      ]
+    },
+    "github.com/gongahkia/gator/internal/worksession": {
+      "includingSubtests": {
+        "pass": 100,
+        "skip": 0,
+        "fail": 0
+      },
+      "topLevel": {
+        "pass": 71,
+        "skip": 0,
+        "fail": 0
+      },
+      "skipped": []
+    }
+  }
+}

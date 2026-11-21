@@ -10,8 +10,6 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
-// DialogueMessage projects public content and input references, never captured
-// execution options or another owner's approval token.
 type DialogueReaction struct {
 	Kind           string `json:"kind"`
 	Version        int    `json:"version"`
@@ -21,6 +19,9 @@ type DialogueReaction struct {
 	Emoji          string `json:"emoji"`
 	Level          string `json:"level"`
 }
+
+// DialogueMessage projects public content and input references, never captured
+// execution options or another owner's approval token.
 type DialogueMessage struct {
 	Revision        uint64            `json:"revision"`
 	Reaction        *DialogueReaction `json:"reaction,omitempty"`

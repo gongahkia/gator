@@ -145,6 +145,12 @@ func routeInteractiveConversation(stateDir string) func(context.Context, workrun
 		if err := verifyConversationScopeFor(input, true); err != nil {
 			return workrun.ConversationDecision{}, err
 		}
+		if err := ctx.Err(); err != nil {
+			return workrun.ConversationDecision{}, err
+		}
+		if decision, ok := workrun.QuickAcknowledgement(request); ok {
+			return decision, nil
+		}
 		provider, model, err := resolveConfiguredProvider(input.RunOptions.ModelProvider, input.RunOptions.ModelName)
 		if err != nil {
 			return workrun.ConversationDecision{}, err

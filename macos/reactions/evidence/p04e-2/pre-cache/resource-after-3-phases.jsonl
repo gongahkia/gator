@@ -1,0 +1,7 @@
+{"pid":94441,"phase":"empty-host","epoch":1795165788.664268}
+{"pid":94441,"epoch":1795165792.0606809,"phase":"visible-static"}
+{"pid":94441,"epoch":1795165796.1675282,"phase":"preference-switch-stress"}
+{"phase":"settled","pid":94441,"epoch":1795165798.1842608}
+{"phase":"hidden-component","pid":94441,"epoch":1795165801.38431}
+{"phase":"released-content","pid":94441,"epoch":1795165804.421382}
+{"phase":"end","pid":94441,"epoch":1795165806.549511}

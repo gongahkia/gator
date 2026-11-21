@@ -396,9 +396,6 @@ func (m Model) startConversationRoute() (tea.Model, tea.Cmd) {
 	request.AcknowledgementBlocked = input.RunOptions.RefreshSource || m.acknowledgementBlocked() || !workrun.AcknowledgementContextSafe(input.TaskContext, input.Recent)
 	route, conversation := m.config.RouteConversation, m.conversation
 	return m, func() tea.Msg {
-		if decision, ok := workrun.QuickAcknowledgement(request); ok && ctx.Err() == nil {
-			return conversationRouted{Conversation: conversation, TurnID: id, Revision: turn.Revision, Request: request, Decision: decision}
-		}
 		decision, err := route(ctx, request, input)
 		return conversationRouted{Conversation: conversation, TurnID: id, Revision: turn.Revision, Request: request, Decision: decision, Err: err}
 	}
@@ -597,7 +594,7 @@ func (m Model) FinishDialogueDispatch(result DialogueDispatchResult) (tea.Model,
 // These gates do not authorize anything; they decline the shortcut and leave
 // existing inspection/routing/approval machinery in control.
 func (m Model) acknowledgementBlocked() bool {
-	return m.quitting || m.interaction != nil || len(m.pendingInteractions) > 0 || m.pendingConnection() != "" || m.bridgeExternal != nil || m.sessionRequest != nil || m.planPreparing != "" || m.planRevising != "" || m.receiptBusy || len(m.actionRecoveries) > 0 || len(m.requestRecoveryViews()) > 0 || m.dialogueIssue != ""
+	return m.quitting || m.interaction != nil || len(m.pendingInteractions) > 0 || m.pendingConnection() != "" || m.bridgeExternal != nil || m.sessionRequest != nil || m.planPreparing != "" || m.planRevising != "" || m.receiptBusy || len(m.actionRecoveries) > 0 || m.actionRecoveryIssue != "" || m.actionRecoveryTruncated || len(m.requestRecoveryViews()) > 0 || m.dialogueIssue != ""
 }
 
 func (m Model) canQuickAcknowledge(request BridgeUploadSubmission, text string) bool {

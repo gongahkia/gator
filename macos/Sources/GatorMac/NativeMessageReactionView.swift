@@ -13,12 +13,20 @@ enum NativeQuickReactionMode: String, CaseIterable {
             guard let reaction = message.messageReaction, mode.displays(reaction) else { return nil }
             return message.id
         })
-        return messages.filter { !reacted.contains($0.value["reaction_for"].string) }
+        return messages.filter { message in
+            let target = message.value["reaction_for"].string
+            guard reacted.contains(target), isFallback(message, for: target) else { return true }
+            return false
+        }
+    }
+    private static func isFallback(_ message: BridgeMessage, for userID: String) -> Bool {
+        message.role == "Gator" && !message.isStructured && userID.hasSuffix(":user") &&
+        message.id.utf8.elementsEqual((String(userID.dropLast(5)) + ":response").utf8)
     }
     static func position(_ saved: NativeReadingPositions.Position, raw: [BridgeMessage], mode: Self) -> NativeReadingPositions.Position {
         guard !saved.following, let anchor = saved.anchor, let response = raw.first(where: { $0.id == anchor }),
               let user = raw.first(where: { $0.id == response.value["reaction_for"].string }),
-              let reaction = user.messageReaction, mode.displays(reaction) else { return saved }
+              let reaction = user.messageReaction, mode.displays(reaction), isFallback(response, for: user.id) else { return saved }
         return .init(anchor: user.id, following: false)
     }
 }

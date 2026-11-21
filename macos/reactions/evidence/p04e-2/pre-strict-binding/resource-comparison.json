@@ -1,0 +1,88 @@
+{
+  "before": {
+    "empty-host": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 45.515625,
+      "footprintMiBMedian": 10.203765869140625,
+      "largestLifetimePeakMiB": 10.235015869140625
+    },
+    "visible-static": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 56.8203125,
+      "footprintMiBMedian": 17.41472625732422,
+      "largestLifetimePeakMiB": 17.51628875732422
+    },
+    "preference-switch-stress": {
+      "cpuMedian": 1.0748125708973917,
+      "rssMiBMedian": 56.9765625,
+      "footprintMiBMedian": 17.55535125732422,
+      "largestLifetimePeakMiB": 17.81316375732422
+    },
+    "settled": {
+      "cpuMedian": 0.022003200613292914,
+      "rssMiBMedian": 56.984375,
+      "footprintMiBMedian": 17.56316375732422,
+      "largestLifetimePeakMiB": 17.81316375732422
+    },
+    "hidden-component": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.03125,
+      "footprintMiBMedian": 17.59441375732422,
+      "largestLifetimePeakMiB": 17.87566375732422
+    },
+    "released-content": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.03125,
+      "footprintMiBMedian": 17.59441375732422,
+      "largestLifetimePeakMiB": 17.87566375732422
+    },
+    "layout": {
+      "reloadProjectionMilliseconds": 13.589167,
+      "reactionFilterMedianMilliseconds": 0.93425,
+      "hostedInsertionMilliseconds": 23.018208
+    }
+  },
+  "after": {
+    "empty-host": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 45.578125,
+      "footprintMiBMedian": 10.313163757324219,
+      "largestLifetimePeakMiB": 10.375640869140625
+    },
+    "visible-static": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 57.6328125,
+      "footprintMiBMedian": 17.66472625732422,
+      "largestLifetimePeakMiB": 17.81316375732422
+    },
+    "preference-switch-stress": {
+      "cpuMedian": 3.0330711097381253,
+      "rssMiBMedian": 57.9765625,
+      "footprintMiBMedian": 18.00066375732422,
+      "largestLifetimePeakMiB": 18.188186645507812
+    },
+    "settled": {
+      "cpuMedian": 0.02695724113804862,
+      "rssMiBMedian": 57.984375,
+      "footprintMiBMedian": 18.07878875732422,
+      "largestLifetimePeakMiB": 18.188186645507812
+    },
+    "hidden-component": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 58.0,
+      "footprintMiBMedian": 18.09441375732422,
+      "largestLifetimePeakMiB": 18.188186645507812
+    },
+    "released-content": {
+      "cpuMedian": 0.0,
+      "rssMiBMedian": 58.0,
+      "footprintMiBMedian": 18.09441375732422,
+      "largestLifetimePeakMiB": 18.188186645507812
+    },
+    "layout": {
+      "reloadProjectionMilliseconds": 25.770625,
+      "reactionFilterMedianMilliseconds": 0.985458,
+      "hostedInsertionMilliseconds": 23.34225
+    }
+  }
+}
